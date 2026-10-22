@@ -67,3 +67,9 @@ Development can be temporarily broken on feature branches. Run narrow local chec
 - [تست Chromium با داده ساختگی و شواهد تصویری](docs/BROWSER-E2E-2026-10-23.fa.md)
 
 `quality-gates` اکنون علاوه بر تست‌های معمول Python/Node، یک مرحله مرورگر Chromium دارد. موفقیت این گیت ادعای آنلاین بودن نسخه production یا تماس واقعی با فروشگاه نیست.
+
+## اتصال BoxAPI ویژهٔ هکاتون
+
+[راهنمای فارسی دریافت اعتبار، تنظیم کلید خصوصی و آزمون واقعی BoxAPI](docs/BOXAPI-HACKATHON.fa.md).
+هنگام انتخاب `LLM_PROVIDER=boxapi`، درخواست چت تنها از فیلدهای مستند `model` و `messages` استفاده می‌کند و توکن فقط به نشانی رسمی HTTPS BoxAPI ارسال می‌شود.
+این اتصال در حال حاضر برای **استخراج نیت خرید** است؛ اطلاعات محصول، قیمت، موجودی و فروشگاه صرفاً از دیتابیس و ابزارهای معتبر ارائه می‌شوند.

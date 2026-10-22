@@ -26,12 +26,22 @@ def configuration_diagnostics() -> dict[str, Any]:
     """Return safe configuration flags; never expose the key, model name, or base URL."""
     enabled = bool(getattr(settings, "LLM_ENABLED", True))
     provider = str(getattr(settings, "LLM_PROVIDER", "openai_compatible")).strip()
-    provider_supported = provider in {"openai", "openai_compatible"}
+    provider_supported = provider in {"openai", "openai_compatible", "boxapi"}
     api_key_present = bool(str(getattr(settings, "LLM_API_KEY", "")).strip())
     model_present = bool(str(getattr(settings, "LLM_MODEL", "")).strip())
     base_url = str(getattr(settings, "LLM_BASE_URL", "https://api.openai.com/v1")).strip()
     parsed_url = urlparse(base_url)
     base_url_valid = parsed_url.scheme in {"https", "http"} and bool(parsed_url.netloc)
+    if provider == "boxapi":
+        # BoxAPI hackathon keys must never be sent to a different gateway.
+        # The official endpoint is https://ai.boxapi.ir/ai/v1/chat/completions.
+        base_url_valid = (
+            parsed_url.scheme == "https"
+            and parsed_url.netloc.lower() == "ai.boxapi.ir"
+            and parsed_url.path.rstrip("/") == "/ai/v1"
+            and not parsed_url.query
+            and not parsed_url.fragment
+        )
 
     if not enabled:
         status = "disabled"
@@ -136,19 +146,28 @@ def extract_intent(message: str, constraints: dict[str, Any]) -> dict[str, Any] 
             "sort": constraints.get("sort", "relevance"),
         },
     }
-    # OpenAI's current Chat Completions API prefers max_completion_tokens; several
-    # OpenAI-compatible gateways still expect the older max_tokens field.
-    token_limit_field = "max_completion_tokens" if str(settings.LLM_PROVIDER).strip() == "openai" else "max_tokens"
+    provider = str(settings.LLM_PROVIDER).strip()
     request_payload = {
         "model": model,
-        "temperature": 0,
-        token_limit_field: 250,
-        "response_format": {"type": "json_object"},
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": json.dumps(user_payload, ensure_ascii=False)},
         ],
     }
+    if provider != "boxapi":
+        # Preserve existing behavior for configured OpenAI and other gateways.
+        # Some compatible gateways still expect the older max_tokens field.
+        token_limit_field = "max_completion_tokens" if provider == "openai" else "max_tokens"
+        request_payload.update({
+            "temperature": 0,
+            token_limit_field: 250,
+            "response_format": {"type": "json_object"},
+        })
+    # BoxAPI's documented /ai/v1/chat/completions sample guarantees model +
+    # messages. Do not assume support for temperature=0, max_tokens,
+    # max_completion_tokens or response_format on every hackathon model.
+    # The system prompt requests JSON and validate_intent_payload checks it.
+    # Do NOT retry speculative parameter combinations: this is a $3 credit.
     body = json.dumps(request_payload, ensure_ascii=False).encode("utf-8")
     request = Request(
         f"{base_url}/chat/completions",
@@ -160,7 +179,8 @@ def extract_intent(message: str, constraints: dict[str, Any]) -> dict[str, Any] 
             "Accept": "application/json",
         },
     )
-    timeout = max(1.0, min(float(getattr(settings, "LLM_TIMEOUT_SECONDS", 6)), 10.0))
+    max_timeout = 20.0 if provider == "boxapi" else 10.0
+    timeout = max(1.0, min(float(getattr(settings, "LLM_TIMEOUT_SECONDS", 6)), max_timeout))
     try:
         with urlopen(request, timeout=timeout) as response:
             result = json.loads(response.read(1_000_000).decode("utf-8"))
