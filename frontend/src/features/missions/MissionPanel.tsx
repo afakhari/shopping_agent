@@ -263,6 +263,10 @@ function ProductResults({
                   </small>
                   {formatRegisteredWarranty(offer.warranty) && <small>گارانتی ثبت‌شده: {formatRegisteredWarranty(offer.warranty)}</small>}
                   <small className="mission-product-address"><MapPin size={13} aria-hidden="true" />{address}</small>
+                  {offer.shop.opening_status && <small>ساعات ثبت‌شده: {offer.shop.opening_status.label} (نه تأیید لحظه‌ای)</small>}
+                  {offer.shop.indoor_hints && [offer.shop.indoor_hints.mall, offer.shop.indoor_hints.floor, offer.shop.indoor_hints.unit].filter(Boolean).length > 0 && (
+                    <small>راهنمای نشانی: {[offer.shop.indoor_hints.mall, offer.shop.indoor_hints.floor, offer.shop.indoor_hints.unit].filter(Boolean).join('، ')}</small>
+                  )}
                   {distanceLabel && <small className="mission-product-distance"><LocateFixed size={13} aria-hidden="true" />فاصلهٔ مستقیم: {distanceLabel}</small>}
                   {mapUrl && <a className="mission-map-link" href={mapUrl} target="_blank" rel="noopener noreferrer">
                     <MapPin size={13} aria-hidden="true" /> نمایش موقعیت ثبت‌شده روی نقشه <ExternalLink size={12} aria-hidden="true" />
@@ -330,6 +334,10 @@ function ProductResults({
                           {sellerOffer.seller_title && <small>عنوان ثبت‌شده فروشنده: {sellerOffer.seller_title}</small>}
                           {formatRegisteredWarranty(sellerOffer.warranty) && <small>گارانتی ثبت‌شده: {formatRegisteredWarranty(sellerOffer.warranty)}</small>}
                           <small><MapPin size={12} />{sellerOffer.shop.address ?? sellerOffer.shop.location_label ?? 'نشانی ثبت نشده'}</small>
+                          {sellerOffer.shop.opening_status && <small>{sellerOffer.shop.opening_status.label} (طبق ساعات ثبت‌شده، نه تأیید واقعی)</small>}
+                          {sellerOffer.shop.indoor_hints && [sellerOffer.shop.indoor_hints.mall, sellerOffer.shop.indoor_hints.floor, sellerOffer.shop.indoor_hints.unit].filter(Boolean).length > 0 && (
+                            <small>داخل مجتمع: {[sellerOffer.shop.indoor_hints.mall, sellerOffer.shop.indoor_hints.floor, sellerOffer.shop.indoor_hints.unit].filter(Boolean).join('، ')}</small>
+                          )}
                           {sellerDistance && <small><LocateFixed size={12} />فاصله مستقیم: {sellerDistance}</small>}
                           {sellerMapUrl && <a className="mission-offer-map" href={sellerMapUrl} target="_blank" rel="noopener noreferrer"><MapPin size={12} /> نمایش روی نقشه <ExternalLink size={11} /></a>}
                           <div className="mission-offer-badges">

@@ -33,6 +33,13 @@ export interface CatalogShop {
   lon: number | null
   distance_m: number | null
   accepts_in_person_credit: boolean
+  opening_status?: {
+    status: 'open' | 'closed' | 'unknown'
+    label: string
+    source: string
+    checked_at: string
+  }
+  indoor_hints?: { mall?: string; floor?: string; unit?: string }
 }
 
 export interface CatalogOffer {
