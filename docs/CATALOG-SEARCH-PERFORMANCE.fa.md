@@ -41,3 +41,23 @@ Measure-Command { Invoke-RestMethod -Uri $url -TimeoutSec 25 | Out-Null }
 - اگر همه مراحل سریع بودند ولی HTTP کند بود، proxy/Gunicorn/connection pool بررسی شوند.
 
 **چیزی پاک یا reset نمی‌شود.** در صورت عدم بهبود، از PR/merge خودداری می‌کنیم و بر اساس `query_plan_nodes` اصلاح بعدی را انجام می‌دهیم.
+
+
+## اندازه‌گیری واقعی بعد از ساخت چهار ایندکس (۲۳ اکتبر ۲۰۲۶)
+
+تست توسط مالک پروژه روی ویندوز، Docker، PostgreSQL 17 و **دیتاست واقعی مسابقه** اجرا شد. در این اندازه‌گیری عبارت «هدفون» همچنان ۱٬۴۵۸ نتیجه برگرداند:
+
+| مرحله | قبل از تکمیل ایندکس | بعد از تکمیل ایندکس | نسبت بهبود تقریبی |
+|---|---:|---:|---:|
+| text_candidate_count | 854.6 ms | 16.9 ms | 50.6× |
+| eligible_product_count | 6030.1 ms | 34.9 ms | 172.8× |
+| full_search_page_size_1 | 2416.8 ms | 79.6 ms | 30.4× |
+| HTTP واقعی localhost:8080 | timeout حدود 26 ثانیه (قبل از رفع گلوگاه) | **0.29 ثانیه با HTTP 200** | پاسخ موفق |
+
+چهار ایندکس `product_title_ci_trgm_idx`، `product_category_ci_trgm_idx`، `product_brand_ci_trgm_idx` و `product_model_ci_trgm_idx` با `valid=true` دیده شدند. Query Plan از Bitmap Index Scan روی هر چهار ایندکس و Index Only Scan روی `offer_prod_price_idx` استفاده کرده است.
+
+### توضیح خطای موقت 502
+
+پس از rebuild، یک درخواست زودهنگام به Nginx قبل از آماده‌شدن Gunicorn با `Connection refused` و 502 برخورد کرد. لاگ نشان می‌دهد مهاجرت catalog.0005 پایان یافته و Gunicorn پس از آن شروع کرده است. پس از readiness و بازسازی frontend همان URL با HTTP 200 پاسخ داد. این خطا نشان‌دهنده خرابی دیتاست یا BoxAPI نبود.
+
+**محدودیت شواهد:** این‌ها یک مجموعه اندازه‌گیری در یک سیستم محلی‌اند و به معنی تضمین p95 یا عملکرد همه عبارت‌ها/فیلترهای دسته، بودجه، اعتبار و فاصله نیستند. CI باید صحت نتیجه‌ها را بررسی کند؛ تکرار benchmark روی چند پرس‌وجو برای انتشار عمومی توصیه می‌شود. برای تأیید performance پیش از ادغام، نتایج محلی کاربر کافی است؛ CI نباید داده مسابقه را دریافت کند.
