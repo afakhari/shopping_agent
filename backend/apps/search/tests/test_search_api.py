@@ -194,6 +194,32 @@ class CatalogSearchApiTests(TestCase):
         self.assertEqual(response.json()["total"], 0)
         self.assertEqual(response.json()["results"], [])
 
+    def test_search_uses_semijoin_and_preserves_distinct_products(self):
+        # The production dataset has many sellers per product: duplicates must
+        # not distort total, pagination or cheapest eligible offer ordering.
+        from django.db.models import Exists, OuterRef
+        from apps.search.services import _product_match_query, eligible_offers
+
+        filters = {
+            "normalized_query": "هدفون",
+            "q": "هدفون",
+            "sort": "relevance",
+            "page": 1,
+            "page_size": 20,
+        }
+        qs = Product.objects.filter(_product_match_query(filters["normalized_query"]))
+        qs = qs.filter(
+            Exists(eligible_offers(filters).order_by().filter(product_id=OuterRef("source_id")))
+        )
+        statement = str(qs.query).upper()
+        self.assertIn("EXISTS", statement)
+        self.assertNotIn("DISTINCT", statement)
+        response = self.client.get("/api/v1/catalog/search/", {"q": "هدفون"})
+        self.assertEqual(response.status_code, 200, response.content)
+        ids = [row["product"]["id"] for row in response.json()["results"]]
+        self.assertEqual(len(ids), len(set(ids)))
+        self.assertEqual(response.json()["total"], 2)
+
     def test_pagination_is_applied_after_unique_product_filtering(self):
         response = self.client.get(
             "/api/v1/catalog/search/", {"q": "هدفون", "page": "2", "page_size": "1"}

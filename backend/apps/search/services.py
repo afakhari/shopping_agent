@@ -14,6 +14,7 @@ from django.db.models import (
     FloatField,
     IntegerField,
     OuterRef,
+    Exists,
     Q,
     Subquery,
     Value,
@@ -189,7 +190,13 @@ def product_search_page(filters: dict[str, Any]) -> dict[str, Any]:
     products = Product.objects.filter(_product_match_query(normalized_query))
     if category_scope is not None:
         products = products.filter(category_scope.query)
-    products = products.filter(offers__in=offers.order_by().values("source_id")).distinct()
+    # One Boolean semi-join per candidate product. Unlike joining Offer plus
+    # DISTINCT, this cannot duplicate product rows and can use the offer
+    # product_id index to stop at the first eligible offer.
+    # Keep all hard filters inside eligible_offers() (budget/credit/location).
+    products = products.filter(
+        Exists(offers.order_by().filter(product_id=OuterRef("source_id")))
+    )
     total = products.count()
 
     has_origin = filters.get("lat") is not None and filters.get("lon") is not None
