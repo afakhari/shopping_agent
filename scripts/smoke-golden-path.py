@@ -186,6 +186,64 @@ def classify_llm_runtime(parser_used: str, config_status: str, agent_mode: str) 
     return "UNKNOWN", f"parser={parser_used}; llm_config={config_status}; agent_mode={agent_mode}"
 
 
+def pick_recovery_offer(contact: dict[str, Any]) -> dict[str, str] | None:
+    """Choose a real eligible backup from the server response, never synthesize an offer."""
+    offers = contact.get("alternatives", [])
+    for offer in offers if isinstance(offers, list) else []:
+        if not isinstance(offer, dict):
+            continue
+        shop = offer.get("shop")
+        if isinstance(shop, dict) and offer.get("id") and shop.get("id"):
+            return {"offer_id": str(offer["id"]), "shop_id": str(shop["id"])}
+    products = contact.get("alternative_products", [])
+    for product in products if isinstance(products, list) else []:
+        if not isinstance(product, dict):
+            continue
+        offer = product.get("best_offer")
+        if isinstance(offer, dict):
+            shop = offer.get("shop")
+            if isinstance(shop, dict) and offer.get("id") and shop.get("id"):
+                return {"offer_id": str(offer["id"]), "shop_id": str(shop["id"])}
+    return None
+
+
+def verify_persisted_plan(
+    base_url: str, mission_id: str, contact: dict[str, Any], offer_id: str,
+) -> None:
+    """Validate the visit plan event, its independent API and restored mission snapshot."""
+    attempt = contact.get("attempt")
+    if not isinstance(attempt, dict) or attempt.get("outcome") != "confirmed_available":
+        raise SmokeFailure("برنامه مراجعه فقط پس از نتیجه موفق شبیه‌سازی قابل تأیید است.")
+    events = contact.get("events", [])
+    if not any(
+        isinstance(event, dict)
+        and event.get("type") == "ui.component"
+        and isinstance(event.get("payload"), dict)
+        and event["payload"].get("component") == "visit_plan"
+        for event in events if isinstance(events, list)
+    ):
+        raise SmokeFailure("رویداد visit_plan بعد از تأیید موجودی دریافت نشد.")
+    url = f"/api/v1/missions/{quote(mission_id, safe='')}/"
+    status, plan, _ = request_json(base_url, url + "visit-plan/")
+    if status != 200 or plan.get("offer_id") != offer_id:
+        raise SmokeFailure(f"برنامه مراجعه آفر انتخاب‌شده را نگه نداشت: {plan.get('offer_id')}")
+    if plan.get("contact_attempt_id") != attempt.get("id"):
+        raise SmokeFailure("برنامه مراجعه به استعلام شبیه‌سازی‌شدهٔ موفق متصل نیست.")
+    details = plan.get("details")
+    if not isinstance(details, list) or not {"address", "weekly_hours"}.issubset(
+        {item.get("key") for item in details if isinstance(item, dict)}
+    ):
+        raise SmokeFailure("برنامه مراجعه آدرس و ساعت کاری ثبت‌شده را ندارد.")
+    backup = plan.get("backup_seller")
+    if isinstance(backup, dict) and "استعلام نشده" not in str(backup.get("status", "")):
+        raise SmokeFailure("برنامه مراجعه موجودی فروشنده پشتیبان را به‌اشتباه تأیید کرده است.")
+    _, snapshot, _ = request_json(base_url, url)
+    saved = snapshot.get("state", {}).get("visit_plan")
+    if saved != plan:
+        raise SmokeFailure("برنامه مراجعه بعد از بازیابی snapshot با پاسخ API تطابق ندارد.")
+    print("  PASS independent visit-plan API + persisted snapshot + honest backup status")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base-url", default="http://localhost:8080", help="ریشهٔ فرانت‌اند/پروکسی API")
@@ -193,6 +251,7 @@ def main() -> int:
     parser.add_argument("--max-price-toman", default=None, help="سقف بودجه اختیاری به تومان، بدون جداکننده")
     parser.add_argument("--in-person-credit", action="store_true", help="اعمال شرط سخت خرید اعتباری حضوری")
     parser.add_argument("--skip-contact", action="store_true", help="فقط مسیر جست‌وجو را اجرا کن؛ تماس دمو ثبت نکن")
+    parser.add_argument("--full-journey", action="store_true", help="پس از شکست شبیه‌سازی، گزینه جایگزین، تکرارنشدن استعلام و برنامه مراجعه را هم بررسی کن")
     parser.add_argument("--expect-empty", action="store_true", help="انتظار دارد رابط حالت بدون نتیجه و فرم اصلاح را نمایش دهد")
     parser.add_argument("--require-llm", action="store_true", help="اگر این turn واقعاً با LLM پردازش نشود، کد خروج غیرصفر بده")
     args = parser.parse_args()
@@ -305,7 +364,8 @@ def main() -> int:
             args.base_url,
             f"/api/v1/missions/{quote(mission_id, safe='')}/contact-attempts/",
             method="POST",
-            payload={"shop_id": shop["id"], "offer_id": offer["id"], "purpose": "verify_availability"},
+            payload={"shop_id": shop["id"], "offer_id": offer["id"], "purpose": "verify_availability",
+                     "client_request_id": "smoke-contact-original"},
         )
         if contact_status != 201:
             raise SmokeFailure(f"شبیه‌سازی استعلام HTTP {contact_status} برگرداند.")
@@ -328,15 +388,55 @@ def main() -> int:
         )
         print(f"  PASS outcome={contact_outcome}; source_type=demo_simulation; alternatives={len(alternative_offers)} offers/{len(alternative_products)} products")
         if contact_outcome == "confirmed_available":
-            response_events = contact.get("events", [])
-            if not any(
-                isinstance(event, dict)
-                and event.get("type") == "ui.component"
-                and isinstance(event.get("payload"), dict)
-                and event["payload"].get("component") == "visit_plan"
-                for event in response_events
-            ):
-                raise SmokeFailure("با تأیید شبیه‌سازی، رویداد رابط visit_plan دریافت نشد.")
+            verify_persisted_plan(args.base_url, mission_id, contact, str(offer["id"]))
+
+        if args.full_journey:
+            print("[7/8] Contact idempotency: replay the identical request")
+            replay_status, replay, _ = request_json(
+                args.base_url,
+                f"/api/v1/missions/{quote(mission_id, safe='')}/contact-attempts/",
+                method="POST",
+                payload={
+                    "shop_id": shop["id"], "offer_id": offer["id"],
+                    "purpose": "verify_availability",
+                    "client_request_id": "smoke-contact-original",
+                },
+            )
+            if replay_status != 200 or replay != contact:
+                raise SmokeFailure("ارسال مجدد شناسهٔ استعلام باید پاسخ ۲۰۰ و همان نتیجه قبلی بدهد.")
+            print("  PASS no duplicate simulation or events created")
+
+            if contact_outcome != "confirmed_available":
+                print("[8/8] Recover from seller failure and build visit plan")
+                replacement = pick_recovery_offer(contact)
+                if replacement is None:
+                    raise SmokeFailure(
+                        "هیچ آفر جایگزین واجد شرایطی در پاسخ سرور موجود نیست؛ "
+                        "مسیر بازیابی هنوز برای این مأموریت قابل تکمیل نیست."
+                    )
+                next_status, recovered, _ = request_json(
+                    args.base_url,
+                    f"/api/v1/missions/{quote(mission_id, safe='')}/contact-attempts/",
+                    method="POST",
+                    payload={
+                        "shop_id": replacement["shop_id"],
+                        "offer_id": replacement["offer_id"],
+                        "purpose": "verify_availability",
+                        "client_request_id": "smoke-contact-recovery",
+                    },
+                )
+                if next_status != 201:
+                    raise SmokeFailure(f"استعلام جایگزین HTTP {next_status} برگرداند.")
+                recovery_outcome = str((recovered.get("attempt") or {}).get("outcome", "unknown"))
+                print(f"  recovery outcome={recovery_outcome}; offer_id={replacement['offer_id']}")
+                if recovery_outcome != "confirmed_available":
+                    raise SmokeFailure(
+                        "سناریوی بازیابی نتوانست استعلام موفق تولید کند؛ "
+                        "پیکربندی DEMO_CONTACT_OUTCOMES را بررسی کن."
+                    )
+                verify_persisted_plan(
+                    args.base_url, mission_id, recovered, replacement["offer_id"],
+                )
 
     llm_ok = parser_used == "llm"
     llm_runtime, llm_explanation = classify_llm_runtime(parser_used, llm_config_status, agent_mode)

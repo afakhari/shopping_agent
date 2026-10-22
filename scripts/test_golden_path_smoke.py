@@ -84,6 +84,31 @@ class GoldenPathHelperTests(unittest.TestCase):
         self.assertEqual(state, "ACTIVE")
 
 
+    def test_recovery_prefers_real_same_model_offer(self) -> None:
+        payload = {
+            "alternatives": [{"id": "offer-2", "shop": {"id": "shop-2"}}],
+            "alternative_products": [
+                {"best_offer": {"id": "offer-3", "shop": {"id": "shop-3"}}}
+            ],
+        }
+        self.assertEqual(
+            SMOKE.pick_recovery_offer(payload),
+            {"offer_id": "offer-2", "shop_id": "shop-2"},
+        )
+
+    def test_recovery_uses_valid_alternative_product_when_same_model_unavailable(self) -> None:
+        payload = {
+            "alternatives": [],
+            "alternative_products": [
+                {"best_offer": {"id": "offer-4", "shop": {"id": "shop-4"}}}
+            ],
+        }
+        self.assertEqual(
+            SMOKE.pick_recovery_offer(payload),
+            {"offer_id": "offer-4", "shop_id": "shop-4"},
+        )
+        self.assertIsNone(SMOKE.pick_recovery_offer({"alternative_products": []}))
+
     def test_sse_and_json_use_same_session_aware_transport(self) -> None:
         """Regression: SSE must not bypass the opener that retains session cookies."""
         from unittest.mock import patch

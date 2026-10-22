@@ -4,7 +4,7 @@
   Uses Docker, without importing data again or invoking GitHub Actions.
 #>
 [CmdletBinding()]
-param([switch]$SkipBackendTests)
+param([switch]$SkipBackendTests, [switch]$FullJourney)
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
@@ -67,11 +67,13 @@ try {
         'compose','exec','-T','backend','python',
         '/tmp/test_golden_path_smoke.py'
     )
-    Invoke-Docker 'Real HTTP mission + SSE + seller simulation through frontend gateway' @(
+    $smokeArgs = @(
         'compose','exec','-T','backend','python',
         '/tmp/smoke-golden-path.py','--base-url','http://frontend',
         '--query',[string]::Concat([char]0x0647,[char]0x062F,[char]0x0641,[char]0x0648,[char]0x0646)
     )
+    if ($FullJourney) { $smokeArgs += '--full-journey' }
+    Invoke-Docker 'Real HTTP mission + SSE + seller simulation through frontend gateway' $smokeArgs
     Write-Host 'ALL REQUESTED LOCAL CHECKS PASSED. No CI used; DB volume preserved.' -ForegroundColor Green
 } finally {
     Pop-Location
