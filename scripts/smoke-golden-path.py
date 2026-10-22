@@ -10,10 +10,16 @@ import argparse
 import json
 import sys
 from decimal import Decimal, InvalidOperation
+from http.cookiejar import CookieJar
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, quote
-from urllib.request import Request, urlopen
+from urllib.request import Request, build_opener, HTTPCookieProcessor
+
+
+# Preserve the Django session cookie across create / turn / contact HTTP calls.
+# Each CLI invocation gets its own isolated browser-like session.
+_SESSION_OPENER = build_opener(HTTPCookieProcessor(CookieJar()))
 
 
 class SmokeFailure(RuntimeError):
@@ -35,7 +41,7 @@ def request_json(
         headers["Content-Type"] = "application/json; charset=utf-8"
     request = Request(base_url.rstrip("/") + path, data=body, method=method, headers=headers)
     try:
-        with urlopen(request, timeout=timeout) as response:
+        with _SESSION_OPENER.open(request, timeout=timeout) as response:
             raw = response.read().decode("utf-8", errors="replace")
             status = response.status
             response_headers = {key.lower(): value for key, value in response.headers.items()}

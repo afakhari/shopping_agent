@@ -18,6 +18,8 @@ class PurchaseMission(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     initial_message = models.TextField(max_length=2000)
+    # Random server-side session owner. Never serialized into the public mission snapshot.
+    owner_token = models.CharField(max_length=64, null=True, blank=True, db_index=True)
     status = models.CharField(max_length=32, choices=Status.choices, default=Status.CREATED)
     current_stage = models.CharField(max_length=80, default="created")
     constraints = models.JSONField(default=dict, blank=True)

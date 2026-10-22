@@ -287,3 +287,28 @@ class MissionApiTests(TestCase):
         self.assertEqual(response.status_code, 200)
         mission.refresh_from_db()
         self.assertIsNone(mission.constraints.get("max_price_toman"))
+
+    def test_mission_is_private_to_creating_browser_session(self):
+        from rest_framework.test import APIClient
+        mission_id = self._create_mission_and_search()
+        other = APIClient()
+        self.assertEqual(other.get(f"/api/v1/missions/{mission_id}/").status_code, 404)
+        self.assertEqual(
+            other.post(
+                f"/api/v1/missions/{mission_id}/turns/",
+                {"message": "هدفون"}, format="json",
+            ).status_code, 404,
+        )
+        self.assertEqual(
+            other.post(
+                f"/api/v1/missions/{mission_id}/contact-attempts/",
+                {"shop_id": self.shop_a.source_id, "offer_id": self.offer_a.source_id},
+                format="json",
+            ).status_code, 404,
+        )
+        self.assertEqual(self.client.get(f"/api/v1/missions/{mission_id}/").status_code, 200)
+
+    def test_legacy_mission_without_owner_is_not_public(self):
+        from rest_framework.test import APIClient
+        mission = PurchaseMission.objects.create(initial_message="legacy", constraints={})
+        self.assertEqual(APIClient().get(f"/api/v1/missions/{mission.id}/").status_code, 404)

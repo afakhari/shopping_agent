@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import secrets
 from decimal import Decimal
 from typing import Any, Iterator
 
@@ -28,6 +29,16 @@ from apps.missions.serializers import (
 from apps.missions.services import append_events_locked, serialize_mission
 from apps.catalog.services.normalization import normalize_persian_text
 from apps.search.services import eligible_offer_list, product_search_page, serialize_offer
+
+
+def _owned_mission(request, mission_id, *, lock=False):
+    """Hide even the existence of missions belonging to another browser session."""
+    owner = request.session.get("bazaar_owner_token")
+    if not isinstance(owner, str) or not owner:
+        from django.http import Http404
+        raise Http404
+    queryset = PurchaseMission.objects.select_for_update() if lock else PurchaseMission.objects
+    return get_object_or_404(queryset, pk=mission_id, owner_token=owner)
 
 
 def _validate_full_constraints(
@@ -113,9 +124,12 @@ def create_mission(request):
     serializer.is_valid(raise_exception=True)
     data = serializer.validated_data
     constraints = _validate_full_constraints({}, data.get("constraints", {}))
+    if "bazaar_owner_token" not in request.session:
+        request.session["bazaar_owner_token"] = secrets.token_hex(24)
     with transaction.atomic():
         mission = PurchaseMission.objects.create(
             initial_message=data["initial_message"],
+            owner_token=request.session["bazaar_owner_token"],
             constraints=constraints,
             client_request_id=data.get("client_request_id"),
             status=PurchaseMission.Status.CREATED,
@@ -130,7 +144,7 @@ def create_mission(request):
 
 @api_view(["GET"])
 def get_mission(request, mission_id: str):
-    mission = get_object_or_404(PurchaseMission, pk=mission_id)
+    mission = _owned_mission(request, mission_id)
     return Response(serialize_mission(mission, include_events=True))
 
 
@@ -144,7 +158,7 @@ def mission_turn(request, mission_id: str):
 
     # Do any optional network call before acquiring the mission row lock. A second validation and
     # hard-filter pass happens after locking; model output cannot loosen those constraints.
-    initial_mission = get_object_or_404(PurchaseMission, pk=mission_id)
+    initial_mission = _owned_mission(request, mission_id)
     preflight_constraints = _validate_full_constraints(
         initial_mission.constraints, data.get("constraints", {})
     )
@@ -155,7 +169,7 @@ def mission_turn(request, mission_id: str):
     )
 
     with transaction.atomic():
-        mission = get_object_or_404(PurchaseMission.objects.select_for_update(), pk=mission_id)
+        mission = _owned_mission(request, mission_id, lock=True)
         constraints = _validate_full_constraints(mission.constraints, data.get("constraints", {}))
         mission.constraints = constraints
         mission.status = PurchaseMission.Status.ACTIVE
@@ -227,7 +241,7 @@ def create_contact_attempt(request, mission_id: str):
     serializer = ContactAttemptCreateSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     data = serializer.validated_data
-    mission = get_object_or_404(PurchaseMission, pk=mission_id)
+    mission = _owned_mission(request, mission_id)
     offer = get_object_or_404(Offer.objects.select_related("shop", "product"), source_id=data["offer_id"])
     if offer.shop_id != data["shop_id"]:
         raise ValidationError({"offer_id": "این آفر متعلق به فروشگاه انتخاب‌شده نیست."})
