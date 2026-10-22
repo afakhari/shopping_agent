@@ -55,3 +55,14 @@ export function isGreetingOnly(message: string): boolean {
 export function isAssistantHelpRequest(message: string): boolean {
   return classifyLocalConversation(message) === 'help'
 }
+
+/** Shared by live chat and presentation repair of events saved by older versions. */
+export function localConversationReply(intent: LocalConversationIntent): string {
+  const replies: Record<LocalConversationIntent, string> = {
+    greeting: 'سلام! خوش اومدی. 🌱 دنبال چه محصولی هستی؟ می‌تونی مدل، کاربرد یا حدود بودجه رو بگی تا فروشگاه‌های تهران رو بررسی کنیم.',
+    help: 'برای شروع نام یا کاربرد محصول را بنویس؛ مثلاً «هدفون بی‌سیم تا ۳ میلیون تومان». بعد می‌توانی مدل‌ها را مقایسه کنی، فروشگاه‌های تهران را ببینی و استعلام نمایشی انجام بدهی. بودجه، اعتبار و محدوده را هم خودت تنظیم می‌کنی.',
+    thanks: 'خواهش می‌کنم! هر زمان محصول دیگری خواستی یا خواستی شروط خرید را تغییر بدهی، همین‌جا بنویس.',
+    goodbye: 'خداحافظ! نتیجه‌های ثبت‌شده مأموریت را می‌توانی بعداً هم بررسی کنی.',
+  }
+  return replies[intent]
+}

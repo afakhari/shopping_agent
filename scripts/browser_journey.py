@@ -99,9 +99,11 @@ def main() -> None:
                     # After a real search, smalltalk should not fabricate or replace
                     # products; the previous search remains available.
                     previous_cards = page.locator(".mission-product-card").count()
+                    previous_replies = page.get_by_text("سلام! خوش اومدی.", exact=False).count()
                     composer.fill("احوال شما؟")
                     page.get_by_role("button", name="ارسال پیام").click()
                     page.get_by_text("سلام! خوش اومدی.", exact=False).last.wait_for()
+                    assert page.get_by_text("سلام! خوش اومدی.", exact=False).count() == previous_replies + 1
                     assert page.locator(".mission-product-card").count() == previous_cards
                 assert_no_horizontal_overflow(page, width)
                 page.screenshot(path=str(OUTPUT / f"products-{width}.png"), full_page=True)

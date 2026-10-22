@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { AlertCircle, ArrowLeft, CheckCircle2, ChevronDown, ChevronUp, Clock3, CreditCard, ExternalLink, Headphones, Laptop, LoaderCircle, LocateFixed, MapPin, MapPinOff, Send, ShieldCheck, SlidersHorizontal, Sparkles, Store, RotateCcw, X } from 'lucide-react'
 import { getProductOffers, type CatalogOffer, type CatalogSearchResult, type ProductOffersResponse } from '../search/catalog-api'
 import { buildComparisonSpecColumns } from './comparison-specs'
-import { classifyLocalConversation } from './greeting-intent'
+import { classifyLocalConversation, localConversationReply } from './greeting-intent'
 import { completedTurnWasPersisted } from './recovery-state'
 import { findCurrentSearchMessage, shouldFollowConversation } from './conversation-behavior'
 import { GenUIRenderer } from './GenUIRenderer'
@@ -507,23 +507,33 @@ function mergeUIEventIntoMessages(messages: MissionChatMessage[], event: Mission
   return next
 }
 
-function rebuildChatFromEvents(events: MissionEvent[]): MissionChatMessage[] {
+export function rebuildChatFromEvents(events: MissionEvent[]): MissionChatMessage[] {
   const messages: MissionChatMessage[] = []
   let awaitingAssistant = false
+  let currentSocialIntent: ReturnType<typeof classifyLocalConversation> = null
   for (const event of [...events].sort((left, right) => left.seq - right.seq)) {
     if (event.type === 'user.message') {
       const value = readText(event.payload, 'message')
       if (value) messages.push({ id: `user-${event.seq}`, role: 'user', text: value, components: [] })
+      currentSocialIntent = classifyLocalConversation(value)
       awaitingAssistant = true
       continue
     }
     if (event.type === 'assistant.message') {
       const value = readText(event.payload, 'text')
-      if (value) messages.push({ id: `assistant-${event.seq}`, role: 'assistant', text: value, components: [] })
+      if (value) messages.push({
+        id: `assistant-${event.seq}`, role: 'assistant',
+        text: currentSocialIntent ? localConversationReply(currentSocialIntent) : value,
+        components: [],
+      })
       awaitingAssistant = false
       continue
     }
     if (event.type === 'ui.component') {
+      // Older app versions incorrectly produced product cards for smalltalk.
+      // Suppress those obsolete cards on replay, not the persisted event itself.
+      if (currentSocialIntent && getUIComponents(event).some((component) =>
+        PRIMARY_SEARCH_COMPONENTS.has(component.type))) continue
       // During a normal turn the assistant.message event precedes this event. Older snapshots
       // may lack that event, so create a safe, explicit fallback message rather than losing UI.
       if (awaitingAssistant) {
@@ -629,8 +639,10 @@ export function MissionPanel({
         const restoredMessage = typeof snapshot.state?.last_turn_message === 'string'
           ? snapshot.state.last_turn_message
           : snapshot.initial_message
-        setLastQuery(restoredProductQuery ?? restoredMessage)
-        onRestoreConstraints(snapshot.constraints, restoredMessage)
+        const restoredQuery = restoredProductQuery
+          ?? (classifyLocalConversation(restoredMessage) ? '' : restoredMessage)
+        setLastQuery(restoredQuery)
+        onRestoreConstraints(snapshot.constraints, restoredQuery)
       })
       .catch((reason: unknown) => {
         if (controller.signal.aborted) return
@@ -741,18 +753,12 @@ export function MissionPanel({
 
     const localIntent = classifyLocalConversation(trimmed)
     if (localIntent) {
-      const replies = {
-        greeting: 'سلام! خوش اومدی. 🌱 دنبال چه محصولی هستی؟ می‌تونی مدل، کاربرد یا حدود بودجه رو بگی تا فروشگاه‌های تهران رو بررسی کنیم.',
-        help: 'برای شروع نام یا کاربرد محصول را بنویس؛ مثلاً «هدفون بی‌سیم تا ۳ میلیون تومان». بعد می‌توانی مدل‌ها را مقایسه کنی، فروشگاه‌های تهران را ببینی و استعلام نمایشی انجام بدهی. بودجه، اعتبار و محدوده را هم خودت تنظیم می‌کنی.',
-        thanks: 'خواهش می‌کنم! هر زمان محصول دیگری خواستی یا خواستی شروط خرید را تغییر بدهی، همین‌جا بنویس.',
-        goodbye: 'خداحافظ! نتیجه‌های ثبت‌شده این مأموریت را می‌توانی بعداً هم بررسی کنی.',
-      }
       turnCounter.current += 1
       const localId = `local-${Date.now()}-${turnCounter.current}`
       setChatMessages((current) => [
         ...current,
         { id: `user-${localId}`, role: 'user', text: trimmed, components: [] },
-        { id: `assistant-${localId}`, role: 'assistant', text: replies[localIntent], components: [] },
+        { id: `assistant-${localId}`, role: 'assistant', text: localConversationReply(localIntent), components: [] },
       ])
       setMessage('')
       setError(null)
@@ -846,8 +852,9 @@ export function MissionPanel({
       setEvents(history)
       setChatMessages(rebuildChatFromEvents(history))
       setContactByOffer(restoreContactResponses(history))
-      const latestQuery = typeof snapshot.state?.search_query === 'string'
+      const rawQuery = typeof snapshot.state?.search_query === 'string'
         ? snapshot.state.search_query : lastQuery
+      const latestQuery = classifyLocalConversation(rawQuery) ? '' : rawQuery
       setLastQuery(latestQuery)
       onRestoreConstraints(snapshot.constraints, latestQuery)
       setError(null)
