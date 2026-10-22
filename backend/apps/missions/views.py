@@ -18,7 +18,7 @@ from apps.agent.graph import _query_from_message, run_purchase_graph
 from apps.agent.llm import extract_intent
 from apps.agent.simulator import serialize_contact_attempt, simulate_contact
 from apps.catalog.models import Offer, Product
-from apps.missions.models import PurchaseMission
+from apps.missions.models import ContactAttempt, PurchaseMission
 from apps.missions.renderers import ServerSentEventRenderer
 from apps.missions.serializers import (
     ContactAttemptCreateSerializer,
@@ -241,118 +241,138 @@ def create_contact_attempt(request, mission_id: str):
     serializer = ContactAttemptCreateSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     data = serializer.validated_data
-    mission = _owned_mission(request, mission_id)
-    offer = get_object_or_404(Offer.objects.select_related("shop", "product"), source_id=data["offer_id"])
-    if offer.shop_id != data["shop_id"]:
-        raise ValidationError({"offer_id": "این آفر متعلق به فروشگاه انتخاب‌شده نیست."})
-
-    # Enforce all hard filters against the current database state immediately before simulation.
-    candidate_ids = set((mission.state or {}).get("candidate_product_ids", []))
-    if offer.product_id not in candidate_ids:
-        raise ValidationError({"offer_id": "ابتدا این محصول را در همین مأموریت جست‌وجو کن."})
-    filters = _search_filterset(mission.constraints or {})
-    eligible = eligible_offer_list(filters, product_id=offer.product_id).filter(source_id=offer.source_id).exists()
-    if not eligible:
-        raise ValidationError({"offer_id": "این آفر شرایط الزامی مأموریت را رعایت نمی‌کند."})
-
-    result = simulate_contact(
-        mission_id=str(mission.pk),
-        shop_id=data["shop_id"],
-        offer_id=data["offer_id"],
-        purpose=data["purpose"],
-    )
-    attempt_payload = serialize_contact_attempt(result.attempt)
-    alternatives: list[dict[str, Any]] = []
-    alternative_products: list[dict[str, Any]] = []
-    if result.attempt.outcome != "confirmed_available":
-        alternatives = _serialize_alternatives(mission, offer, data["shop_id"])
-        alternative_products = _serialize_alternative_products(mission, offer.product)
-
-    event_list: list[tuple[str, dict[str, Any]]] = [
-        ("contact.completed", {"attempt": attempt_payload, "source_type": "demo_simulation"}),
-        (
-            "ui.component",
-            {
-                "component": "contact_progress",
-                "data": {
-                    "attempts": [attempt_payload],
-                    "next_action": "compare_alternatives" if (alternatives or alternative_products) else None,
-                },
-            },
-        ),
-    ]
-    if result.attempt.outcome == "confirmed_available":
-        registered_price = (
-            f"{offer.price_toman:,.0f} تومان" if offer.price_toman is not None else "قیمت ثبت نشده"
-        )
-        changed_at = offer.last_price_changed_at.isoformat() if offer.last_price_changed_at else ""
-        event_list.append(
-            (
-                "ui.component",
-                {
-                    "component": "visit_plan",
-                    "data": {
-                        "title": "برنامه مراجعه آماده است",
-                        "description": "اطلاعات ثبت‌شده برای بازبینی پیش از حرکت؛ موجودی فقط در سناریوی دمو تأیید شده است.",
-                        "status": "موجودی در سناریوی دمو تأیید شد",
-                        "source_label": "شبیه‌سازی کنترل‌شده؛ هیچ تماس واقعی انجام نشده است.",
-                        "details": [
-                            {"key": "product", "label": "محصول", "value": offer.product.persian_title or offer.product.source_id},
-                            {"key": "shop", "label": "فروشگاه", "value": offer.shop.name or offer.shop.source_id},
-                            {"key": "price", "label": "قیمت ثبت‌شده", "value": registered_price},
-                            {"key": "last_price_changed_at", "label": "آخرین تغییر قیمت", "value": changed_at or "زمان تغییر قیمت ثبت نشده"},
-                            {"key": "address", "label": "نشانی ثبت‌شده", "value": offer.shop.address or offer.shop.location_label or "نشانی ثبت نشده"},
-                            {"key": "in_person_credit", "label": "خرید اعتباری حضوری", "value": "پذیرش ثبت شده" if offer.shop.accepts_in_person_credit else "پذیرش ثبت نشده"},
-                        ],
-                    },
-                },
-            )
-        )
-    if alternatives or alternative_products:
-        event_list.append(
-            (
-                "ui.component",
-                {
-                    "component": "alternative_options",
-                    "data": {
-                        "alternatives": alternatives,
-                        "alternative_products": alternative_products,
-                        "preserved_constraints": list((mission.constraints or {}).keys()),
-                    },
-                },
-            )
-        )
+    request_id = data.get("client_request_id")
+    # Serialize contact requests for this mission, including duplicate-key checks.
     with transaction.atomic():
-        locked_mission = PurchaseMission.objects.select_for_update().get(pk=mission.pk)
-        existing_state = locked_mission.state or {}
-        alternative_product_ids = [
-            item["product"]["id"]
-            for item in alternative_products
-            if item.get("product", {}).get("id")
-        ]
-        candidate_product_ids = list(
-            dict.fromkeys([*existing_state.get("candidate_product_ids", []), *alternative_product_ids])
-        )
-        locked_mission.state = {
-            **existing_state,
-            "last_contact_attempt_id": str(result.attempt.pk),
-            "last_contact_outcome": result.attempt.outcome,
-            "alternative_offer_ids": [item["id"] for item in alternatives],
-            "alternative_product_ids": alternative_product_ids,
-            "candidate_product_ids": candidate_product_ids,
-        }
-        locked_mission.current_stage = "contact_checked"
-        locked_mission.status = PurchaseMission.Status.WAITING_FOR_USER
-        locked_mission.save(update_fields=["state", "current_stage", "status", "updated_at"])
-        events = append_events_locked(locked_mission, event_list)
+        mission = _owned_mission(request, mission_id, lock=True)
+        if request_id:
+            existing = ContactAttempt.objects.filter(
+                mission=mission, client_request_id=request_id
+            ).first()
+            if existing is not None:
+                if existing.offer_id != data["offer_id"] or existing.shop_id != data["shop_id"]:
+                    raise ValidationError({
+                        "client_request_id": "این شناسه قبلاً برای استعلام دیگری استفاده شده است."
+                    })
+                if not existing.response_snapshot:
+                    raise ValidationError({
+                        "client_request_id": "نتیجه استعلام قبلی هنوز آماده نیست."
+                    })
+                return Response(existing.response_snapshot, status=200)
+        offer = get_object_or_404(Offer.objects.select_related("shop", "product"), source_id=data["offer_id"])
+        if offer.shop_id != data["shop_id"]:
+            raise ValidationError({"offer_id": "این آفر متعلق به فروشگاه انتخاب‌شده نیست."})
 
-    return Response(
-        {
+        # Enforce all hard filters against the current database state immediately before simulation.
+        candidate_ids = set((mission.state or {}).get("candidate_product_ids", []))
+        if offer.product_id not in candidate_ids:
+            raise ValidationError({"offer_id": "ابتدا این محصول را در همین مأموریت جست‌وجو کن."})
+        filters = _search_filterset(mission.constraints or {})
+        eligible = eligible_offer_list(filters, product_id=offer.product_id).filter(source_id=offer.source_id).exists()
+        if not eligible:
+            raise ValidationError({"offer_id": "این آفر شرایط الزامی مأموریت را رعایت نمی‌کند."})
+
+        result = simulate_contact(
+            mission_id=str(mission.pk),
+            shop_id=data["shop_id"],
+            offer_id=data["offer_id"],
+            purpose=data["purpose"],
+            client_request_id=request_id,
+        )
+        attempt_payload = serialize_contact_attempt(result.attempt)
+        alternatives: list[dict[str, Any]] = []
+        alternative_products: list[dict[str, Any]] = []
+        if result.attempt.outcome != "confirmed_available":
+            alternatives = _serialize_alternatives(mission, offer, data["shop_id"])
+            alternative_products = _serialize_alternative_products(mission, offer.product)
+
+        event_list: list[tuple[str, dict[str, Any]]] = [
+            ("contact.completed", {"attempt": attempt_payload, "source_type": "demo_simulation"}),
+            (
+                "ui.component",
+                {
+                    "component": "contact_progress",
+                    "data": {
+                        "attempts": [attempt_payload],
+                        "next_action": "compare_alternatives" if (alternatives or alternative_products) else None,
+                    },
+                },
+            ),
+        ]
+        if result.attempt.outcome == "confirmed_available":
+            registered_price = (
+                f"{offer.price_toman:,.0f} تومان" if offer.price_toman is not None else "قیمت ثبت نشده"
+            )
+            changed_at = offer.last_price_changed_at.isoformat() if offer.last_price_changed_at else ""
+            event_list.append(
+                (
+                    "ui.component",
+                    {
+                        "component": "visit_plan",
+                        "data": {
+                            "title": "برنامه مراجعه آماده است",
+                            "description": "اطلاعات ثبت‌شده برای بازبینی پیش از حرکت؛ موجودی فقط در سناریوی دمو تأیید شده است.",
+                            "status": "موجودی در سناریوی دمو تأیید شد",
+                            "source_label": "شبیه‌سازی کنترل‌شده؛ هیچ تماس واقعی انجام نشده است.",
+                            "details": [
+                                {"key": "product", "label": "محصول", "value": offer.product.persian_title or offer.product.source_id},
+                                {"key": "shop", "label": "فروشگاه", "value": offer.shop.name or offer.shop.source_id},
+                                {"key": "price", "label": "قیمت ثبت‌شده", "value": registered_price},
+                                {"key": "last_price_changed_at", "label": "آخرین تغییر قیمت", "value": changed_at or "زمان تغییر قیمت ثبت نشده"},
+                                {"key": "address", "label": "نشانی ثبت‌شده", "value": offer.shop.address or offer.shop.location_label or "نشانی ثبت نشده"},
+                                {"key": "in_person_credit", "label": "خرید اعتباری حضوری", "value": "پذیرش ثبت شده" if offer.shop.accepts_in_person_credit else "پذیرش ثبت نشده"},
+                            ],
+                        },
+                    },
+                )
+            )
+        if alternatives or alternative_products:
+            event_list.append(
+                (
+                    "ui.component",
+                    {
+                        "component": "alternative_options",
+                        "data": {
+                            "alternatives": alternatives,
+                            "alternative_products": alternative_products,
+                            "preserved_constraints": list((mission.constraints or {}).keys()),
+                        },
+                    },
+                )
+            )
+        with transaction.atomic():
+            locked_mission = PurchaseMission.objects.select_for_update().get(pk=mission.pk)
+            existing_state = locked_mission.state or {}
+            alternative_product_ids = [
+                item["product"]["id"]
+                for item in alternative_products
+                if item.get("product", {}).get("id")
+            ]
+            candidate_product_ids = list(
+                dict.fromkeys([*existing_state.get("candidate_product_ids", []), *alternative_product_ids])
+            )
+            locked_mission.state = {
+                **existing_state,
+                "last_contact_attempt_id": str(result.attempt.pk),
+                "last_contact_outcome": result.attempt.outcome,
+                "alternative_offer_ids": [item["id"] for item in alternatives],
+                "alternative_product_ids": alternative_product_ids,
+                "candidate_product_ids": candidate_product_ids,
+            }
+            locked_mission.current_stage = "contact_checked"
+            locked_mission.status = PurchaseMission.Status.WAITING_FOR_USER
+            locked_mission.save(update_fields=["state", "current_stage", "status", "updated_at"])
+            events = append_events_locked(locked_mission, event_list)
+
+        payload = {
             "attempt": attempt_payload,
             "alternatives": alternatives,
             "alternative_products": alternative_products,
             "events": events,
             "mission": serialize_mission(locked_mission),
-        },
-        status=201,
-    )
+        }
+        # Persist the response before commit so retries return the same event sequence
+        # and simulation outcome, even if the client missed the first response.
+        result.attempt.response_snapshot = payload
+        result.attempt.save(update_fields=["response_snapshot"])
+        return Response(payload, status=201)

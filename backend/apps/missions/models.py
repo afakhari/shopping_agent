@@ -94,11 +94,20 @@ class ContactAttempt(models.Model):
     source_type = models.CharField(max_length=32, default="demo_simulation")
     scenario_index = models.PositiveIntegerField(default=0)
     response_text = models.TextField(blank=True, default="")
+    # Retry a contact with the same key without changing its simulated outcome.
+    client_request_id = models.CharField(max_length=100, blank=True, null=True)
+    response_snapshot = models.JSONField(blank=True, default=dict)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = "purchase_contact_attempt"
         ordering = ["created_at", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["mission", "client_request_id"],
+                name="contact_attempt_idempotent_uniq",
+            ),
+        ]
         indexes = [
             models.Index(fields=["mission", "created_at"], name="contact_mission_time_idx"),
             models.Index(fields=["shop", "outcome"], name="contact_shop_outcome_idx"),

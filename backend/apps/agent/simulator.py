@@ -40,6 +40,7 @@ def simulate_contact(
     shop_id: str,
     offer_id: str,
     purpose: str,
+    client_request_id: str | None = None,
 ) -> SimulationResult:
     """Record a deterministic availability-check result from server config and mission history."""
     if purpose != ContactAttempt.Purpose.VERIFY_AVAILABILITY:
@@ -97,6 +98,7 @@ def simulate_contact(
             source_type="demo_simulation",
             scenario_index=scenario_index,
             response_text=_RESPONSE_TEXT[outcome],
+            client_request_id=client_request_id,
         )
         return SimulationResult(attempt=attempt, scenario_index=scenario_index)
 

@@ -82,6 +82,7 @@ class MissionTurnSerializer(serializers.Serializer):
 
 
 class ContactAttemptCreateSerializer(serializers.Serializer):
+    client_request_id = serializers.CharField(required=False, allow_blank=False, max_length=100)
     shop_id = serializers.CharField(max_length=64)
     offer_id = serializers.CharField(max_length=64)
     purpose = serializers.ChoiceField(

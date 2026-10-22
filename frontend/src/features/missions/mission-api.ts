@@ -152,7 +152,7 @@ export async function sendMissionTurn(
 
 export async function createContactAttempt(
   missionId: string,
-  input: { shopId: string; offerId: string; purpose?: 'verify_availability' | 'verify_price' | 'verify_hours' },
+  input: { shopId: string; offerId: string; purpose?: 'verify_availability' | 'verify_price' | 'verify_hours'; clientRequestId?: string },
   signal?: AbortSignal,
 ): Promise<ContactAttemptResponse> {
   const response = await fetch(`/api/v1/missions/${encodeURIComponent(missionId)}/contact-attempts/`, {
@@ -163,6 +163,7 @@ export async function createContactAttempt(
       shop_id: input.shopId,
       offer_id: input.offerId,
       purpose: input.purpose ?? 'verify_availability',
+      client_request_id: input.clientRequestId ?? globalThis.crypto.randomUUID(),
     }),
   })
   return readJson<ContactAttemptResponse>(response)

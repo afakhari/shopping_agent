@@ -312,3 +312,26 @@ class MissionApiTests(TestCase):
         from rest_framework.test import APIClient
         mission = PurchaseMission.objects.create(initial_message="legacy", constraints={})
         self.assertEqual(APIClient().get(f"/api/v1/missions/{mission.id}/").status_code, 404)
+
+    def test_contact_retry_is_idempotent_and_cannot_change_offer(self):
+        mission_id = self._create_mission_and_search()
+        url = f"/api/v1/missions/{mission_id}/contact-attempts/"
+        payload = {
+            "shop_id": self.shop_a.source_id,
+            "offer_id": self.offer_a.source_id,
+            "client_request_id": "fixed-user-action-001",
+        }
+        first = self.client.post(url, payload, format="json")
+        self.assertEqual(first.status_code, 201, first.content)
+        count_before = MissionEvent.objects.filter(mission_id=mission_id).count()
+        replay = self.client.post(url, payload, format="json")
+        self.assertEqual(replay.status_code, 200, replay.content)
+        self.assertEqual(replay.json(), first.json())
+        self.assertEqual(ContactAttempt.objects.filter(mission_id=mission_id).count(), 1)
+        self.assertEqual(MissionEvent.objects.filter(mission_id=mission_id).count(), count_before)
+        collision = self.client.post(
+            url, {**payload, "shop_id": self.shop_b.source_id, "offer_id": self.offer_b.source_id},
+            format="json",
+        )
+        self.assertEqual(collision.status_code, 400)
+        self.assertEqual(ContactAttempt.objects.count(), 1)
