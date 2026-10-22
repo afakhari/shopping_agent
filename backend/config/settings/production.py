@@ -27,3 +27,6 @@ CSRF_COOKIE_SECURE = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
 X_FRAME_OPTIONS = "DENY"
+
+# A listening web process is not production-ready until the catalog is populated.
+REQUIRE_DATASET_FOR_READINESS = True

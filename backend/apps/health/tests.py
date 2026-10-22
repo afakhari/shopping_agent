@@ -54,3 +54,31 @@ class ReadinessTests(TestCase):
         self.assertEqual(response.json()["agent_mode"], "deterministic_fallback")
         self.assertEqual(response.json()["llm"]["status"], "missing_api_key")
         self.assertFalse(response.json()["llm"]["api_key_present"])
+
+
+@override_settings(REQUIRE_DATASET_FOR_READINESS=True)
+class ProductionDatasetReadinessTests(TestCase):
+    def test_empty_catalog_is_not_ready(self):
+        response = Client().get("/api/v1/health/ready/")
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json()["checks"], {"database": "ok", "catalog": "incomplete"})
+
+    def test_incomplete_catalog_is_not_ready(self):
+        from apps.catalog.models import Product
+
+        Product.objects.create(source_id="p1", persian_title="نمونه")
+        response = Client().get("/api/v1/health/ready/")
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json()["checks"]["catalog"], "incomplete")
+
+    def test_linked_catalog_is_ready(self):
+        from decimal import Decimal
+
+        from apps.catalog.models import Offer, Product, Shop
+
+        product = Product.objects.create(source_id="p1", persian_title="نمونه")
+        shop = Shop.objects.create(source_id="s1", name="فروشگاه نمونه")
+        Offer.objects.create(source_id="o1", product=product, shop=shop, price_toman=Decimal("100"))
+        response = Client().get("/api/v1/health/ready/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["checks"], {"database": "ok", "catalog": "ok"})
