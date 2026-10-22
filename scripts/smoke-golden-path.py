@@ -57,6 +57,12 @@ def request_json(
         ) from exc
     except URLError as exc:
         raise SmokeFailure(f"اتصال به {base_url} برقرار نشد: {exc.reason}") from exc
+    except TimeoutError as exc:
+        raise SmokeFailure(
+            f"مهلت {timeout:g} ثانیه برای {method} {path} تمام شد. "
+            "این خطا لزوماً مربوط به LLM نیست؛ ابتدا عملکرد SQL کاتالوگ را "
+            "با profile_catalog_search بررسی کن."
+        ) from exc
     try:
         parsed = json.loads(raw) if raw else {}
     except json.JSONDecodeError as exc:

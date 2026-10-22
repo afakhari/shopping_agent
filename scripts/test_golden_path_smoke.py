@@ -109,6 +109,20 @@ class GoldenPathHelperTests(unittest.TestCase):
         )
         self.assertIsNone(SMOKE.pick_recovery_offer({"alternative_products": []}))
 
+    def test_raw_catalog_timeout_returns_helpful_smoke_failure(self) -> None:
+        from unittest.mock import patch
+
+        with patch.object(SMOKE, "_SESSION_OPENER") as opener:
+            opener.open.side_effect = TimeoutError("timed out")
+            with self.assertRaises(SMOKE.SmokeFailure) as failure:
+                SMOKE.request_json(
+                    "http://frontend",
+                    "/api/v1/catalog/search/?q=headphone",
+                    timeout=1,
+                )
+        self.assertIn("profile_catalog_search", str(failure.exception))
+        self.assertIn("کاتالوگ", str(failure.exception))
+
     def test_sse_and_json_use_same_session_aware_transport(self) -> None:
         """Regression: SSE must not bypass the opener that retains session cookies."""
         from unittest.mock import patch
