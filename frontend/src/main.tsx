@@ -8,6 +8,7 @@ import './chat-shell.css'
 import './design-system.css'
 import './result-cards.css'
 import './visit-plan.css'
+import './experience-v2.css'
 
 const queryClient = new QueryClient({
   defaultOptions: {
