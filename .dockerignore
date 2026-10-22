@@ -1,0 +1,13 @@
+.git
+.env
+.env.*
+!.env.example
+**/node_modules
+**/dist
+**/.venv
+**/__pycache__
+data
+*.csv
+*.zip
+*.sqlite3
+coverage
