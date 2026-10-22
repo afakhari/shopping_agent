@@ -113,6 +113,18 @@ def main() -> None:
                     page.screenshot(path=str(OUTPUT / "visit-plan-mobile.png"), full_page=True)
                     assert_no_horizontal_overflow(page, width)
 
+                    # The server must return inferred natural-language budget as
+                    # effective constraints so the editable UI reflects hard filters.
+                    page.locator('textarea[aria-label="پیام به دستیار خرید"]').fill(
+                        "هدفون بی سیم تست مرورگر تا سقف ۱ میلیون تومان"
+                    )
+                    page.get_by_role("button", name="ارسال پیام").click()
+                    page.locator(".mission-active-filters").first.wait_for()
+                    assert "شرایط همین جست‌وجو" in page.locator(".mission-active-filters").first.inner_text()
+                    assert "۱" in page.locator(".mission-active-filters").first.inner_text()
+                    assert_no_horizontal_overflow(page, width)
+                    page.screenshot(path=str(OUTPUT / "inferred-budget-mobile.png"), full_page=True)
+
                 context.close()
             print("BROWSER_JOURNEY=PASS; Chromium RTL 320/390/1440; synthetic fixtures.")
         finally:
