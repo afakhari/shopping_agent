@@ -48,3 +48,14 @@ Scoring: Product 75, UX 75, Intelligence 50, Deployment 40, Engineering 40, Data
 ## Fast development and efficient CI
 
 Development can be temporarily broken on feature branches. Run narrow local checks while iterating (`powershell -NoProfile -ExecutionPolicy Bypass -File scripts/quick-check.ps1 -Frontend` for Windows), then the full [quality-gates workflow](https://github.com/afakhari/shopping_agent/actions/workflows/ci.yml) at review/release milestones. The final candidate must be thoroughly verified. [سیاست تفصیلی](docs/DEVELOPMENT-POLICY.fa.md).
+
+## راه‌اندازی سریع با دیتاست واقعی (ویندوز)
+
+اسکریپت جدید ورود دیتاست از ZIP اصلی را به PostgreSQL انجام می‌دهد، تعداد رکوردها و شناسه‌های نمونه را کنترل می‌کند و سپس API جست‌وجو را آزمایش می‌کند. **هیچ داده خامی وارد GitHub نمی‌شود و GitHub Actions هم اجرا نمی‌شود.**
+
+پیش‌نیاز: Docker Desktop روشن، Git و دریافت ZIP دیتاست از Sources پروژه. در PowerShell پس از clone مخزن اجرا کنید:
+
+    powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup-dataset.ps1 -ArchivePath "$env:USERPROFILE\Downloads\starcoach-dataset-v16-cap300-csv.zip"
+
+[راهنمای کامل اجرای محلی](docs/LOCAL-DATASET-SETUP.fa.md) · [فرمان کنترل داده‌های واردشده](backend/apps/catalog/management/commands/verify_dataset.py)
+
