@@ -6,6 +6,7 @@ import { isGreetingOnly } from './greeting-intent'
 import { findCurrentSearchMessage, shouldFollowConversation } from './conversation-behavior'
 import { GenUIRenderer } from './GenUIRenderer'
 import { formatDistance, formatLastPriceChange, getPriceQualityLabel, openStreetMapUrl } from './ui-formatters'
+import { osmEmbedUrl, TEHRAN_REGION_SAMPLES } from './shop-map'
 import { getResultPayload, getUIComponents, type GenUIAction, type GenUIComponent } from './genui-types'
 import {
   createContactAttempt,
@@ -214,6 +215,7 @@ function ProductResults({
   allowActions?: boolean
 }) {
   const [showAllResults, setShowAllResults] = useState(false)
+  const [openMapOfferId, setOpenMapOfferId] = useState<string | null>(null)
   if (results.length === 0) return <p className="mission-empty-results">با این عبارت و شرایط، محصول واجد شرایطی پیدا نشد. می‌توانی عبارت یا شروط خرید را تغییر بدهی.</p>
   const visibleResults = showAllResults ? results : results.slice(0, 4)
   return (
@@ -326,6 +328,7 @@ function ProductResults({
                     const sellerDistance = formatDistance(sellerOffer.shop.distance_m)
                     const sellerUpdatedAt = formatPersianDateTime(sellerOffer.last_price_changed_at)
                     const sellerMapUrl = openStreetMapUrl(sellerOffer.shop.lat, sellerOffer.shop.lon)
+                    const inlineMapUrl = osmEmbedUrl(sellerOffer.shop.lat, sellerOffer.shop.lon)
                     return (
                       <article className="mission-offer-row" key={sellerOffer.id}>
                         <div className="mission-offer-copy">
@@ -340,12 +343,21 @@ function ProductResults({
                           )}
                           {sellerDistance && <small><LocateFixed size={12} />فاصله مستقیم: {sellerDistance}</small>}
                           {sellerMapUrl && <a className="mission-offer-map" href={sellerMapUrl} target="_blank" rel="noopener noreferrer"><MapPin size={12} /> نمایش روی نقشه <ExternalLink size={11} /></a>}
+                          {inlineMapUrl && <button className="mission-inline-map-toggle" type="button" aria-expanded={openMapOfferId === sellerOffer.id} onClick={() => setOpenMapOfferId(current => current === sellerOffer.id ? null : sellerOffer.id)}>
+                            <MapPin size={12} />{openMapOfferId === sellerOffer.id ? 'بستن نقشه' : 'نقشه در همین صفحه'}
+                          </button>}
                           <div className="mission-offer-badges">
                             <span className={`mission-price-quality ${sellerOffer.price_quality}`}><i />{getPriceQualityLabel(sellerOffer.price_quality)}</span>
                             <span className={`mission-shop-credit ${sellerOffer.in_person_credit_eligible ? 'registered' : 'unknown'}`}><CreditCard size={12} />{sellerOffer.in_person_credit_eligible ? 'اعتبار حضوری ثبت شده' : 'اعتبار حضوری برای این آفر ثبت نشده'}</span>
                           </div>
                           {sellerUpdatedAt && <small className="mission-offer-updated"><Clock3 size={12} />آخرین تغییر: {sellerUpdatedAt}</small>}
                         </div>
+                        {inlineMapUrl && openMapOfferId === sellerOffer.id && (
+                          <div className="mission-inline-map" role="region" aria-label={`پیش‌نمایش نقشه فروشگاه ${sellerOffer.shop.name}`}>
+                            <iframe src={inlineMapUrl} title={`موقعیت ثبت‌شده ${sellerOffer.shop.name} روی OpenStreetMap`} loading="lazy" referrerPolicy="no-referrer" />
+                            <small>مختصات ثبت‌شده فروشگاه؛ زمان سفر و مسیر داخل پاساژ تأیید نشده‌اند.</small>
+                          </div>
+                        )}
                         <button
                           type="button"
                           className="mission-offer-verify"
@@ -573,6 +585,8 @@ export function MissionPanel({
   const [error, setError] = useState<string | null>(null)
   const [stageLabel, setStageLabel] = useState<string | null>(null)
   const [isLocating, setIsLocating] = useState(false)
+  const [showRegionPicker, setShowRegionPicker] = useState(false)
+  const [selectedRegionId, setSelectedRegionId] = useState('')
   const composerInputRef = useRef<HTMLTextAreaElement | null>(null)
   const turnCounter = useRef(0)
 
@@ -782,6 +796,34 @@ export function MissionPanel({
     }
   }
 
+  const applyManualRegion = (regionId: string) => {
+    if (isLocating || isRunning || isRestoring) return
+    const area = TEHRAN_REGION_SAMPLES.find((item) => item.id === regionId)
+    if (!area) return
+    const nextLocation = { lat: area.lat, lon: area.lon }
+    const nextConstraints: MissionConstraints = {
+      city: 'tehran',
+      ...(budget.trim() ? { max_price_toman: budget.trim() } : {}),
+      must_have_in_person_credit: mustHaveCredit,
+      lat: nextLocation.lat,
+      lon: nextLocation.lon,
+      radius_m: radiusM,
+      sort: 'distance_asc',
+    }
+    setSelectedRegionId(regionId)
+    onLocationChange(nextLocation)
+    onRestoreConstraints(nextConstraints, lastQuery)
+    setShowRegionPicker(false)
+    setError(null)
+    setChatMessages((current) => [...current, {
+      id: `assistant-manual-location-${Date.now()}`,
+      role: 'assistant',
+      text: `محدوده نمونه «${area.label}» انتخاب شد. فاصله‌ها مستقیم‌اند و بر اساس مختصات نمونهٔ فروشگاه‌های این محدوده محاسبه می‌شوند.`,
+      components: [],
+    }])
+    if (lastQuery.trim()) void runTurn(lastQuery, nextConstraints, lastQuery)
+  }
+
   const handleLocationClick = () => {
     if (isLocating || isRunning || isRestoring) return
     if (location) {
@@ -791,6 +833,7 @@ export function MissionPanel({
         must_have_in_person_credit: mustHaveCredit,
         sort: sort === 'distance_asc' ? 'relevance' : sort,
       }
+      setSelectedRegionId('')
       onLocationChange(null)
       onRestoreConstraints(nextConstraints, lastQuery)
       if (lastQuery.trim()) void runTurn(lastQuery, nextConstraints, lastQuery)
@@ -825,6 +868,7 @@ export function MissionPanel({
           radius_m: radiusM,
           sort: 'distance_asc',
         }
+        setSelectedRegionId('')
         onLocationChange(nextLocation)
         onRestoreConstraints(nextConstraints, lastQuery)
         setChatMessages((current) => [...current, {
@@ -1276,11 +1320,24 @@ export function MissionPanel({
           {location && <span><MapPin size={13} /> فاصله مستقیم تا {money.format(radiusM / 1000)} کیلومتر</span>}
           {isLocating && <span><LoaderCircle size={13} className="spin" /> دریافت موقعیت…</span>}
         </div>
+        <button className="mission-manual-region-toggle" type="button" aria-expanded={showRegionPicker} disabled={isRunning || isRestoring} onClick={() => setShowRegionPicker(value => !value)}>
+          <MapPin size={13} /> انتخاب دستی محدوده
+        </button>
         <details className="conversation-disclosure">
           <summary>درباره داده‌ها</summary>
           <p>قیمت‌ها تاریخی‌اند و موجودی به‌صورت نمایشی بررسی می‌شود. بیشتر نام فروشگاه‌ها و همه شماره‌های تماس دیتاست مسابقه ساختگی‌اند.</p>
         </details>
       </div>
+      {showRegionPicker && (
+        <div className="mission-manual-region-panel">
+          <label htmlFor="manual-tehran-region">محدوده تقریبی اطراف فروشگاه‌های دیتاست</label>
+          <select id="manual-tehran-region" value={selectedRegionId} disabled={isRunning || isRestoring} onChange={event => applyManualRegion(event.target.value)}>
+            <option value="">یک محدوده انتخاب کن</option>
+            {TEHRAN_REGION_SAMPLES.map(area => <option key={area.id} value={area.id}>{area.label}</option>)}
+          </select>
+          <small>این مختصات نمونه‌اند؛ همه فروشگاه‌های تهران در دیتاست حضور ندارند.</small>
+        </div>
+      )}
     </section>
   )
 }

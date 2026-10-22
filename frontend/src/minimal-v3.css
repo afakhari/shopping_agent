@@ -787,3 +787,30 @@
     padding-inline: 10px;
   }
 }
+
+
+/* Optional map and privacy-preserving manual area fallback. */
+.redesign-v2 .mission-inline-map-toggle,
+.redesign-v2 .mission-manual-region-toggle {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 36px; padding: 6px 10px; border: 1px solid var(--bc-border);
+  border-radius: 9px; background: #fff; color: var(--bc-ink); font-size: 12px;
+  cursor: pointer;
+}
+.redesign-v2 .mission-inline-map { grid-column: 1 / -1; width: 100%; min-width: 0; padding: 8px 0; }
+.redesign-v2 .mission-inline-map iframe { display: block; width: 100%; height: 260px; border: 1px solid var(--bc-border); border-radius: 12px; }
+.redesign-v2 .mission-inline-map small { display: block; margin-block-start: 6px; color: var(--bc-muted); }
+.redesign-v2 .mission-manual-region-panel {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 14px 12px;
+  max-width: 100%; border-top: 1px solid var(--bc-border); font-size: 12px;
+}
+.redesign-v2 .mission-manual-region-panel select {
+  min-height: 42px; max-width: 100%; min-width: 140px; padding-inline: 12px;
+  border: 1px solid var(--bc-border); border-radius: 10px; background: #fff; color: var(--bc-ink);
+}
+.redesign-v2 .mission-manual-region-panel small { flex-basis: 100%; color: var(--bc-muted); }
+@media (max-width: 390px) {
+  .redesign-v2 .mission-manual-region-panel { flex-direction: column; align-items: stretch; }
+  .redesign-v2 .mission-manual-region-panel select { width: 100%; }
+  .redesign-v2 .mission-inline-map iframe { height: 210px; }
+}
