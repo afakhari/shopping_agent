@@ -6,7 +6,7 @@
   powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\diagnose-search.ps1
 #>
 [CmdletBinding()]
-param([string]$Query = 'هدفون')
+param([string]$Query = '', [switch]$RebuildBackend)
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $Root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
@@ -17,12 +17,24 @@ try {
     & docker compose ps
     if ($LASTEXITCODE -ne 0) { throw 'Docker compose status unavailable.' }
 
-    Write-Host '>>> Build backend source updates (no dataset reimport)' -ForegroundColor Cyan
-    & docker compose up -d --build backend
-    if ($LASTEXITCODE -ne 0) { throw 'Backend build/start failed.' }
+    # Rebuild only when backend Python code changes; plain diagnosis is fast.
+    if ($RebuildBackend) {
+        Write-Host '>>> Rebuild backend (explicitly requested)' -ForegroundColor Cyan
+        & docker compose up -d --build backend
+    } else {
+        Write-Host '>>> Ensure existing backend is started (no rebuild)' -ForegroundColor Cyan
+        & docker compose up -d backend
+    }
+    if ($LASTEXITCODE -ne 0) { throw 'Backend start failed.' }
 
     Write-Host '>>> Database counters and direct Django API' -ForegroundColor Cyan
-    & docker compose exec -T backend python manage.py diagnose_search --query $Query
+    # A blank Query uses the UTF-8 default defined in Python on Linux.
+    # Windows PowerShell 5.1 decodes UTF-8 scripts without BOM as ANSI.
+    if ([string]::IsNullOrWhiteSpace($Query)) {
+        & docker compose exec -T backend python manage.py diagnose_search
+    } else {
+        & docker compose exec -T backend python manage.py diagnose_search --query $Query
+    }
     if ($LASTEXITCODE -ne 0) { throw 'Django diagnostic command failed.' }
 
     $port = 8080
@@ -33,7 +45,13 @@ try {
             Select-Object -First 1
         if ($line -match '^APP_PORT=(\d+)$') { $port = [int]$Matches[1] }
     }
-    $q = [Uri]::EscapeDataString($Query)
+    # This ASCII-only literal is the UTF-8 percent encoding of the default query.
+    # Never embed Persian characters directly in a Windows PowerShell 5.1 .ps1.
+    $q = if ([string]::IsNullOrWhiteSpace($Query)) {
+        '%D9%87%D8%AF%D9%81%D9%88%D9%86'
+    } else {
+        [Uri]::EscapeDataString($Query)
+    }
     $uri = "http://127.0.0.1:$port/api/v1/catalog/search/?q=$q"
     Write-Host '>>> Gateway API response (search query is URL-encoded)' -ForegroundColor Cyan
     try {

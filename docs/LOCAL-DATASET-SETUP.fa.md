@@ -57,3 +57,22 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup-dataset.ps1 
 
 ## محدودیت اثبات
 اجرای موفق این اسکریپت فقط ورود دیتاست محلی، تطبیق تعداد رکوردها و smoke test API را ثابت می‌کند. مرورگر موبایل، نقشه واقعی، LLM، کل سناریوی مأموریت و محیط production همچنان به تست مستقل نیاز دارند.
+
+## رفع صفر بودن نتیجه جست‌وجوی فارسی در Windows PowerShell 5.1
+
+اگر تعداد رکوردها درست است اما جست‌وجوی «هدفون» صفر نتیجه برمی‌گرداند و خروجی Django شامل `\\u00d9\\u2021` یا کاراکترهای `Ã` است، احتمالاً اسکریپت PowerShell قدیمی، رشته فارسی UTF-8 بدون BOM را با ANSI تفسیر کرده است. مشکل از ورود داده نیست.
+
+```powershell
+git pull --ff-only origin main
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\diagnose-search.ps1
+```
+
+اسکریپت اصلاح‌شده برای پرس‌وجوی پیش‌فرض، متن فارسی را داخل Django تعیین می‌کند و در سمت HTTP از رشته percent-encoded استاندارد UTF-8 استفاده می‌کند؛ بنابراین نیازی به بازسازی Backend، اجرای دوباره import یا تغییر code page ویندوز ندارد.
+
+برای ارزیابی مستقیم Django بدون عبور از PowerShell به‌عنوان پارامتر فارسی:
+
+```powershell
+docker compose exec -T backend python manage.py diagnose_search
+```
+
+پس از تأیید نتیجه غیرصفر، می‌توان اسکریپت معمول راه‌اندازی را دوباره اجرا کرد. هیچ CI جدیدی برای این اصلاح ضروری نیست.

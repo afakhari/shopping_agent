@@ -205,7 +205,9 @@ try {
             & docker compose logs --tail 80 frontend backend
             throw 'Web gateway did not become ready.'
         }
-        $encodedQuery = [Uri]::EscapeDataString('هدفون')
+        # ASCII-only UTF-8 percent encoding for the default Persian query:
+        # Avoid Windows PowerShell 5.1 misreading UTF-8 .ps1 files without BOM.
+        $encodedQuery = '%D9%87%D8%AF%D9%81%D9%88%D9%86'
         $searchUrl = "http://127.0.0.1:$appPort/api/v1/catalog/search/?q=$encodedQuery" + '&page=1&page_size=2'
         $result = Invoke-RestMethod -Uri $searchUrl -TimeoutSec 120
         $hasTotal = $null -ne $result -and $result.PSObject.Properties.Name -contains 'total'
