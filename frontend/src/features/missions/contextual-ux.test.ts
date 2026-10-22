@@ -44,6 +44,11 @@ describe('evidence-first purchase flow', () => {
     const localIntents = readFileSync(new URL('./greeting-intent.ts', import.meta.url), 'utf8')
     expect(localIntents).toContain('چطور ازت استفاده کنم')
   })
+  it('keeps the latest empty-result form usable after a courtesy reply but hides older disabled forms', () => {
+    expect(mission).toContain('const isActionableSearch = isCurrent || isCurrentResult')
+    expect(mission).toContain('visiblePreComponents.length > 0')
+    expect(mission).toContain('جست‌وجوی قبلی نتیجه‌ای نداشت')
+  })
   it('never blindly reposts a failed turn or a failed contact request', () => {
     expect(mission).toContain('completedTurnWasPersisted(snapshot, trimmed, lastSavedSequence)')
     expect(mission).toContain('clientRequestId = pendingContactIdsRef.current.get(requestKey)')

@@ -1294,6 +1294,12 @@ export function MissionPanel({
           const isCurrent = currentAssistantMessage?.id === item.id
           const isCurrentResult = currentResultsMessage?.id === item.id
           const preComponents = item.components.filter((component) => PRE_RESULT_COMPONENTS.has(component.type))
+          // Local courtesy/help turns must not disable the last usable search form.
+          // Older failed searches, however, should not fill the transcript with dead forms.
+          const isActionableSearch = isCurrent || isCurrentResult
+          const visiblePreComponents = isActionableSearch
+            ? preComponents
+            : preComponents.filter((component) => component.type === 'notice')
           const postComponents = item.components.filter((component) => !PRE_RESULT_COMPONENTS.has(component.type))
           const hasDedicatedEmptyState = item.components.some((component) => ['empty_state', 'clarification_form'].includes(component.type))
           return (
@@ -1302,7 +1308,10 @@ export function MissionPanel({
               {item.text && !item.components.some((component) => component.type === 'empty_state') && (item.results && item.results.length > 0 && !item.pending
                 ? <details className="assistant-explanation"><summary>درباره این نتایج <ChevronDown size={13} aria-hidden="true" /></summary><p>{item.text}</p></details>
                 : <div className="assistant-message-copy">{item.text}</div>)}
-              {preComponents.length > 0 && <GenUIRenderer components={preComponents} defaults={{ query: lastQuery, max_price_toman: budget, must_have_in_person_credit: mustHaveCredit, sort: constraints.sort ?? 'relevance' }} disabled={isRunning || isRestoring || !isCurrent} onAction={handleGenUIAction} />}
+              {!isActionableSearch && hasDedicatedEmptyState && (
+                <p className="assistant-message-copy">این جست‌وجوی قبلی نتیجه‌ای نداشت؛ شرایط جست‌وجوی فعلی را از آخرین پیام اصلاح کن.</p>
+              )}
+              {visiblePreComponents.length > 0 && <GenUIRenderer components={visiblePreComponents} defaults={{ query: lastQuery, max_price_toman: budget, must_have_in_person_credit: mustHaveCredit, sort: constraints.sort ?? 'relevance' }} disabled={isRunning || isRestoring || !isActionableSearch} onAction={handleGenUIAction} />}
               {item.results && item.results.length > 0 && (
                 <div className="mission-results-block conversation-results-block">
                   <div className="mission-results-header">
