@@ -14,6 +14,10 @@ describe('seller shortlist factual tags',()=>{
     expect(sellerHighlights([item('a',null,null)]))
       .toEqual({cheapestOfferId:null, closestOfferId:null})
   })
+  it('accepts whole-toman decimals without truncating fractional prices',()=>{
+    expect(sellerHighlights([item('whole','600.00',200),item('fractional','500.25',100)]))
+      .toEqual({cheapestOfferId:'whole',closestOfferId:'fractional'})
+  })
   it('ignores negative and NaN distances and nonnumeric prices',()=>{
     expect(sellerHighlights([item('x','bad',-1),item('b','123',Number.NaN)]))
       .toEqual({cheapestOfferId:'b', closestOfferId:null})

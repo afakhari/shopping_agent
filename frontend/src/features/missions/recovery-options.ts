@@ -36,7 +36,7 @@ function parseOffer(raw: unknown, kind: RecoveryChoice['kind'], productTitle: st
     shopName: readable(shop?.name) ?? 'فروشگاه با نام نامشخص',
     productTitle,
     address: readable(shop?.address) ?? readable(shop?.location_label),
-    priceToman: price && /^\d+(?:\.\d+)?$/.test(price) ? price : null,
+    priceToman: price && /^\d+(?:\.0+)?$/.test(price) ? price : null,
   }
 }
 

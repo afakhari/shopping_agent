@@ -36,7 +36,10 @@ const OUTCOME_LABELS: Record<ContactAttemptResponse['attempt']['outcome'], strin
 
 function formatPrice(price: string | null): string {
   if (!price) return 'قیمت ثبت نشده'
-  try { return `${money.format(BigInt(price))} تومان` } catch { return 'قیمت نامشخص' }
+  try {
+    if (!/^\\d+(?:\\.0+)?$/.test(price)) return 'قیمت نامشخص'
+    return `${money.format(BigInt(price.split('.')[0]))} تومان`
+  } catch { return 'قیمت نامشخص' }
 }
 
 function formatRegisteredWarranty(warranty: CatalogOffer['warranty']): string | null {
