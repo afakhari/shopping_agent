@@ -207,6 +207,12 @@ class MissionApiTests(TestCase):
         mission = PurchaseMission.objects.get(pk=mission_id)
         self.assertEqual(mission.constraints["max_price_toman"], "3000000")
         self.assertTrue(mission.constraints["must_have_in_person_credit"])
+        completed = MissionEvent.objects.filter(
+            mission_id=mission_id, event_type="turn.completed"
+        ).order_by("-seq").first()
+        self.assertIsNotNone(completed)
+        self.assertEqual(completed.payload["constraints"]["max_price_toman"], "3000000")
+        self.assertTrue(completed.payload["constraints"]["must_have_in_person_credit"])
 
     def test_contact_purpose_not_implemented_is_rejected(self):
         mission_id = self._create_mission_and_search()

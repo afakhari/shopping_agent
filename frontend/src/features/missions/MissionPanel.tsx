@@ -643,6 +643,11 @@ export function MissionPanel({
       ? current
       : [...current, event].sort((left, right) => left.seq - right.seq))
 
+    if (event.type === 'turn.completed' && isRecord(event.payload.constraints)) {
+      // Reconcile inferred natural-language constraints with the visible filters.
+      // The server decides eligibility; the client must not silently present stale filters.
+      onRestoreConstraints(event.payload.constraints as MissionConstraints, lastQuery)
+    }
     if (event.type === 'stage') {
       const label = readText(event.payload, 'label')
       if (label) setStageLabel(label)
