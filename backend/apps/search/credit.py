@@ -50,7 +50,7 @@ def eligible_credit_offer_query() -> Q:
                 continue
             if min_price is not None and max_price is not None and min_price > max_price:
                 continue
-            categories = option.get("category_names")
+            categories = option.get("category_names", [])
             if not isinstance(categories, list):
                 continue
             if any(not isinstance(name, str) for name in categories):

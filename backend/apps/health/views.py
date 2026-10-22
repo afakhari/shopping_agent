@@ -35,11 +35,17 @@ def ready(_request):
     # Keep lightweight development environments usable without the challenge dataset.
     checks = {"database": "ok"}
     if getattr(settings, "REQUIRE_DATASET_FOR_READINESS", False):
-        populated = {
-            "products": Product.objects.exists(),
-            "shops": Shop.objects.exists(),
-            "offers": Offer.objects.exists(),
-        }
+        try:
+            populated = {
+                "products": Product.objects.exists(),
+                "shops": Shop.objects.exists(),
+                "offers": Offer.objects.exists(),
+            }
+        except DatabaseError:
+            return JsonResponse(
+                {"status": "not_ready", "checks": {"database": "ok", "catalog": "error"}},
+                status=503,
+            )
         checks["catalog"] = "ok" if all(populated.values()) else "incomplete"
         if checks["catalog"] != "ok":
             return JsonResponse({"status": "not_ready", "checks": checks}, status=503)
