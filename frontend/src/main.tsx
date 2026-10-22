@@ -6,6 +6,7 @@ import './styles.css'
 import './styles-polish.css'
 import './chat-shell.css'
 import './design-system.css'
+import './result-cards.css'
 
 const queryClient = new QueryClient({
   defaultOptions: {

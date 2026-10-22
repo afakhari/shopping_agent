@@ -201,7 +201,7 @@ function ProductResults({
 }) {
   const [showAllResults, setShowAllResults] = useState(false)
   if (results.length === 0) return <p className="mission-empty-results">با این عبارت و شرایط، محصول واجد شرایطی پیدا نشد. می‌توانی عبارت یا شروط خرید را تغییر بدهی.</p>
-  const visibleResults = showAllResults ? results : results.slice(0, 6)
+  const visibleResults = showAllResults ? results : results.slice(0, 4)
   return (
     <div className="mission-product-results" aria-label="نتایج محصولات">
       {visibleResults.map((result) => {
@@ -234,23 +234,39 @@ function ProductResults({
                 <span className={`mission-price-quality ${offer.price_quality}`}><i />{getPriceQualityLabel(offer.price_quality)}</span>
                 <span className="mission-offer-count"><Store size={14} />{money.format(result.eligible_offers_count)} فروشگاه واجد شرایط</span>
               </div>
-              {result.reasons.length > 0 && (
-                <div className="mission-product-reasons" aria-label="دلایل نمایش این پیشنهاد">
-                  {result.reasons.slice(0, 3).map((reason) => <span key={reason}><CheckCircle2 size={12} />{reason}</span>)}
-                </div>
-              )}
-              <small className="mission-product-updated" title={priceUpdatedAt ? `زمان دقیق ثبت‌شده: ${priceUpdatedAt}` : undefined}>
-                <Clock3 size={13} />
-                {priceUpdatedRelative}
-                {priceUpdatedAt && <span className="mission-product-updated-exact">({priceUpdatedAt})</span>}
+              <small className="mission-product-address-preview" title={address}>
+                <MapPin size={13} aria-hidden="true" />
+                <span>{offer.shop.location_label ?? address}</span>
               </small>
-              <small className="mission-product-address"><MapPin size={13} />{address}</small>
-              {distanceLabel && <small className="mission-product-distance"><LocateFixed size={13} />فاصلهٔ مستقیم: {distanceLabel}</small>}
-              {mapUrl && <a className="mission-map-link" href={mapUrl} target="_blank" rel="noopener noreferrer"><MapPin size={13} /> نمایش نقطهٔ ثبت‌شده روی نقشه <ExternalLink size={12} /></a>}
-              <span className={`mission-shop-credit ${offer.shop.accepts_in_person_credit ? 'registered' : 'unknown'}`}>
-                <CreditCard size={13} />
-                {offer.shop.accepts_in_person_credit ? 'پذیرش اعتباری حضوری ثبت شده' : 'اطلاعات اعتبار حضوری ثبت نشده'}
-              </span>
+              {offer.shop.accepts_in_person_credit && (
+                <span className="mission-credit-confirmed"><CreditCard size={13} /> خرید اعتباری حضوری ثبت شده</span>
+              )}
+              <details className="mission-product-details">
+                <summary>
+                  جزئیات فروشنده و اعتبار اطلاعات
+                  <ChevronDown size={14} aria-hidden="true" />
+                </summary>
+                <div className="mission-product-details-content">
+                  <small className="mission-product-updated" title={priceUpdatedAt ? `زمان دقیق ثبت‌شده: ${priceUpdatedAt}` : undefined}>
+                    <Clock3 size={13} aria-hidden="true" />{priceUpdatedRelative}
+                    {priceUpdatedAt && <span className="mission-product-updated-exact">(${priceUpdatedAt})</span>}
+                  </small>
+                  <small className="mission-product-address"><MapPin size={13} aria-hidden="true" />{address}</small>
+                  {distanceLabel && <small className="mission-product-distance"><LocateFixed size={13} aria-hidden="true" />فاصلهٔ مستقیم: {distanceLabel}</small>}
+                  {mapUrl && <a className="mission-map-link" href={mapUrl} target="_blank" rel="noopener noreferrer">
+                    <MapPin size={13} aria-hidden="true" /> نمایش موقعیت ثبت‌شده روی نقشه <ExternalLink size={12} aria-hidden="true" />
+                  </a>}
+                  {!offer.shop.accepts_in_person_credit && (
+                    <span className="mission-credit-unknown"><CreditCard size={13} aria-hidden="true" /> اطلاعات خرید اعتباری حضوری ثبت نشده</span>
+                  )}
+                  {result.reasons.length > 0 && (
+                    <div className="mission-product-reasons" aria-label="دلایل نمایش این پیشنهاد">
+                      {result.reasons.slice(0, 3).map((reason) => <span key={reason}><CheckCircle2 size={12} />{reason}</span>)}
+                    </div>
+                  )}
+                  <small className="mission-product-disclaimer">قیمت و موجودی حضوری نیاز به استعلام فروشنده دارند.</small>
+                </div>
+              </details>
               <div className="mission-product-actions">
                 {allowActions ? (
                   <button
@@ -383,7 +399,7 @@ function ProductResults({
           </article>
         )
       })}
-      {results.length > 6 && (
+      {results.length > 4 && (
         <button type="button" className="mission-more-results" onClick={() => setShowAllResults((visible) => !visible)} aria-expanded={showAllResults}>
           {showAllResults ? <>نمایش گزینه‌های کمتر <ChevronUp size={16} /></> : <>نمایش {new Intl.NumberFormat('fa-IR').format(results.length - visibleResults.length)} گزینهٔ دیگر <ChevronDown size={16} /></>}
         </button>
