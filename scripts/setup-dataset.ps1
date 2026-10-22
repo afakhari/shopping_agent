@@ -205,10 +205,16 @@ try {
             & docker compose logs --tail 80 frontend backend
             throw 'Web gateway did not become ready.'
         }
-        $query = [Uri]::EscapeDataString('هدفون')
-        $result = Invoke-RestMethod -Uri "http://127.0.0.1:$appPort/api/v1/catalog/search/?q=$query&page=1&page_size=2" -TimeoutSec 60
-        if ([int]$result.total -lt 1) {
-            throw 'Catalog search returned no result for the known sample query.'
+        $encodedQuery = [Uri]::EscapeDataString('هدفون')
+        $searchUrl = "http://127.0.0.1:$appPort/api/v1/catalog/search/?q=$encodedQuery" + '&page=1&page_size=2'
+        $result = Invoke-RestMethod -Uri $searchUrl -TimeoutSec 120
+        $hasTotal = $null -ne $result -and $result.PSObject.Properties.Name -contains 'total'
+        if (-not $hasTotal -or [int]$result.total -lt 1) {
+            Write-Host 'Search smoke test failed. Inspecting the actual PostgreSQL and Django API state:' -ForegroundColor Yellow
+            Invoke-Checked 'Read-only DB and search diagnostics' @(
+                'compose','exec','-T','backend','python','manage.py','diagnose_search'
+            )
+            throw 'The real catalog search returned zero results or unexpected JSON. Use the diagnostics above; do not reimport the dataset.'
         }
         Write-Host "Search smoke test passed: $($result.total) matching products." -ForegroundColor Green
         Write-Host "Application: http://localhost:$appPort" -ForegroundColor Green
