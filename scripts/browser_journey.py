@@ -66,6 +66,15 @@ def main() -> None:
                 page.screenshot(path=str(OUTPUT / f"welcome-{width}.png"), full_page=True)
 
                 if width == 390:
+                    composer = page.locator('textarea[aria-label="پیام به دستیار خرید"]')
+                    composer.fill("چطوری؟")
+                    page.get_by_role("button", name="ارسال پیام").click()
+                    page.get_by_text("سلام! خوش اومدی.", exact=False).first.wait_for()
+                    assert page.locator(".genui-empty-state").count() == 0
+                    composer.fill("راهنما")
+                    page.get_by_role("button", name="ارسال پیام").click()
+                    page.get_by_text("برای شروع نام یا کاربرد محصول را بنویس", exact=False).first.wait_for()
+                    assert_no_horizontal_overflow(page, width)
                     page.get_by_role("button", name="انتخاب دستی محدوده").click()
                     page.locator("#manual-tehran-region").select_option("jomhouri")
                     page.get_by_text("محدوده نمونه", exact=False).first.wait_for()
@@ -124,6 +133,35 @@ def main() -> None:
                     assert "۱" in page.locator(".mission-active-filters").first.inner_text()
                     assert_no_horizontal_overflow(page, width)
                     page.screenshot(path=str(OUTPUT / "inferred-budget-mobile.png"), full_page=True)
+
+                    # Missing products should show a single clear recovery form,
+                    # not a three-times-repeated no-result announcement.
+                    page.locator('textarea[aria-label="پیام به دستیار خرید"]').fill(
+                        "کوانتوم ناموجود آزمایشگاهی بدون مدل"
+                    )
+                    page.get_by_role("button", name="ارسال پیام").click()
+                    page.locator(".genui-empty-state").last.wait_for()
+                    assert page.locator(".genui-empty-state .genui-empty-heading").last.count() == 1
+                    assert page.locator(".genui-empty-state .genui-card-heading").last.count() == 0
+                    assert page.locator(".chat-message-assistant").last.locator(".assistant-message-copy").count() == 0
+                    assert_no_horizontal_overflow(page, width)
+                    page.screenshot(path=str(OUTPUT / "empty-result-mobile.png"), full_page=True)
+
+                    # A temporary proxy failure must not delete the draft or
+                    # silently submit twice. Recover via GET instead of POST.
+                    page.route(
+                        "**/api/v1/missions/*/turns/",
+                        lambda route: route.fulfill(status=502, content_type="text/html", body="<html>upstream</html>"),
+                    )
+                    composer.fill("هدفون بی سیم تست مرورگر")
+                    page.get_by_role("button", name="ارسال پیام").click()
+                    page.locator(".conversation-error").get_by_text("ارتباط با سرور", exact=False).wait_for()
+                    assert composer.input_value() == "هدفون بی سیم تست مرورگر"
+                    page.unroute("**/api/v1/missions/*/turns/")
+                    page.get_by_role("button", name="بازیابی وضعیت").click()
+                    page.locator(".conversation-error").wait_for(state="detached")
+                    assert_no_horizontal_overflow(page, width)
+                    page.screenshot(path=str(OUTPUT / "upstream-recovery-mobile.png"), full_page=True)
 
                 context.close()
             print("BROWSER_JOURNEY=PASS; Chromium RTL 320/390/1440; synthetic fixtures.")

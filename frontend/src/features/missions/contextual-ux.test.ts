@@ -33,6 +33,27 @@ describe('evidence-first purchase flow', () => {
     expect(mission).toContain('mission-compare-tray')
     expect(mission).toContain('setComparisonOpen(')
   })
+  it('renders one explanatory heading for a missing result instead of three repeated warnings', () => {
+    const genUI = readFileSync(new URL('./GenUIRenderer.tsx', import.meta.url), 'utf8')
+    expect(mission).toContain("!item.components.some((component) => component.type === 'empty_state')")
+    expect(genUI).toContain("data: { ...data, title: undefined, description: undefined }")
+    expect(genUI).toContain('genui-empty-heading')
+  })
+  it('routes short help and greetings without starting a paid LLM request', () => {
+    expect(mission).toContain('const localIntent = classifyLocalConversation(trimmed)')
+    const localIntents = readFileSync(new URL('./greeting-intent.ts', import.meta.url), 'utf8')
+    expect(localIntents).toContain('چطور ازت استفاده کنم')
+  })
+  it('keeps the latest empty-result form usable after a courtesy reply but hides older disabled forms', () => {
+    expect(mission).toContain('const isActionableSearch = isCurrent || isCurrentResult')
+    expect(mission).toContain('visiblePreComponents.length > 0')
+    expect(mission).toContain('جست‌وجوی قبلی نتیجه‌ای نداشت')
+  })
+  it('never blindly reposts a failed turn or a failed contact request', () => {
+    expect(mission).toContain('completedTurnWasPersisted(snapshot, trimmed, lastSavedSequence)')
+    expect(mission).toContain('clientRequestId = pendingContactIdsRef.current.get(requestKey)')
+    expect(mission).toContain('بازیابی وضعیت')
+  })
   it('keeps seller details optional instead of expanding every long address', () => {
     expect(mission).toContain('<details className="mission-seller-details">')
     expect(styles).toContain('.mission-seller-details summary')

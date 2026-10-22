@@ -214,6 +214,7 @@ function SchemaForm({
                       <input
                         id={`genui-${component.id ?? component.type}-${field.id}`}
                         type="text"
+                        maxLength={field.type === 'number' ? 32 : 2000}
                         inputMode={field.type === 'number' ? 'numeric' : 'text'}
                         autoComplete={field.type === 'number' ? 'off' : 'on'}
                         dir={field.type === 'number' ? 'ltr' : 'rtl'}
@@ -258,7 +259,7 @@ function EmptyState({ component, defaults, onAction, disabled }: { component: Ge
   return (
     <section className="genui-empty-state">
       <div className="genui-empty-heading"><AlertCircle size={21} /><div><strong>{text(data.title, 'با این شرایط موردی پیدا نشد')}</strong><p>{text(data.message, 'شروط سخت خرید خودکار تغییر نمی‌کنند. می‌توانی عبارت یا فیلترها را اصلاح کنی.')}</p></div></div>
-      {readFields(data.fields).length > 0 && <SchemaForm key={component.id ?? 'empty-state-form'} component={{ ...component, type: 'constraint_form' }} defaults={defaults} disabled={disabled} onAction={onAction} />}
+      {readFields(data.fields).length > 0 && <SchemaForm key={component.id ?? 'empty-state-form'} component={{ ...component, type: 'constraint_form', data: { ...data, title: undefined, description: undefined } }} defaults={defaults} disabled={disabled} onAction={onAction} />}
       {readFields(data.fields).length === 0 && <button type="button" disabled={disabled} className="genui-secondary-action" onClick={() => onAction({ type: 'fill_query', query: text(data.query, defaults.query) })}>اصلاح عبارت جست‌وجو <ArrowLeft size={15} /></button>}
     </section>
   )
