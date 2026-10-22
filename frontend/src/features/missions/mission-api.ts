@@ -165,7 +165,8 @@ export async function sendMissionTurn(
     try {
       const event = JSON.parse(raw) as MissionEvent
       if (event && Number.isSafeInteger(event.seq) && typeof event.type === 'string'
-        && event.mission_id === missionId && event.schema_version === 1) {
+        && event.mission_id === missionId && event.schema_version === 1
+        && event.payload && typeof event.payload === 'object' && !Array.isArray(event.payload)) {
         if (event.type === 'ui.component') gotResultSurface = true
         if (event.type === 'turn.completed') gotCompletion = true
         onEvent(event)

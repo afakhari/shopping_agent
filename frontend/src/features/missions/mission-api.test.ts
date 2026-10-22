@@ -52,6 +52,13 @@ describe('SSE stream terminal state', () => {
       { status: 200 })))
     await expect(sendMissionTurn('mission', 'هدفون', {}, () => undefined)).rejects.toThrow('کامل')
   })
+  it('rejects a completion event without a structured payload', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+      stream(event('ui.component', 1), { ...event('turn.completed', 2), payload: null } as unknown as MissionEvent),
+      { status: 200 },
+    )))
+    await expect(sendMissionTurn('mission', 'هدفون', {}, () => undefined)).rejects.toThrow('کامل')
+  })
   it('ignores cross-mission stream frames', async () => {
     vi.stubGlobal('fetch', vi.fn(async () =>
       new Response(stream({ ...event('ui.component', 1), mission_id: 'other' },
