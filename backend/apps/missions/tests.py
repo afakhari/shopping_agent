@@ -335,3 +335,39 @@ class MissionApiTests(TestCase):
         )
         self.assertEqual(collision.status_code, 400)
         self.assertEqual(ContactAttempt.objects.count(), 1)
+
+    def test_visit_plan_backup_hours_and_snapshot(self):
+        mission_id = self._create_mission_and_search()
+        url = f"/api/v1/missions/{mission_id}/visit-plan/"
+        self.assertEqual(self.client.get(url).status_code, 404)
+        first = self.client.post(
+            f"/api/v1/missions/{mission_id}/contact-attempts/",
+            {"shop_id": self.shop_a.source_id, "offer_id": self.offer_a.source_id},
+            format="json",
+        )
+        self.assertEqual(first.status_code, 201)
+        second = self.client.post(
+            f"/api/v1/missions/{mission_id}/contact-attempts/",
+            {"shop_id": self.shop_b.source_id, "offer_id": self.offer_b.source_id},
+            format="json",
+        )
+        self.assertEqual(second.status_code, 201)
+        plan = self.client.get(url)
+        self.assertEqual(plan.status_code, 200, plan.content)
+        details = plan.json()
+        self.assertEqual(details["offer_id"], self.offer_b.source_id)
+        self.assertEqual(details["backup_seller"]["offer_id"], self.offer_a.source_id)
+        self.assertIn("استعلام نشده", details["backup_seller"]["status"])
+        self.assertTrue(any(item["key"] == "weekly_hours" for item in details["details"]))
+        self.assertEqual(
+            self.client.get(f"/api/v1/missions/{mission_id}/").json()["state"]["visit_plan"],
+            details,
+        )
+
+    def test_visit_plan_cannot_be_read_from_another_session(self):
+        from rest_framework.test import APIClient
+        mission_id = self._create_mission_and_search()
+        self.assertEqual(
+            APIClient().get(f"/api/v1/missions/{mission_id}/visit-plan/").status_code,
+            404,
+        )

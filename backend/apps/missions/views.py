@@ -10,7 +10,7 @@ from django.db import transaction
 from django.http import StreamingHttpResponse
 from django.shortcuts import get_object_or_404
 from rest_framework.decorators import api_view, renderer_classes
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 
@@ -27,6 +27,7 @@ from apps.missions.serializers import (
     MissionTurnSerializer,
 )
 from apps.missions.services import append_events_locked, serialize_mission
+from apps.missions.visit_plan import build_visit_plan
 from apps.catalog.services.normalization import normalize_persian_text
 from apps.search.services import eligible_offer_list, product_search_page, serialize_offer
 
@@ -236,6 +237,15 @@ def mission_turn(request, mission_id: str):
     return response_stream
 
 
+@api_view(["GET"])
+def get_visit_plan(request, mission_id: str):
+    mission = _owned_mission(request, mission_id)
+    plan = (mission.state or {}).get("visit_plan")
+    if not isinstance(plan, dict) or not plan:
+        raise NotFound("برنامه مراجعه برای این مأموریت هنوز آماده نیست.")
+    return Response(plan)
+
+
 @api_view(["POST"])
 def create_contact_attempt(request, mission_id: str):
     serializer = ContactAttemptCreateSerializer(data=request.data)
@@ -299,33 +309,14 @@ def create_contact_attempt(request, mission_id: str):
                 },
             ),
         ]
+        visit_plan: dict | None = None
         if result.attempt.outcome == "confirmed_available":
-            registered_price = (
-                f"{offer.price_toman:,.0f} تومان" if offer.price_toman is not None else "قیمت ثبت نشده"
+            backup_candidates = _serialize_alternatives(mission, offer, data["shop_id"])
+            visit_plan = build_visit_plan(
+                offer, str(result.attempt.pk),
+                backup_candidates[0] if backup_candidates else None,
             )
-            changed_at = offer.last_price_changed_at.isoformat() if offer.last_price_changed_at else ""
-            event_list.append(
-                (
-                    "ui.component",
-                    {
-                        "component": "visit_plan",
-                        "data": {
-                            "title": "برنامه مراجعه آماده است",
-                            "description": "اطلاعات ثبت‌شده برای بازبینی پیش از حرکت؛ موجودی فقط در سناریوی دمو تأیید شده است.",
-                            "status": "موجودی در سناریوی دمو تأیید شد",
-                            "source_label": "شبیه‌سازی کنترل‌شده؛ هیچ تماس واقعی انجام نشده است.",
-                            "details": [
-                                {"key": "product", "label": "محصول", "value": offer.product.persian_title or offer.product.source_id},
-                                {"key": "shop", "label": "فروشگاه", "value": offer.shop.name or offer.shop.source_id},
-                                {"key": "price", "label": "قیمت ثبت‌شده", "value": registered_price},
-                                {"key": "last_price_changed_at", "label": "آخرین تغییر قیمت", "value": changed_at or "زمان تغییر قیمت ثبت نشده"},
-                                {"key": "address", "label": "نشانی ثبت‌شده", "value": offer.shop.address or offer.shop.location_label or "نشانی ثبت نشده"},
-                                {"key": "in_person_credit", "label": "خرید اعتباری حضوری", "value": "پذیرش ثبت شده" if offer.shop.accepts_in_person_credit else "پذیرش ثبت نشده"},
-                            ],
-                        },
-                    },
-                )
-            )
+            event_list.append(("ui.component", {"component": "visit_plan", "data": visit_plan}))
         if alternatives or alternative_products:
             event_list.append(
                 (
@@ -358,6 +349,7 @@ def create_contact_attempt(request, mission_id: str):
                 "alternative_offer_ids": [item["id"] for item in alternatives],
                 "alternative_product_ids": alternative_product_ids,
                 "candidate_product_ids": candidate_product_ids,
+                **({"visit_plan": visit_plan} if visit_plan is not None else {}),
             }
             locked_mission.current_stage = "contact_checked"
             locked_mission.status = PurchaseMission.Status.WAITING_FOR_USER
