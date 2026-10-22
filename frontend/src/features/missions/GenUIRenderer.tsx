@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import type { GenUIAction, GenUIComponent, GenUIFormValues, GenUIValue } from './genui-types'
 import { RecoveryOptions } from './RecoveryOptions'
+import { buildComparisonFields, visibleComparisonFields } from './comparison-view'
 
 interface GenUIDefaults {
   query: string
@@ -264,13 +265,47 @@ function EmptyState({ component, defaults, onAction, disabled }: { component: Ge
 }
 
 function ComparisonTable({ component }: { component: GenUIComponent }) {
-  const columns = Array.isArray(component.data.columns) ? component.data.columns.filter(isRecord) : []
-  const rows = Array.isArray(component.data.rows) ? component.data.rows.filter(isRecord) : []
-  if (!columns.length || !rows.length) return <FallbackCard component={component} />
+  const [onlyDifferences, setOnlyDifferences] = useState(true)
+  const columns = Array.isArray(component.data.columns) ? component.data.columns.filter(isRecord)
+    .filter((item) => typeof item.key === 'string' && typeof item.label === 'string')
+    .slice(0, 16) as Array<{key:string;label:string}> : []
+  const rows = Array.isArray(component.data.rows) ? component.data.rows.filter(isRecord).slice(0,3) : []
+  if (!columns.length || rows.length < 2) return <FallbackCard component={component} />
+  const normalizedRows = rows.map((row) => Object.fromEntries(Object.entries(row).map(([key,value]) =>
+    [key, typeof value === 'string' || typeof value === 'number' ? String(value) : 'ثبت نشده']
+  )))
+  const fields = buildComparisonFields(columns, normalizedRows)
+  const visible = visibleComparisonFields(fields, onlyDifferences)
   return (
-    <section className="genui-structured-card">
-      <div className="genui-card-heading"><span className="genui-icon"><Store size={17} /></span><div><h4>{text(component.data.title, 'مقایسه گزینه‌ها')}</h4>{text(component.data.description) && <p>{text(component.data.description)}</p>}</div></div>
-      <div className="genui-table-wrap"><table className="genui-table"><thead><tr>{columns.map((column, index) => <th key={String(column.key ?? index)}>{text(column.label, 'مشخصه')}</th>)}</tr></thead><tbody>{rows.map((row, rowIndex) => <tr key={String(row.id ?? rowIndex)}>{columns.map((column, columnIndex) => {const key = text(column.key); const value = key ? row[key] : ''; return <td key={key || columnIndex}>{typeof value === 'string' || typeof value === 'number' ? String(value) : value === null ? 'ثبت نشده' : '—'}</td>})}</tr>)}</tbody></table></div>
+    <section className="genui-structured-card genui-comparison" aria-label="مقایسه محصولات منتخب">
+      <div className="genui-card-heading"><span className="genui-icon"><Store size={17} /></span><div>
+        <h4>{text(component.data.title,'مقایسه محصولات')}</h4>
+        <p>اختلاف قیمت و مشخصات ثبت‌شده را کنار هم ببین. «ثبت نشده» به معنای نبود ویژگی نیست.</p>
+      </div></div>
+      <div className="genui-comparison-toolbar">
+        <span>{new Intl.NumberFormat('fa-IR').format(rows.length)} محصول انتخاب شده</span>
+        <button type="button" onClick={() => setOnlyDifferences((value) => !value)}
+          aria-pressed={onlyDifferences}>
+          {onlyDifferences ? 'نمایش همه ویژگی‌ها' : 'نمایش فقط تفاوت‌ها'}
+        </button>
+      </div>
+      <div className="genui-table-wrap">
+        <table className="genui-table genui-comparison-table">
+          <caption>مقایسه ویژگی‌به‌ویژگی محصولات انتخاب‌شده</caption>
+          <thead><tr>
+            <th scope="col">مشخصه</th>
+            {normalizedRows.map((row,index) => <th scope="col" key={String(row.id ?? index)}>{row.product ?? 'محصول'}</th>)}
+          </tr></thead>
+          <tbody>{visible.map((field) => (
+            <tr key={field.key} className={field.different ? 'is-different' : undefined}>
+              <th scope="row">{field.label}</th>
+              {field.values.map((value,index) => <td key={index}>{value}</td>)}
+            </tr>
+          ))}</tbody>
+        </table>
+      </div>
+      {!visible.length && <p className="genui-data-caveat">در ویژگی‌های ثبت‌شده اختلافی پیدا نشد؛ همه ویژگی‌ها را باز کن.</p>}
+      <p className="genui-data-caveat">قیمت و موجودی این جدول تاریخی‌اند؛ استعلام شبیه‌سازی‌شده جای تأیید واقعی نیست.</p>
     </section>
   )
 }

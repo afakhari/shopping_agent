@@ -9,6 +9,8 @@ import { formatDistance, formatLastPriceChange, getPriceQualityLabel, openStreet
 import { osmEmbedUrl, TEHRAN_REGION_SAMPLES } from './shop-map'
 import { getResultPayload, getUIComponents, type GenUIAction, type GenUIComponent } from './genui-types'
 import { resolveRecoveryOffer } from './recovery-options'
+import { chooseProductHighlights } from './product-highlights'
+import { ActiveShoppingFilters } from './ActiveShoppingFilters'
 import {
   createContactAttempt,
   createMission,
@@ -233,6 +235,7 @@ function ProductResults({
         const distanceLabel = formatDistance(offer.shop.distance_m)
         const mapUrl = openStreetMapUrl(offer.shop.lat, offer.shop.lon)
         const isCompared = selectedCompareProductIds.includes(result.product.id)
+        const highlights = chooseProductHighlights(result.product)
         return (
           <article className={`mission-product-card ${isCompared ? 'is-compared' : ''} ${allowActions && offerView?.expanded ? 'is-offers-expanded' : ''}`} key={result.product.id}>
             <div className="mission-product-image">
@@ -254,6 +257,11 @@ function ProductResults({
                   <span className="mission-credit-confirmed"><CreditCard size={12} /> اعتباری</span>
                 )}
               </div>
+              {highlights.length > 0 && <dl className="mission-product-highlights" aria-label="مشخصات مهم ثبت‌شده">
+                {highlights.map((item) => (
+                  <div key={item.key}><dt>{item.key}</dt><dd>{item.value}</dd></div>
+                ))}
+              </dl>}
               <details className="mission-product-details">
                 <summary>
                   جزئیات
@@ -531,6 +539,7 @@ export function MissionPanel({
   const [chatMessages, setChatMessages] = useState<MissionChatMessage[]>([])
   const [lastQuery, setLastQuery] = useState('')
   const [selectedCompareProductIds, setSelectedCompareProductIds] = useState<string[]>([])
+  const [comparisonOpen, setComparisonOpen] = useState(false)
   const [isRunning, setIsRunning] = useState(false)
   const [contactingOfferId, setContactingOfferId] = useState<string | null>(null)
   const [contactByOffer, setContactByOffer] = useState<Record<string, ContactAttemptResponse>>({})
@@ -679,6 +688,7 @@ export function MissionPanel({
       setChatMessages((current) => mergeUIEventIntoMessages(current, event))
       if (incoming.some((component) => PRIMARY_SEARCH_COMPONENTS.has(component.type))) {
         setSelectedCompareProductIds([])
+        setComparisonOpen(false)
         offerRequestControllers.current.forEach((controller) => controller.abort())
         offerRequestControllers.current.clear()
         setOfferViews({})
@@ -859,13 +869,16 @@ export function MissionPanel({
   }
 
   const toggleComparedProduct = (result: CatalogSearchResult) => {
-    if (!selectedCompareProductIds.includes(result.product.id) && selectedCompareProductIds.length >= 3) {
-      setError('برای مقایسه، حداکثر سه گزینه را انتخاب کن. ابتدا یکی را از مقایسه حذف کن.')
+    const exists = selectedCompareProductIds.includes(result.product.id)
+    if (!exists && selectedCompareProductIds.length >= 3) {
+      setError('حداکثر سه مدل را می‌توانی هم‌زمان مقایسه کنی. یکی را از انتخاب خارج کن.')
       return
     }
-    setSelectedCompareProductIds((current) => current.includes(result.product.id)
-      ? current.filter((id) => id !== result.product.id)
-      : [...current, result.product.id])
+    const next = exists
+      ? selectedCompareProductIds.filter((id) => id !== result.product.id)
+      : [...selectedCompareProductIds, result.product.id]
+    setSelectedCompareProductIds(next)
+    setComparisonOpen(next.length >= 2)
   }
 
   const fetchProductOffers = async (result: CatalogSearchResult, page: number, append: boolean) => {
@@ -1093,6 +1106,7 @@ export function MissionPanel({
     setChatMessages([])
     setLastQuery('')
     setSelectedCompareProductIds([])
+    setComparisonOpen(false)
     setContactByOffer({})
     setActiveFilterForm(null)
     shouldAutoScrollRef.current = true
@@ -1125,26 +1139,19 @@ export function MissionPanel({
       price: formatPrice(offer.price_toman),
       shop: offer.shop.name,
       address: offer.shop.address ?? offer.shop.location_label ?? 'نشانی ثبت نشده',
-      credit: offer.shop.accepts_in_person_credit ? 'ثبت شده' : 'ثبت نشده',
+      credit: offer.in_person_credit_eligible ? 'برای این آفر ثبت‌شده' : 'برای این آفر ثبت نشده',
       updated,
       distance: formatDistance(offer.shop.distance_m) ?? 'محاسبه نشده',
       ...specComparison.valuesByProduct[index],
     }
   })
   const comparisonComponents: GenUIComponent[] = selectedCompareResults.length >= 2
-    ? [{
-      type: 'comparison_table',
-      id: 'live-selected-product-comparison',
-      data: {
-        title: 'مقایسه گزینه‌های انتخاب‌شده',
-        description: 'مقایسه بر پایه بهترین آفر موجود در همین نتایج؛ قیمت و پذیرش اعتباری مطابق داده ثبت‌شده است.',
-        columns: comparisonColumns,
-        rows: comparisonRows,
-      },
-    }]
-    : selectedCompareResults.length === 1
-      ? [{ type: 'notice', id: 'comparison-next-step', data: { message: 'یک گزینه انتخاب شده است. برای نمایش جدول مقایسه، یک یا دو محصول دیگر هم انتخاب کن.' } }]
-      : []
+    ? [{ type: 'comparison_table', id: 'live-selected-product-comparison', data: {
+      title: 'مقایسه مدل‌های منتخب',
+      columns: comparisonColumns,
+      rows: comparisonRows,
+    } }]
+    : []
 
   const quickPrompts = [
     { label: 'لپ‌تاپ برای کار', detail: 'بودجه و مشخصات مهم را مقایسه کن', icon: <Laptop size={18} />, prompt: 'برای برنامه‌نویسی یک لپ‌تاپ مناسب در تهران پیدا کن؛ گزینه‌ها را با قیمت و مزایا مقایسه کن.' },
@@ -1202,14 +1209,33 @@ export function MissionPanel({
               {item.results && item.results.length > 0 && (
                 <div className="mission-results-block conversation-results-block">
                   <div className="mission-results-header">
-                    <div><h3>نتایج پیشنهادی</h3></div>
+                    <div><h3>مدل‌هایی که می‌توانی بررسی کنی</h3>{isCurrentResult && <p className="mission-results-guidance">مدل را مقایسه کن یا فروشگاه‌هایش را ببین.</p>}</div>
                     <div className="mission-results-header-actions">
                       <span>{money.format(item.resultCount ?? item.results.length)} محصول</span>
                       {isCurrentResult && <button type="button" className="mission-edit-filters" onClick={() => handleGenUIAction({ type: 'open_filter_form' })} disabled={isRunning || isRestoring}><SlidersHorizontal size={15} /> تغییر شرایط</button>}
                     </div>
                   </div>
-                  {isCurrentResult && selectedCompareProductIds.length > 0 && <p className="mission-compare-hint">{money.format(selectedCompareProductIds.length)} گزینه برای مقایسه انتخاب شده؛ حداکثر ۳ گزینه.</p>}
-                  {isCurrentResult && comparisonComponents.length > 0 && <GenUIRenderer components={comparisonComponents} defaults={{ query: lastQuery, max_price_toman: budget, must_have_in_person_credit: mustHaveCredit, sort: constraints.sort ?? 'relevance' }} disabled={isRunning || isRestoring} onAction={handleGenUIAction} />}
+                  {isCurrentResult && <ActiveShoppingFilters constraints={constraints} disabled={isRunning || isRestoring}
+                    onEdit={() => handleGenUIAction({type:'open_filter_form'})} />}
+                  {isCurrentResult && selectedCompareResults.length > 0 && (
+                    <div className="mission-compare-tray" role="region" aria-label="انتخاب‌های مقایسه">
+                      <div className="mission-compare-tray-copy">
+                        <strong>{money.format(selectedCompareResults.length)} مدل برای مقایسه</strong>
+                        <span>{selectedCompareResults.length === 1 ? 'یک مدل دیگر انتخاب کن.' : 'تفاوت قیمت و مشخصات را ببین.'}</span>
+                      </div>
+                      <div className="mission-compare-tray-actions">
+                        {selectedCompareResults.length >= 2 && <button type="button" className="mission-compare-toggle"
+                          aria-expanded={comparisonOpen} onClick={() => setComparisonOpen((open) => !open)}>
+                          {comparisonOpen ? 'بستن مقایسه' : 'نمایش مقایسه'}
+                        </button>}
+                        <button type="button" className="mission-compare-clear" aria-label="پاک کردن انتخاب‌های مقایسه"
+                          onClick={() => { setSelectedCompareProductIds([]); setComparisonOpen(false) }}>
+                          پاک کردن
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {isCurrentResult && comparisonOpen && comparisonComponents.length > 0 && <GenUIRenderer components={comparisonComponents} defaults={{ query: lastQuery, max_price_toman: budget, must_have_in_person_credit: mustHaveCredit, sort: constraints.sort ?? 'relevance' }} disabled={isRunning || isRestoring} onAction={handleGenUIAction} />}
                   <ProductResults
                     results={item.results}
                     missionId={missionId ?? ''}
