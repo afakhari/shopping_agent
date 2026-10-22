@@ -230,23 +230,19 @@ function ProductResults({
                 {isCompared && <span className="mission-compared-badge"><CheckCircle2 size={13} /> انتخاب‌شده</span>}
               </div>
               <div className="mission-product-price-line">
-                <span className="mission-product-price-wrap"><small>قیمت ثبت‌شده</small><strong className="mission-product-price">{formatPrice(offer.price_toman)}</strong></span>
+                <strong className="mission-product-price">{formatPrice(offer.price_toman)}</strong>
                 <span className="mission-product-seller"><Store size={13} aria-hidden="true" />{offer.shop.name}</span>
               </div>
               <div className="mission-product-meta">
                 <span className={`mission-price-quality ${offer.price_quality}`}><i />{getPriceQualityLabel(offer.price_quality)}</span>
                 <span className="mission-offer-count"><Store size={14} />{money.format(result.eligible_offers_count)} فروشگاه واجد شرایط</span>
               </div>
-              <small className="mission-product-address-preview" title={address}>
-                <MapPin size={13} aria-hidden="true" />
-                <span>{offer.shop.location_label ?? address}</span>
-              </small>
               {offer.shop.accepts_in_person_credit && (
-                <span className="mission-credit-confirmed"><CreditCard size={13} /> خرید اعتباری حضوری ثبت شده</span>
+                <span className="mission-credit-confirmed"><CreditCard size={12} /> اعتباری</span>
               )}
               <details className="mission-product-details">
                 <summary>
-                  جزئیات فروشنده و اعتبار اطلاعات
+                  جزئیات
                   <ChevronDown size={14} aria-hidden="true" />
                 </summary>
                 <div className="mission-product-details-content">
@@ -281,7 +277,7 @@ function ProductResults({
                     disabled={Boolean(offerView?.loading && !offerView.expanded)}
                   >
                     {offerView?.loading && !offerView.offers.length ? <LoaderCircle size={16} className="spin" /> : <Store size={16} />}
-                    {offerView?.expanded ? 'بستن فهرست فروشگاه‌ها' : 'مقایسه قیمت فروشگاه‌ها'}
+                    {offerView?.expanded ? 'بستن فروشگاه‌ها' : 'دیدن فروشگاه‌ها'}
                     <ArrowLeft size={14} className={offerView?.expanded ? 'offer-chevron open' : 'offer-chevron'} />
                   </button>
                 ) : (
@@ -296,7 +292,7 @@ function ProductResults({
                     onClick={() => onToggleCompare(result)}
                   >
                     {isCompared ? <CheckCircle2 size={15} /> : <SlidersHorizontal size={15} />}
-                    {isCompared ? 'در مقایسه' : 'مقایسه مدل'}
+                    {isCompared ? 'انتخاب‌شده' : 'مقایسه'}
                   </button>
                 )}
               </div>
@@ -1126,7 +1122,7 @@ export function MissionPanel({
     <section className={`conversation-panel${isEmptyConversation ? ' conversation-panel-empty' : ''}`} aria-labelledby="conversation-heading">
       <div className="conversation-panel-header">
         <div className="conversation-header-copy">
-          <h2 id={!isEmptyConversation ? 'conversation-heading' : undefined}>دستیار خرید شما</h2><p>پیدا کن، مقایسه کن، آگاهانه انتخاب کن.</p>
+          <h2 id={!isEmptyConversation ? 'conversation-heading' : undefined}>گفتگوی خرید</h2>
         </div>
         {chatMessages.length > 0 && <button className="conversation-reset" type="button" disabled={isRunning || isRestoring || contactingOfferId !== null} onClick={startNewMission}><RotateCcw size={15} /> گفتگوی تازه</button>}
       </div>
@@ -1134,11 +1130,8 @@ export function MissionPanel({
       <div className="conversation-transcript" aria-label="گفتگوی مأموریت خرید" aria-live="off" aria-busy={isRunning || isRestoring}>
         {isEmptyConversation && (
           <div className="conversation-welcome">
-            <span className="welcome-orb" aria-hidden="true"><Sparkles size={21} /></span>
-            <span className="welcome-kicker"><span className="welcome-kicker-dot" /> دستیار خرید فارسی‌زبان</span>
-            <h3 id="conversation-heading">دنبال چی می‌گردی؟ <span>با هم گزینه‌های مناسب رو پیدا می‌کنیم.</span></h3>
-            <p>از نیازی که داری شروع کن. بودجه، مدل‌ها و فروشگاه‌ها رو باهم بررسی می‌کنیم تا تصمیم‌گرفتن ساده‌تر بشه.</p>
-            <div className="welcome-prompt-heading"><strong>برای شروع، یکی رو انتخاب کن</strong><small>یا درخواست خودت رو پایین صفحه بنویس</small></div>
+            <h3 id="conversation-heading">چی می‌خوای بخری؟</h3>
+            <p>کالا، کاربرد یا بودجه‌ات رو بنویس.</p>
             <div className="quick-prompt-grid">
               {quickPrompts.map((item) => (
                 <button type="button" className="quick-prompt" key={item.label} disabled={isRunning || isRestoring} onClick={() => void runTurn(item.prompt)}>
@@ -1148,7 +1141,7 @@ export function MissionPanel({
                 </button>
               ))}
             </div>
-            <div className="welcome-trust-row"><span><MapPin size={14} /> فروشگاه‌های تهران</span><span><ShieldCheck size={14} /> قیمت ثبت‌شده، بدون ادعای موجودی قطعی</span></div>
+
           </div>
         )}
 
@@ -1163,12 +1156,14 @@ export function MissionPanel({
           return (
             <article className={`chat-message chat-message-assistant ${item.pending ? 'pending' : ''}`} key={item.id}>
               <div className="assistant-message-heading"><span className="assistant-mini-avatar"><Sparkles size={15} /></span><strong>بازارکامپس</strong>{item.pending && <span className="assistant-working"><i /><i /><i /> در حال بررسی</span>}</div>
-              <div className="assistant-message-copy">{item.text}</div>
+              {item.text && (item.results && item.results.length > 0 && !item.pending
+                ? <details className="assistant-explanation"><summary>درباره این نتایج <ChevronDown size={13} aria-hidden="true" /></summary><p>{item.text}</p></details>
+                : <div className="assistant-message-copy">{item.text}</div>)}
               {preComponents.length > 0 && <GenUIRenderer components={preComponents} defaults={{ query: lastQuery, max_price_toman: budget, must_have_in_person_credit: mustHaveCredit, sort: constraints.sort ?? 'relevance' }} disabled={isRunning || isRestoring || !isCurrent} onAction={handleGenUIAction} />}
               {item.results && item.results.length > 0 && (
                 <div className="mission-results-block conversation-results-block">
                   <div className="mission-results-header">
-                    <div><span className="mission-results-kicker">نتیجه جست‌وجوی شما</span><h3>این گزینه‌ها ارزش بررسی دارن</h3><p>از قیمت‌های ثبت‌شده شروع کن؛ بعد فروشگاه‌ها و جزئیات هر مدل رو مقایسه کن.</p></div>
+                    <div><h3>نتایج پیشنهادی</h3></div>
                     <div className="mission-results-header-actions">
                       <span>{money.format(item.resultCount ?? item.results.length)} محصول</span>
                       {isCurrent && <button type="button" className="mission-edit-filters" onClick={() => handleGenUIAction({ type: 'open_filter_form' })} disabled={isRunning || isRestoring}><SlidersHorizontal size={15} /> تغییر شرایط</button>}
@@ -1244,7 +1239,7 @@ export function MissionPanel({
           {isRunning ? <LoaderCircle size={18} className="spin" /> : <Send size={17} />}
         </button>
       </form>
-      <div className="conversation-composer-hint"><span>Enter برای ارسال · Shift + Enter برای خط جدید</span><span>پرسش دقیق‌تر، پیشنهاد بهتر</span></div>
+      
       <div className="conversation-bottom-row">
         <div className="mission-context-row">
           {formatBudgetLabel(budget) && <span>بودجه: {formatBudgetLabel(budget)}</span>}
@@ -1252,7 +1247,10 @@ export function MissionPanel({
           {location && <span><MapPin size={13} /> فاصله مستقیم تا {money.format(radiusM / 1000)} کیلومتر</span>}
           {isLocating && <span><LoaderCircle size={13} className="spin" /> دریافت موقعیت…</span>}
         </div>
-        <p className="conversation-disclaimer">قیمت‌ها تاریخی‌اند و استعلام موجودی نمایشی است. نام بیشتر فروشگاه‌ها و همه شماره‌های تماس در دیتاست مسابقه ساختگی‌اند.</p>
+        <details className="conversation-disclosure">
+          <summary>درباره داده‌ها</summary>
+          <p>قیمت‌ها تاریخی‌اند و موجودی به‌صورت نمایشی بررسی می‌شود. بیشتر نام فروشگاه‌ها و همه شماره‌های تماس دیتاست مسابقه ساختگی‌اند.</p>
+        </details>
       </div>
     </section>
   )

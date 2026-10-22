@@ -8,8 +8,7 @@ import './chat-shell.css'
 import './design-system.css'
 import './result-cards.css'
 import './visit-plan.css'
-import './experience-v2.css'
-import './torob-red.css'
+import './minimal-v3.css'
 
 const queryClient = new QueryClient({
   defaultOptions: {

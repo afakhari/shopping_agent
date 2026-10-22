@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useCallback, useEffect, useState } from 'react'
-import { ArrowUpLeft, Compass, MapPin, Search, Store, ShieldCheck, Route, Sparkles } from 'lucide-react'
+import { Compass, MapPin } from 'lucide-react'
 import { MissionPanel } from '../features/missions/MissionPanel'
 import type { MissionConstraints } from '../features/missions/mission-api'
 import { getHealth } from '../shared/api/health'
@@ -99,37 +99,7 @@ export default function App() {
       </header>
 
       <main className="chat-main journey-layout" id="home">
-        <aside className="journey-sidebar" aria-label="راهنمای مسیر خرید">
-          <div className="journey-sidebar-top">
-            <span className="journey-sidebar-eyebrow"><Sparkles size={15} /> همراه تو در انتخاب</span>
-            <h2>خرید خوب، از یک سؤال خوب شروع می‌شود.</h2>
-            <p>نیازت را بگو؛ از پیدا کردن مدل تا انتخاب فروشگاه و برنامه مراجعه کنارت هستیم.</p>
-          </div>
-          <section className="journey-steps" aria-labelledby="journey-steps-heading">
-            <h3 className="journey-section-label" id="journey-steps-heading">مسیر خرید</h3>
-            <ol>
-              <li><span className="journey-step-icon"><Search size={17} /></span><span><strong>شناخت نیاز</strong><small>بودجه و ویژگی‌های مهم</small></span><b>۰۱</b></li>
-              <li><span className="journey-step-icon"><Store size={17} /></span><span><strong>کالا و فروشگاه</strong><small>مقایسه مدل‌ها و قیمت‌ها</small></span><b>۰۲</b></li>
-              <li><span className="journey-step-icon"><ShieldCheck size={17} /></span><span><strong>بررسی فروشنده</strong><small>استعلام شبیه‌سازی‌شده</small></span><b>۰۳</b></li>
-              <li><span className="journey-step-icon"><Route size={17} /></span><span><strong>آمادگی مراجعه</strong><small>نشانی و گزینه پشتیبان</small></span><b>۰۴</b></li>
-            </ol>
-          </section>
-          <div className="journey-side-note">
-            <div className="journey-side-note-icon"><ShieldCheck size={19} /></div>
-            <strong>شفافیت، قبل از خرید</strong>
-            <p>قیمت‌ها از دیتاست ثبت‌شده هستند؛ موجودی فروشگاه در این نسخه به‌صورت نمایشی بررسی می‌شود. بسیاری از نام‌ها و تمام شماره‌های تماس دیتاست مسابقه نیز ساختگی‌اند.</p>
-            <a href="#conversation-composer">شروع گفتگوی خرید <ArrowUpLeft size={15} aria-hidden="true" /></a>
-          </div>
-          <p className="journey-sidebar-footer">نسخه آزمایشی · پوشش داده‌های فروشگاهی تهران</p>
-        </aside>
         <div className="journey-workspace">
-          <div className="journey-mobile-ribbon" aria-label="مراحل خرید">
-            <span><Search size={14} /> انتخاب</span>
-            <span className="journey-ribbon-divider" aria-hidden="true" />
-            <span><Store size={14} /> مقایسه</span>
-            <span className="journey-ribbon-divider" aria-hidden="true" />
-            <span><Route size={14} /> مراجعه</span>
-          </div>
           <MissionPanel budget={maxPriceToman} mustHaveCredit={mustHaveCredit} location={location} radiusM={radiusM} sort={sort} onLocationChange={setLocation} onRestoreConstraints={restoreMissionFilters} />
         </div>
       </main>
