@@ -41,7 +41,13 @@ describe('evidence-first purchase flow', () => {
   })
   it('routes short help and greetings without starting a paid LLM request', () => {
     expect(mission).toContain('isGreetingOnly(trimmed) || isAssistantHelpRequest(trimmed)')
-    expect(mission).toContain('چطور ازت استفاده کنم')
+    const localIntents = readFileSync(new URL('./greeting-intent.ts', import.meta.url), 'utf8')
+    expect(localIntents).toContain('چطور ازت استفاده کنم')
+  })
+  it('never blindly reposts a failed turn or a failed contact request', () => {
+    expect(mission).toContain('completedTurnWasPersisted(snapshot, trimmed, lastSavedSequence)')
+    expect(mission).toContain('clientRequestId = pendingContactIdsRef.current.get(requestKey)')
+    expect(mission).toContain('بازیابی وضعیت')
   })
   it('keeps seller details optional instead of expanding every long address', () => {
     expect(mission).toContain('<details className="mission-seller-details">')

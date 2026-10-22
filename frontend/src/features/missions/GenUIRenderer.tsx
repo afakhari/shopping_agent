@@ -214,6 +214,7 @@ function SchemaForm({
                       <input
                         id={`genui-${component.id ?? component.type}-${field.id}`}
                         type="text"
+                        maxLength={field.type === 'number' ? 32 : 2000}
                         inputMode={field.type === 'number' ? 'numeric' : 'text'}
                         autoComplete={field.type === 'number' ? 'off' : 'on'}
                         dir={field.type === 'number' ? 'ltr' : 'rtl'}

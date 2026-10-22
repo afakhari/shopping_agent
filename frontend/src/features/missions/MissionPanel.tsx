@@ -2,7 +2,8 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { AlertCircle, ArrowLeft, CheckCircle2, ChevronDown, ChevronUp, Clock3, CreditCard, ExternalLink, Headphones, Laptop, LoaderCircle, LocateFixed, MapPin, MapPinOff, Send, ShieldCheck, SlidersHorizontal, Sparkles, Store, RotateCcw, X } from 'lucide-react'
 import { getProductOffers, type CatalogOffer, type CatalogSearchResult, type ProductOffersResponse } from '../search/catalog-api'
 import { buildComparisonSpecColumns } from './comparison-specs'
-import { isAssistantHelpRequest, isGreetingOnly } from './greeting-intent'
+import { classifyLocalConversation } from './greeting-intent'
+import { completedTurnWasPersisted } from './recovery-state'
 import { findCurrentSearchMessage, shouldFollowConversation } from './conversation-behavior'
 import { GenUIRenderer } from './GenUIRenderer'
 import { formatDistance, formatLastPriceChange, getPriceQualityLabel, openStreetMapUrl } from './ui-formatters'
@@ -573,6 +574,11 @@ export function MissionPanel({
   const [selectedRegionId, setSelectedRegionId] = useState('')
   const composerInputRef = useRef<HTMLTextAreaElement | null>(null)
   const turnCounter = useRef(0)
+  const turnInFlightRef = useRef(false)
+  const contactInFlightRef = useRef(false)
+  // Retain a request ID after a network failure, so a user-triggered retry
+  // receives the original server simulation instead of creating a duplicate.
+  const pendingContactIdsRef = useRef(new Map<string, string>())
 
   const constraints: MissionConstraints = {
     city: 'tehran',
@@ -672,7 +678,8 @@ export function MissionPanel({
     if (event.type === 'turn.completed' && isRecord(event.payload.constraints)) {
       // Reconcile inferred natural-language constraints with the visible filters.
       // The server decides eligibility; the client must not silently present stale filters.
-      onRestoreConstraints(event.payload.constraints as MissionConstraints, lastQuery)
+      const interpreted = readText(event.payload, 'search_query') || lastQuery
+      onRestoreConstraints(event.payload.constraints as MissionConstraints, interpreted)
     }
     if (event.type === 'stage') {
       const label = readText(event.payload, 'label')
@@ -722,35 +729,41 @@ export function MissionPanel({
 
   const runTurn = async (turnMessage: string, turnConstraints: MissionConstraints = constraints, displayQuery = turnMessage) => {
     const trimmed = turnMessage.trim()
-    if (!trimmed || isRunning || isRestoring) return
+    // The ref is synchronous: two Enter clicks in the same React render cannot
+    // launch duplicate POSTs or two paid model requests.
+    if (!trimmed || isRunning || isRestoring || turnInFlightRef.current) return
     shouldAutoScrollRef.current = true
-    // A salutation is not a catalog query. Avoid irrelevant product recommendations
-    // and avoid creating a misleading purchase mission until a product intent exists.
-    if (isGreetingOnly(trimmed) || isAssistantHelpRequest(trimmed)) {
+
+    const localIntent = classifyLocalConversation(trimmed)
+    if (localIntent) {
+      const replies = {
+        greeting: 'سلام! خوش اومدی. 🌱 دنبال چه محصولی هستی؟ می‌تونی مدل، کاربرد یا حدود بودجه رو بگی تا فروشگاه‌های تهران رو بررسی کنیم.',
+        help: 'برای شروع نام یا کاربرد محصول را بنویس؛ مثلاً «هدفون بی‌سیم تا ۳ میلیون تومان». بعد می‌توانی مدل‌ها را مقایسه کنی، فروشگاه‌های تهران را ببینی و استعلام نمایشی انجام بدهی. بودجه، اعتبار و محدوده را هم خودت تنظیم می‌کنی.',
+        thanks: 'خواهش می‌کنم! هر زمان محصول دیگری خواستی یا خواستی شروط خرید را تغییر بدهی، همین‌جا بنویس.',
+        goodbye: 'خداحافظ! نتیجه‌های ثبت‌شده این مأموریت را می‌توانی بعداً هم بررسی کنی.',
+      }
       turnCounter.current += 1
-      const greetingId = `hello-${Date.now()}-${turnCounter.current}`
+      const localId = `local-${Date.now()}-${turnCounter.current}`
       setChatMessages((current) => [
         ...current,
-        { id: `user-${greetingId}`, role: 'user', text: trimmed, components: [] },
-        {
-          id: `assistant-${greetingId}`,
-          role: 'assistant',
-          text: isAssistantHelpRequest(trimmed)
-            ? 'برای شروع، نام یا کاربرد محصول را بنویس؛ مثلاً «هدفون بی‌سیم تا ۳ میلیون تومان». بعد می‌توانی مدل‌ها را مقایسه کنی، فروشگاه‌های تهران را ببینی و استعلام نمایشی را انجام بدهی. خرید اعتباری و محدوده مکانی هم قابل تنظیم‌اند.'
-            : 'سلام! خوش اومدی. 🌱 دنبال چه محصولی هستی؟ می‌تونی مدل، کاربرد یا حدود بودجه رو بگی تا گزینه‌های مناسب و فروشگاه‌های تهران رو بررسی کنیم.',
-          components: [],
-        },
+        { id: `user-${localId}`, role: 'user', text: trimmed, components: [] },
+        { id: `assistant-${localId}`, role: 'assistant', text: replies[localIntent], components: [] },
       ])
       setMessage('')
       setError(null)
       return
     }
+
+    turnInFlightRef.current = true
     setError(null)
     setIsRunning(true)
     setStageLabel('در حال آماده‌سازی مأموریت خرید...')
     if (!results.length) setLastQuery(displayQuery.trim())
     turnCounter.current += 1
     const turnId = `${Date.now()}-${turnCounter.current}`
+    const lastSavedSequence = events.reduce((max, event) => Math.max(max, event.seq), 0)
+    let activeMissionId: string | null = missionId
+    let startedServerTurn = false
     setChatMessages((current) => [
       ...current,
       { id: `user-${turnId}`, role: 'user', text: trimmed, components: [] },
@@ -758,33 +771,88 @@ export function MissionPanel({
     ])
     setMessage('')
     try {
-      let activeMissionId = missionId
       if (!activeMissionId) {
         const created = await createMission(trimmed, turnConstraints)
         activeMissionId = created.mission_id
         setMissionId(activeMissionId)
         storeMissionId(activeMissionId)
       }
+      startedServerTurn = true
       await sendMissionTurn(activeMissionId, trimmed, turnConstraints, handleEvent)
     } catch (reason) {
-      const errorText = reason instanceof Error ? reason.message : 'اجرای مأموریت ناموفق بود.'
-      setError(errorText)
-      setChatMessages((current) => {
-        const next = [...current]
-        const index = findLastPendingAssistantIndex(next)
-        if (index >= 0 && next[index]) next[index] = { ...next[index]!, text: `نتوانستم این بررسی را کامل کنم: ${errorText}`, pending: false }
-        return next
-      })
+      // A response stream can disconnect AFTER Django commits the turn.
+      // Restore that saved turn instead of suggesting a duplicate submission.
+      let recovered = false
+      if (startedServerTurn && activeMissionId) {
+        try {
+          const snapshot = await getMission(activeMissionId)
+          if (completedTurnWasPersisted(snapshot, trimmed, lastSavedSequence)) {
+            const history = snapshot.events ?? []
+            setEvents(history)
+            setChatMessages(rebuildChatFromEvents(history))
+            setContactByOffer(restoreContactResponses(history))
+            const actualQuery = typeof snapshot.state?.search_query === 'string'
+              ? snapshot.state.search_query : displayQuery
+            setLastQuery(actualQuery)
+            onRestoreConstraints(snapshot.constraints, actualQuery)
+            setStageLabel('نتیجه ثبت‌شده مأموریت از سرور بازیابی شد.')
+            recovered = true
+          }
+        } catch {
+          // Do not mask the original error; an offline network may block GET too.
+        }
+      }
+      if (!recovered) {
+        const rawError = reason instanceof Error ? reason.message : 'ارتباط با سرور برقرار نشد.'
+        const errorText = startedServerTurn
+          ? `${rawError} ممکن است درخواست در سرور ثبت شده باشد؛ قبل از تکرار، «بازیابی وضعیت» را بزن.`
+          : rawError
+        setError(errorText)
+        setMessage((current) => current.trim() ? current : trimmed)
+        setChatMessages((current) => {
+          const next = [...current]
+          const index = findLastPendingAssistantIndex(next)
+          if (index >= 0 && next[index]) next[index] = {
+            ...next[index]!, text: 'پاسخ کامل دریافت نشد. متن درخواستت در کادر باقی مانده؛ می‌توانی وضعیت را بازیابی یا درخواست را ویرایش کنی.', pending: false,
+          }
+          return next
+        })
+      }
     } finally {
+      turnInFlightRef.current = false
       setIsRunning(false)
       setChatMessages((current) => {
         const next = [...current]
         const index = findLastPendingAssistantIndex(next)
         if (index >= 0 && next[index]) {
-          next[index] = { ...next[index]!, text: 'درخواست ارسال شد، اما پاسخ کامل دریافت نشد. می‌توانی دوباره تلاش کنی.', pending: false }
+          next[index] = { ...next[index]!, text: 'پاسخ کامل دریافت نشد؛ وضعیت ثبت‌شده را بررسی کن.', pending: false }
         }
         return next
       })
+    }
+  }
+
+  const restoreLatestMission = async () => {
+    if (!missionId || isRunning || isRestoring) return
+    setIsRestoring(true)
+    try {
+      const snapshot = await getMission(missionId)
+      const history = snapshot.events ?? []
+      setEvents(history)
+      setChatMessages(rebuildChatFromEvents(history))
+      setContactByOffer(restoreContactResponses(history))
+      const latestQuery = typeof snapshot.state?.search_query === 'string'
+        ? snapshot.state.search_query : lastQuery
+      setLastQuery(latestQuery)
+      onRestoreConstraints(snapshot.constraints, latestQuery)
+      setError(null)
+      setStageLabel('آخرین وضعیت ذخیره‌شده بازیابی شد. درخواست ناقص خودکار تکرار نمی‌شود.')
+    } catch (reason) {
+      setError(reason instanceof Error
+        ? `بازیابی فعلاً ممکن نیست: ${reason.message}`
+        : 'بازیابی فعلاً ممکن نیست. دوباره به اینترنت متصل شو.')
+    } finally {
+      setIsRestoring(false)
     }
   }
 
@@ -995,12 +1063,20 @@ export function MissionPanel({
   }
 
   const contact = async (result: CatalogSearchResult | CatalogOffer) => {
-    if (!missionId || contactingOfferId || isRunning) return
+    if (!missionId || contactingOfferId || contactInFlightRef.current || isRunning) return
     const offer = 'best_offer' in result ? result.best_offer : result
+    contactInFlightRef.current = true
     setContactingOfferId(offer.id)
     setError(null)
+    const requestKey = `${missionId}:${offer.id}`
+    const clientRequestId = pendingContactIdsRef.current.get(requestKey)
+      ?? globalThis.crypto.randomUUID()
+    pendingContactIdsRef.current.set(requestKey, clientRequestId)
     try {
-      const response = await createContactAttempt(missionId, { shopId: offer.shop.id, offerId: offer.id })
+      const response = await createContactAttempt(missionId, {
+        shopId: offer.shop.id, offerId: offer.id, clientRequestId,
+      })
+      pendingContactIdsRef.current.delete(requestKey)
       setContactByOffer((current) => ({ ...current, [offer.id]: response }))
       if (response.events?.length) {
         setEvents((current) => {
@@ -1014,6 +1090,7 @@ export function MissionPanel({
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'استعلام ناموفق بود.')
     } finally {
+      contactInFlightRef.current = false
       setContactingOfferId(null)
     }
   }
@@ -1127,6 +1204,7 @@ export function MissionPanel({
     setSelectedCompareProductIds([])
     setComparisonOpen(false)
     setContactByOffer({})
+    pendingContactIdsRef.current.clear()
     setActiveFilterForm(null)
     shouldAutoScrollRef.current = true
     setError(null)
@@ -1304,7 +1382,12 @@ export function MissionPanel({
         {activeFilterForm && <GenUIRenderer key={activeFilterForm.id} components={[activeFilterForm]} defaults={{ query: lastQuery, max_price_toman: budget, must_have_in_person_credit: mustHaveCredit, sort: constraints.sort ?? 'relevance' }} disabled={isRunning || isRestoring} onAction={handleGenUIAction} />}
       </dialog>
 
-      {error && <div className="conversation-error" role="alert"><AlertCircle size={17} /><span>{error}</span><button type="button" onClick={() => setError(null)}>بستن</button></div>}
+      {error && <div className="conversation-error" role="alert">
+        <AlertCircle size={17} /><span>{error}</span>
+        {missionId && <button type="button" disabled={isRunning || isRestoring}
+          onClick={() => void restoreLatestMission()}>بازیابی وضعیت</button>}
+        <button type="button" onClick={() => setError(null)}>بستن</button>
+      </div>}
       {isRunning && <div className="conversation-running-note" role="status" aria-live="polite"><span className="mission-progress-dot" />{stageLabel ?? 'در حال بررسی درخواست'}<span className="conversation-running-sub">اطلاعات محصول و شروط خرید در حال بررسی است</span></div>}
 
       <form className="conversation-composer" id="conversation-composer" onSubmit={submit}>

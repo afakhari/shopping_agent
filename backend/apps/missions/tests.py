@@ -213,6 +213,7 @@ class MissionApiTests(TestCase):
         self.assertIsNotNone(completed)
         self.assertEqual(completed.payload["constraints"]["max_price_toman"], "3000000")
         self.assertTrue(completed.payload["constraints"]["must_have_in_person_credit"])
+        self.assertIn("هدفون", completed.payload["search_query"])
 
     def test_contact_purpose_not_implemented_is_rejected(self):
         mission_id = self._create_mission_and_search()

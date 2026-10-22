@@ -71,12 +71,28 @@ interface ApiErrorBody {
   error?: { code?: string; message?: string; details?: unknown }
 }
 
+function friendlyHttpError(status: number): string {
+  if (status === 429) return 'تعداد درخواست‌ها بیش از حد مجاز است. بعداً دوباره تلاش کن.'
+  if (status === 502 || status === 503 || status === 504)
+    return 'ارتباط با سرور موقتاً برقرار نیست. درخواست را دوباره نفرست؛ ابتدا وضعیت ذخیره‌شده را بررسی کن.'
+  if (status === 401 || status === 403 || status === 404)
+    return 'دسترسی به این مأموریت ممکن نیست. شاید نشست مرورگر منقضی شده باشد.'
+  return `درخواست با خطای ${status} مواجه شد.`
+}
+
 async function readJson<T>(response: Response): Promise<T> {
-  const payload = (await response.json()) as T & ApiErrorBody
+  const body = await response.text()
+  let payload: unknown = null
+  try { payload = JSON.parse(body) } catch { /* Nginx may return an HTML error page. */ }
   if (!response.ok) {
-    throw new Error(payload.error?.message ?? `درخواست با خطای ${response.status} مواجه شد.`)
+    const serverMessage = payload && typeof payload === 'object'
+      ? (payload as ApiErrorBody).error?.message : null
+    throw new Error(serverMessage || friendlyHttpError(response.status))
   }
-  return payload
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    throw new Error('پاسخ سرور ناقص یا نامعتبر است. وضعیت مأموریت را دوباره بررسی کن.')
+  }
+  return payload as T
 }
 
 export async function createMission(
@@ -119,7 +135,7 @@ export async function sendMissionTurn(
     body: JSON.stringify({ message, constraints }),
   })
   if (!response.ok) {
-    let messageText = `پردازش مأموریت با خطای ${response.status} مواجه شد.`
+    let messageText = friendlyHttpError(response.status)
     try {
       const bodyText = await response.text()
       // DRF encodes errors negotiated as text/event-stream as a single `data:` frame.
@@ -138,6 +154,8 @@ export async function sendMissionTurn(
   const reader = response.body.getReader()
   const decoder = new TextDecoder()
   let buffer = ''
+  let gotCompletion = false
+  let gotResultSurface = false
 
   const dispatchBlock = (block: string) => {
     const dataLines = block.split(/\r?\n/).filter((line) => line.startsWith('data:'))
@@ -146,7 +164,12 @@ export async function sendMissionTurn(
     if (!raw) return
     try {
       const event = JSON.parse(raw) as MissionEvent
-      if (event && typeof event.seq === 'number' && typeof event.type === 'string') onEvent(event)
+      if (event && Number.isSafeInteger(event.seq) && typeof event.type === 'string'
+        && event.mission_id === missionId && event.schema_version === 1) {
+        if (event.type === 'ui.component') gotResultSurface = true
+        if (event.type === 'turn.completed') gotCompletion = true
+        onEvent(event)
+      }
     } catch {
       // Ignore malformed event blocks; the persistent mission snapshot remains recoverable.
     }
@@ -157,12 +180,16 @@ export async function sendMissionTurn(
       const { value, done } = await reader.read()
       if (done) break
       buffer += decoder.decode(value, { stream: true })
+      if (buffer.length > 2_000_000) throw new Error('پاسخ جریانی بیش از حد بزرگ است؛ وضعیت ذخیره‌شده را بررسی کن.')
       const blocks = buffer.split(/\r?\n\r?\n/)
       buffer = blocks.pop() ?? ''
       for (const block of blocks) dispatchBlock(block)
     }
     buffer += decoder.decode()
     if (buffer.trim()) dispatchBlock(buffer)
+    if (!gotCompletion || !gotResultSurface) {
+      throw new Error('پاسخ جریانی کامل نرسید؛ قبل از ارسال دوباره، نتیجه ذخیره‌شده بررسی می‌شود.')
+    }
   } finally {
     reader.releaseLock()
   }

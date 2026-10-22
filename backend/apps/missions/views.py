@@ -224,6 +224,7 @@ def mission_turn(request, mission_id: str):
                     "total": response.get("total", 0),
                     "agent_runtime": graph_state.get("graph_runtime", "langgraph"),
                     "intent_parser": graph_state.get("intent_parser", "heuristic"),
+                    "search_query": graph_state.get("search_query", ""),
                     # Sync the *effective* server-side filters to the browser.
                     # Natural-language budget/credit may differ from initial form toggles.
                     "constraints": effective_constraints,
