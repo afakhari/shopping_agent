@@ -34,6 +34,16 @@ function formatPrice(price: string | null): string {
   try { return `${money.format(BigInt(price))} تومان` } catch { return 'قیمت نامشخص' }
 }
 
+function formatRegisteredWarranty(warranty: CatalogOffer['warranty']): string | null {
+  if (!warranty) return null
+  const provider = typeof warranty.provider === 'string' ? warranty.provider.trim() : ''
+  const period = Number.isFinite(warranty.period_months) && Number(warranty.period_months) > 0
+    ? `${money.format(warranty.period_months!)} ماه`
+    : ''
+  const description = typeof warranty.description === 'string' ? warranty.description.trim() : ''
+  return [provider, period, description].filter(Boolean).join('، ') || null
+}
+
 function formatPersianDateTime(value: string | null): string | null {
   if (!value) return null
   const date = new Date(value)
@@ -237,7 +247,7 @@ function ProductResults({
               <div className="mission-product-meta">
                 <span className={`mission-price-quality ${offer.price_quality}`}><i />{getPriceQualityLabel(offer.price_quality)}</span>
                 <span className="mission-offer-count"><Store size={13} />{money.format(result.eligible_offers_count)} فروشگاه</span>
-                {offer.shop.accepts_in_person_credit && (
+                {offer.in_person_credit_eligible && (
                   <span className="mission-credit-confirmed"><CreditCard size={12} /> اعتباری</span>
                 )}
               </div>
@@ -251,12 +261,13 @@ function ProductResults({
                     <Clock3 size={13} aria-hidden="true" />{priceUpdatedRelative}
                     {priceUpdatedAt && <span className="mission-product-updated-exact">({priceUpdatedAt})</span>}
                   </small>
+                  {formatRegisteredWarranty(offer.warranty) && <small>گارانتی ثبت‌شده: {formatRegisteredWarranty(offer.warranty)}</small>}
                   <small className="mission-product-address"><MapPin size={13} aria-hidden="true" />{address}</small>
                   {distanceLabel && <small className="mission-product-distance"><LocateFixed size={13} aria-hidden="true" />فاصلهٔ مستقیم: {distanceLabel}</small>}
                   {mapUrl && <a className="mission-map-link" href={mapUrl} target="_blank" rel="noopener noreferrer">
                     <MapPin size={13} aria-hidden="true" /> نمایش موقعیت ثبت‌شده روی نقشه <ExternalLink size={12} aria-hidden="true" />
                   </a>}
-                  {!offer.shop.accepts_in_person_credit && (
+                  {!offer.in_person_credit_eligible && (
                     <span className="mission-credit-unknown"><CreditCard size={13} aria-hidden="true" /> اطلاعات خرید اعتباری حضوری ثبت نشده</span>
                   )}
                   {result.reasons.length > 0 && (
@@ -316,12 +327,14 @@ function ProductResults({
                         <div className="mission-offer-copy">
                           <strong>{sellerOffer.shop.name}</strong>
                           <span className="mission-offer-price">{formatPrice(sellerOffer.price_toman)}</span>
+                          {sellerOffer.seller_title && <small>عنوان ثبت‌شده فروشنده: {sellerOffer.seller_title}</small>}
+                          {formatRegisteredWarranty(sellerOffer.warranty) && <small>گارانتی ثبت‌شده: {formatRegisteredWarranty(sellerOffer.warranty)}</small>}
                           <small><MapPin size={12} />{sellerOffer.shop.address ?? sellerOffer.shop.location_label ?? 'نشانی ثبت نشده'}</small>
                           {sellerDistance && <small><LocateFixed size={12} />فاصله مستقیم: {sellerDistance}</small>}
                           {sellerMapUrl && <a className="mission-offer-map" href={sellerMapUrl} target="_blank" rel="noopener noreferrer"><MapPin size={12} /> نمایش روی نقشه <ExternalLink size={11} /></a>}
                           <div className="mission-offer-badges">
                             <span className={`mission-price-quality ${sellerOffer.price_quality}`}><i />{getPriceQualityLabel(sellerOffer.price_quality)}</span>
-                            <span className={`mission-shop-credit ${sellerOffer.shop.accepts_in_person_credit ? 'registered' : 'unknown'}`}><CreditCard size={12} />{sellerOffer.shop.accepts_in_person_credit ? 'اعتبار حضوری ثبت شده' : 'اطلاعات اعتبار ثبت نشده'}</span>
+                            <span className={`mission-shop-credit ${sellerOffer.in_person_credit_eligible ? 'registered' : 'unknown'}`}><CreditCard size={12} />{sellerOffer.in_person_credit_eligible ? 'اعتبار حضوری ثبت شده' : 'اعتبار حضوری برای این آفر ثبت نشده'}</span>
                           </div>
                           {sellerUpdatedAt && <small className="mission-offer-updated"><Clock3 size={12} />آخرین تغییر: {sellerUpdatedAt}</small>}
                         </div>

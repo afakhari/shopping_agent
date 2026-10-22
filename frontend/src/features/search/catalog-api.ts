@@ -40,6 +40,13 @@ export interface CatalogOffer {
   price_toman: string | null
   last_price_changed_at: string | null
   price_quality: 'recent_change' | 'stale' | 'unknown_timestamp' | 'unknown_price'
+  seller_title?: string | null
+  warranty?: {
+    provider?: string | null
+    description?: string | null
+    period_months?: number | null
+  } | null
+  in_person_credit_eligible?: boolean
   shop: CatalogShop
 }
 

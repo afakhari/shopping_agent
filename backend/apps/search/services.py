@@ -23,6 +23,7 @@ from django.db.models.functions import ASin, Cos, Least, Power, Radians, Sin, Sq
 from django.utils import timezone
 
 from apps.catalog.models import Offer, Product, Shop
+from apps.search.credit import eligible_credit_offer_query, offer_supports_in_person_credit
 from apps.search.intents import CategoryScope, resolve_category_scope
 
 DEFAULT_MAX_REASONABLE_PRICE_TOMAN = 100_000_000_000
@@ -75,7 +76,8 @@ def eligible_offers(filters: dict[str, Any], *, include_distance: bool | None = 
         qs = qs.filter(price_toman__gt=0, price_toman__lte=budget)
 
     if filters.get("must_have_in_person_credit"):
-        qs = qs.filter(shop__accepts_in_person_credit=True)
+        # An in-person provider must cover this *offer*, not merely the shop.
+        qs = qs.filter(eligible_credit_offer_query())
 
     lat, lon = filters.get("lat"), filters.get("lon")
     radius_m = filters.get("radius_m")
@@ -232,7 +234,7 @@ def product_search_page(filters: dict[str, Any]) -> dict[str, Any]:
     ]
     offer_map = {
         offer.source_id: offer
-        for offer in Offer.objects.filter(source_id__in=offer_ids).select_related("shop")
+        for offer in Offer.objects.filter(source_id__in=offer_ids).select_related("shop", "product")
     }
     page_product_ids = [product.source_id for product in page_products]
     counts = {
@@ -348,6 +350,9 @@ def serialize_offer(offer: Offer, distance_m: float | None = None) -> dict[str, 
             offer.last_price_changed_at.isoformat() if offer.last_price_changed_at else None
         ),
         "price_quality": _price_quality(offer),
+        "seller_title": offer.seller_title,
+        "warranty": offer.warranty if isinstance(offer.warranty, dict) else None,
+        "in_person_credit_eligible": offer_supports_in_person_credit(offer),
         "shop": serialize_shop(offer.shop, distance_m),
     }
 
