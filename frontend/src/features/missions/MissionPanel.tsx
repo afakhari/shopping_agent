@@ -249,7 +249,7 @@ function ProductResults({
                 <div className="mission-product-details-content">
                   <small className="mission-product-updated" title={priceUpdatedAt ? `زمان دقیق ثبت‌شده: ${priceUpdatedAt}` : undefined}>
                     <Clock3 size={13} aria-hidden="true" />{priceUpdatedRelative}
-                    {priceUpdatedAt && <span className="mission-product-updated-exact">(${priceUpdatedAt})</span>}
+                    {priceUpdatedAt && <span className="mission-product-updated-exact">({priceUpdatedAt})</span>}
                   </small>
                   <small className="mission-product-address"><MapPin size={13} aria-hidden="true" />{address}</small>
                   {distanceLabel && <small className="mission-product-distance"><LocateFixed size={13} aria-hidden="true" />فاصلهٔ مستقیم: {distanceLabel}</small>}
