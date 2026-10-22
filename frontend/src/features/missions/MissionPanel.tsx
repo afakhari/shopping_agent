@@ -515,28 +515,6 @@ function rebuildChatFromEvents(events: MissionEvent[]): MissionChatMessage[] {
   return messages
 }
 
-function appendLocalComponent(messages: MissionChatMessage[], component: GenUIComponent): MissionChatMessage[] {
-  const next = [...messages]
-  let index = -1
-  for (let cursor = next.length - 1; cursor >= 0; cursor -= 1) {
-    if (next[cursor]?.role === 'assistant') {
-      index = cursor
-      break
-    }
-  }
-  if (index < 0) {
-    next.push({ id: `assistant-local-${Date.now()}`, role: 'assistant', text: 'می‌توانیم شرایط جست‌وجو را دقیق‌تر کنیم.', components: [component] })
-    return next
-  }
-  const current = next[index]
-  if (!current) return messages
-  next[index] = {
-    ...current,
-    components: [...current.components.filter((saved) => saved.type !== component.type), component],
-  }
-  return next
-}
-
 export function MissionPanel({
   budget,
   mustHaveCredit,
@@ -743,7 +721,7 @@ export function MissionPanel({
     setError(null)
     setIsRunning(true)
     setStageLabel('در حال آماده‌سازی مأموریت خرید...')
-    setLastQuery(displayQuery.trim())
+    if (!results.length) setLastQuery(displayQuery.trim())
     turnCounter.current += 1
     const turnId = `${Date.now()}-${turnCounter.current}`
     setChatMessages((current) => [

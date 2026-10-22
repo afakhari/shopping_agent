@@ -23,5 +23,6 @@ describe('progressive shopping surface', () => {
     expect(mission).toContain('allowActions={isCurrentResult}')
     expect(mission).toContain('shouldFollowConversation(')
     expect(mission).not.toContain('scrollIntoView(')
+    expect(mission).toContain('if (!results.length) setLastQuery(displayQuery.trim())')
   })
 })
