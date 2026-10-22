@@ -10,6 +10,7 @@ from decimal import Decimal, InvalidOperation
 from typing import Any, TypedDict
 
 from apps.agent.llm import extract_intent
+from apps.agent.conversation import classify_conversation_intent
 from apps.catalog.services.normalization import normalize_persian_text
 from apps.search.services import product_search_page
 
@@ -69,6 +70,9 @@ def _budget_from_message(message: str) -> str | None:
 
 
 def _query_from_message(message: str) -> str:
+    if classify_conversation_intent(message) is not None:
+        # A courtesy message isn't evidence that the user wants any product.
+        return ""
     normalized = normalize_persian_text(message)
     normalized = BUDGET_RE.sub(" ", normalized)
     normalized = re.sub(r"\d+(?:[.,]\d+)?", " ", normalized)

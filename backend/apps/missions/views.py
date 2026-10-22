@@ -16,6 +16,7 @@ from rest_framework.response import Response
 
 from apps.agent.graph import _query_from_message, run_purchase_graph
 from apps.agent.llm import extract_intent
+from apps.agent.conversation import classify_conversation_intent, conversation_reply
 from apps.agent.simulator import serialize_contact_attempt, simulate_contact
 from apps.agent.contact_evidence import build_contact_evidence
 from apps.catalog.models import Offer, Product
@@ -157,6 +158,34 @@ def mission_turn(request, mission_id: str):
     serializer.is_valid(raise_exception=True)
     data = serializer.validated_data
     created_events: list[dict[str, Any]] = []
+    local_intent = classify_conversation_intent(data["message"])
+    if local_intent is not None:
+        # This API guard is as important as the fast UI guard: mobile or future
+        # clients can bypass React. Keep old search state, candidate offers and
+        # hard constraints intact, and do not call BoxAPI or the catalogue.
+        with transaction.atomic():
+            mission = _owned_mission(request, mission_id, lock=True)
+            _validate_full_constraints(mission.constraints, data.get("constraints", {}))
+            message = conversation_reply(local_intent)
+            created_events = append_events_locked(mission, [
+                ("user.message", {"message": data["message"]}),
+                ("assistant.message", {"text": message}),
+                ("turn.completed", {
+                    "status": mission.status,
+                    "current_stage": mission.current_stage,
+                    "intent_parser": "local_conversation",
+                    "agent_runtime": "deterministic_guard",
+                    "search_query": (mission.state or {}).get("search_query", ""),
+                    "constraints": mission.constraints,
+                }),
+            ])
+        response_stream = StreamingHttpResponse(
+            _sse_stream(created_events), content_type="text/event-stream; charset=utf-8"
+        )
+        response_stream["Cache-Control"] = "no-cache, no-transform"
+        response_stream["X-Accel-Buffering"] = "no"
+        response_stream["X-Mission-ID"] = str(mission.pk)
+        return response_stream
 
     # Do any optional network call before acquiring the mission row lock. A second validation and
     # hard-filter pass happens after locking; model output cannot loosen those constraints.

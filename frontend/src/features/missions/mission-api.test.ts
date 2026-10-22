@@ -59,6 +59,21 @@ describe('SSE stream terminal state', () => {
     )))
     await expect(sendMissionTurn('mission', 'هدفون', {}, () => undefined)).rejects.toThrow('کامل')
   })
+  it('accepts a persisted conversational reply without fake product UI', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(stream(
+      { ...event('assistant.message', 1), payload: { text: 'سلام، چطوری؟' } },
+      { ...event('turn.completed', 2), payload: { intent_parser: 'local_conversation' } },
+    ), { status: 200 })))
+    const received: MissionEvent[] = []
+    await sendMissionTurn('mission', 'احوال شما؟', {}, value => received.push(value))
+    expect(received.map(item => item.type)).toEqual(['assistant.message', 'turn.completed'])
+  })
+  it('does not accept a forged conversational completion with no assistant reply', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(stream(
+      { ...event('turn.completed', 1), payload: { intent_parser: 'local_conversation' } },
+    ), { status: 200 })))
+    await expect(sendMissionTurn('mission', 'احوال شما؟', {}, () => undefined)).rejects.toThrow('کامل')
+  })
   it('ignores cross-mission stream frames', async () => {
     vi.stubGlobal('fetch', vi.fn(async () =>
       new Response(stream({ ...event('ui.component', 1), mission_id: 'other' },

@@ -92,6 +92,60 @@ class MissionApiTests(TestCase):
         self.assertIn(completed["payload"].get("agent_runtime"), {"langgraph", "deterministic_fallback"})
         return mission_id
 
+    def test_courtesy_message_does_not_search_or_spend_llm_credit(self):
+        from unittest.mock import patch
+
+        mission_id = self._create_mission_and_search()
+        mission = PurchaseMission.objects.get(pk=mission_id)
+        before_state = dict(mission.state)
+        before_constraints = dict(mission.constraints)
+        before_count = mission.last_event_seq
+        for phrase in ("احوال شما؟", "احوالتون چطوره؟", "مرسی"):
+            with self.subTest(phrase=phrase):
+                with patch("apps.missions.views.extract_intent") as model, patch(
+                    "apps.missions.views.run_purchase_graph"
+                ) as graph, patch("apps.missions.views.product_search_page") as catalog:
+                    result = self.client.post(
+                        f"/api/v1/missions/{mission_id}/turns/",
+                        {"message": phrase}, format="json",
+                        HTTP_ACCEPT="text/event-stream",
+                    )
+                    self.assertEqual(result.status_code, 200)
+                    body = b"".join(result.streaming_content).decode("utf-8")
+                    entries = [json.loads(line[6:]) for line in body.splitlines()
+                               if line.startswith("data: ")]
+                    self.assertEqual(
+                        [event["type"] for event in entries],
+                        ["user.message", "assistant.message", "turn.completed"],
+                    )
+                    self.assertEqual(entries[-1]["payload"]["intent_parser"], "local_conversation")
+                    self.assertNotIn("ui.component", [event["type"] for event in entries])
+                    model.assert_not_called()
+                    graph.assert_not_called()
+                    catalog.assert_not_called()
+        mission.refresh_from_db()
+        self.assertEqual(mission.state, before_state)
+        self.assertEqual(mission.constraints, before_constraints)
+        self.assertEqual(mission.last_event_seq, before_count + 9)
+
+    def test_social_turn_direct_api_does_not_make_empty_shopping_form(self):
+        create = self.client.post(
+            "/api/v1/missions/",
+            {"initial_message": "احوال شما؟", "constraints": {}}, format="json",
+        )
+        self.assertEqual(create.status_code, 201)
+        mission_id = create.json()["mission_id"]
+        result = self.client.post(
+            f"/api/v1/missions/{mission_id}/turns/",
+            {"message": "احوال شما؟"}, format="json",
+            HTTP_ACCEPT="text/event-stream",
+        )
+        self.assertEqual(result.status_code, 200)
+        stream = b"".join(result.streaming_content).decode("utf-8")
+        self.assertIn("local_conversation", stream)
+        self.assertNotIn("empty_state", stream)
+        self.assertNotIn("product_results", stream)
+
     def test_create_mission_and_run_turn_emits_persisted_sse_events(self):
         mission_id = self._create_mission_and_search()
         mission = PurchaseMission.objects.get(pk=mission_id)

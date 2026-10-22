@@ -156,6 +156,8 @@ export async function sendMissionTurn(
   let buffer = ''
   let gotCompletion = false
   let gotResultSurface = false
+  let gotAssistantMessage = false
+  let gotConversationalCompletion = false
 
   const dispatchBlock = (block: string) => {
     const dataLines = block.split(/\r?\n/).filter((line) => line.startsWith('data:'))
@@ -168,7 +170,14 @@ export async function sendMissionTurn(
         && event.mission_id === missionId && event.schema_version === 1
         && event.payload && typeof event.payload === 'object' && !Array.isArray(event.payload)) {
         if (event.type === 'ui.component') gotResultSurface = true
-        if (event.type === 'turn.completed') gotCompletion = true
+        if (event.type === 'assistant.message' && typeof event.payload.text === 'string'
+          && Boolean(event.payload.text.trim())) gotAssistantMessage = true
+        if (event.type === 'turn.completed') {
+          gotCompletion = true
+          if (event.payload.intent_parser === 'local_conversation') {
+            gotConversationalCompletion = true
+          }
+        }
         onEvent(event)
       }
     } catch {
@@ -188,7 +197,7 @@ export async function sendMissionTurn(
     }
     buffer += decoder.decode()
     if (buffer.trim()) dispatchBlock(buffer)
-    if (!gotCompletion || !gotResultSurface) {
+    if (!gotCompletion || (!gotResultSurface && !(gotConversationalCompletion && gotAssistantMessage))) {
       throw new Error('پاسخ جریانی کامل نرسید؛ قبل از ارسال دوباره، نتیجه ذخیره‌شده بررسی می‌شود.')
     }
   } finally {

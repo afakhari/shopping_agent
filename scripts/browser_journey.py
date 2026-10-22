@@ -67,6 +67,12 @@ def main() -> None:
 
                 if width == 390:
                     composer = page.locator('textarea[aria-label="پیام به دستیار خرید"]')
+                    composer.fill("احوال شما؟")
+                    page.get_by_role("button", name="ارسال پیام").click()
+                    page.get_by_text("سلام! خوش اومدی.", exact=False).first.wait_for()
+                    assert page.locator(".mission-product-card").count() == 0
+                    assert page.locator(".genui-empty-state").count() == 0
+                    page.screenshot(path=str(OUTPUT / "greeting-no-products-mobile.png"), full_page=True)
                     composer.fill("چطوری؟")
                     page.get_by_role("button", name="ارسال پیام").click()
                     page.get_by_text("سلام! خوش اومدی.", exact=False).first.wait_for()
@@ -89,6 +95,14 @@ def main() -> None:
                 page.get_by_role("button", name="ارسال پیام").click()
                 page.locator(".mission-product-card").first.wait_for()
                 assert page.locator(".mission-product-highlights").first.is_visible()
+                if width == 390:
+                    # After a real search, smalltalk should not fabricate or replace
+                    # products; the previous search remains available.
+                    previous_cards = page.locator(".mission-product-card").count()
+                    composer.fill("احوال شما؟")
+                    page.get_by_role("button", name="ارسال پیام").click()
+                    page.get_by_text("سلام! خوش اومدی.", exact=False).last.wait_for()
+                    assert page.locator(".mission-product-card").count() == previous_cards
                 assert_no_horizontal_overflow(page, width)
                 page.screenshot(path=str(OUTPUT / f"products-{width}.png"), full_page=True)
 
