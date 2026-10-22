@@ -229,8 +229,8 @@ function ProductResults({
                 {isCompared && <span className="mission-compared-badge"><CheckCircle2 size={13} /> انتخاب‌شده</span>}
               </div>
               <div className="mission-product-price-line">
-                <strong className="mission-product-price">{formatPrice(offer.price_toman)}</strong>
-                <span className="mission-product-seller">{offer.shop.name}</span>
+                <span className="mission-product-price-wrap"><small>قیمت ثبت‌شده</small><strong className="mission-product-price">{formatPrice(offer.price_toman)}</strong></span>
+                <span className="mission-product-seller"><Store size={13} aria-hidden="true" />{offer.shop.name}</span>
               </div>
               <div className="mission-product-meta">
                 <span className={`mission-price-quality ${offer.price_quality}`}><i />{getPriceQualityLabel(offer.price_quality)}</span>
@@ -1106,7 +1106,7 @@ export function MissionPanel({
     <section className={`conversation-panel${isEmptyConversation ? ' conversation-panel-empty' : ''}`} aria-labelledby="conversation-heading">
       <div className="conversation-panel-header">
         <div className="conversation-header-copy">
-          <h2 id={!isEmptyConversation ? 'conversation-heading' : undefined}>گفتگوی خرید</h2>
+          <h2 id={!isEmptyConversation ? 'conversation-heading' : undefined}>دستیار خرید شما</h2><p>پیدا کن، مقایسه کن، آگاهانه انتخاب کن.</p>
         </div>
         {chatMessages.length > 0 && <button className="conversation-reset" type="button" disabled={isRunning || isRestoring || contactingOfferId !== null} onClick={startNewMission}><RotateCcw size={15} /> گفتگوی تازه</button>}
       </div>
@@ -1115,9 +1115,10 @@ export function MissionPanel({
         {isEmptyConversation && (
           <div className="conversation-welcome">
             <span className="welcome-orb" aria-hidden="true"><Sparkles size={21} /></span>
-            <span className="welcome-kicker">خرید حضوری، با تصمیم بهتر</span>
-            <h3 id="conversation-heading">امروز دنبال چه چیزی می‌گردی؟</h3>
-            <p>محصول یا کاربردت را بنویس؛ بقیهٔ مسیر را با هم پیش می‌بریم.</p>
+            <span className="welcome-kicker"><span className="welcome-kicker-dot" /> دستیار خرید فارسی‌زبان</span>
+            <h3 id="conversation-heading">دنبال چی می‌گردی؟ <span>با هم گزینه‌های مناسب رو پیدا می‌کنیم.</span></h3>
+            <p>از نیازی که داری شروع کن. بودجه، مدل‌ها و فروشگاه‌ها رو باهم بررسی می‌کنیم تا تصمیم‌گرفتن ساده‌تر بشه.</p>
+            <div className="welcome-prompt-heading"><strong>برای شروع، یکی رو انتخاب کن</strong><small>یا درخواست خودت رو پایین صفحه بنویس</small></div>
             <div className="quick-prompt-grid">
               {quickPrompts.map((item) => (
                 <button type="button" className="quick-prompt" key={item.label} disabled={isRunning || isRestoring} onClick={() => void runTurn(item.prompt)}>
@@ -1127,7 +1128,7 @@ export function MissionPanel({
                 </button>
               ))}
             </div>
-            <div className="welcome-trust-row"><span><MapPin size={14} /> فروشگاه‌های ثبت‌شده در تهران</span><span><ShieldCheck size={14} /> قیمت ثبت‌شده و استعلام جداگانه</span></div>
+            <div className="welcome-trust-row"><span><MapPin size={14} /> فروشگاه‌های تهران</span><span><ShieldCheck size={14} /> قیمت ثبت‌شده، بدون ادعای موجودی قطعی</span></div>
           </div>
         )}
 
@@ -1147,7 +1148,7 @@ export function MissionPanel({
               {item.results && item.results.length > 0 && (
                 <div className="mission-results-block conversation-results-block">
                   <div className="mission-results-header">
-                    <div><h3>گزینه‌های پیدا‌شده</h3><p>قیمت و شرایط از دادهٔ ثبت‌شده؛ موجودی امروز هنوز تضمین نشده است.</p></div>
+                    <div><span className="mission-results-kicker">نتیجه جست‌وجوی شما</span><h3>این گزینه‌ها ارزش بررسی دارن</h3><p>از قیمت‌های ثبت‌شده شروع کن؛ بعد فروشگاه‌ها و جزئیات هر مدل رو مقایسه کن.</p></div>
                     <div className="mission-results-header-actions">
                       <span>{money.format(item.resultCount ?? item.results.length)} محصول</span>
                       {isCurrent && <button type="button" className="mission-edit-filters" onClick={() => handleGenUIAction({ type: 'open_filter_form' })} disabled={isRunning || isRestoring}><SlidersHorizontal size={15} /> تغییر شرایط</button>}
@@ -1200,7 +1201,7 @@ export function MissionPanel({
       {error && <div className="conversation-error" role="alert"><AlertCircle size={17} /><span>{error}</span><button type="button" onClick={() => setError(null)}>بستن</button></div>}
       {isRunning && <div className="conversation-running-note" role="status" aria-live="polite"><span className="mission-progress-dot" />{stageLabel ?? 'در حال بررسی درخواست'}<span className="conversation-running-sub">اطلاعات محصول و شروط خرید در حال بررسی است</span></div>}
 
-      <form className="conversation-composer" onSubmit={submit}>
+      <form className="conversation-composer" id="conversation-composer" onSubmit={submit}>
         {lastQuery && <button className="composer-tool" type="button" aria-label="تنظیم شرایط خرید" title="تنظیم شرایط خرید" disabled={isRunning || isRestoring} onClick={() => handleGenUIAction({ type: 'open_filter_form' })}><SlidersHorizontal size={18} /></button>}
         <button className={`composer-tool ${location ? 'location-active' : ''}`} type="button" aria-label={location ? 'حذف موقعیت' : 'استفاده از موقعیت فعلی'} title={location ? 'حذف فیلتر موقعیت' : 'مرتب‌سازی فروشگاه‌ها بر اساس فاصله از موقعیت فعلی'} disabled={isRunning || isRestoring || isLocating} onClick={handleLocationClick}>{isLocating ? <LoaderCircle size={18} className="spin" /> : location ? <MapPinOff size={18} /> : <LocateFixed size={18} />}</button>
         <textarea
@@ -1223,7 +1224,7 @@ export function MissionPanel({
           {isRunning ? <LoaderCircle size={18} className="spin" /> : <Send size={17} />}
         </button>
       </form>
-      <div className="conversation-composer-hint">با Enter ارسال کن؛ برای نوشتن چندخطی از Shift + Enter استفاده کن.</div>
+      <div className="conversation-composer-hint"><span>Enter برای ارسال · Shift + Enter برای خط جدید</span><span>پرسش دقیق‌تر، پیشنهاد بهتر</span></div>
       <div className="conversation-bottom-row">
         <div className="mission-context-row">
           {formatBudgetLabel(budget) && <span>بودجه: {formatBudgetLabel(budget)}</span>}
