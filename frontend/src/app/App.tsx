@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useCallback, useEffect, useState } from 'react'
-import { Compass, MapPin } from 'lucide-react'
+import { ArrowUpLeft, Compass, MapPin, Search, Store, ShieldCheck, Route, Sparkles } from 'lucide-react'
 import { MissionPanel } from '../features/missions/MissionPanel'
 import type { MissionConstraints } from '../features/missions/mission-api'
 import { getHealth } from '../shared/api/health'
@@ -80,13 +80,13 @@ export default function App() {
       ? 'offline'
       : 'checking'
   return (
-    <div className="chat-app">
+    <div className="chat-app redesign-v2">
       <a className="skip-link" href="#conversation-heading">رفتن به گفتگوی خرید</a>
       <header className="chat-topbar">
         <div className="chat-topbar-inner">
           <a className="chat-brand" href="#home" aria-label="بازارکامپس، دستیار خرید">
             <span className="chat-brand-mark"><Compass size={21} strokeWidth={2.3} /></span>
-            <span className="chat-brand-copy"><strong>بازارکامپس</strong><small>دستیار خرید حضوری</small></span>
+            <span className="chat-brand-copy"><strong>بازارکامپس</strong><small>دستیار هوشمند خرید حضوری</small></span>
           </a>
           <div className="chat-topbar-status">
             <span className="chat-location"><MapPin size={14} /> تهران</span>
@@ -98,8 +98,40 @@ export default function App() {
         </div>
       </header>
 
-      <main className="chat-main" id="home">
-        <MissionPanel budget={maxPriceToman} mustHaveCredit={mustHaveCredit} location={location} radiusM={radiusM} sort={sort} onLocationChange={setLocation} onRestoreConstraints={restoreMissionFilters} />
+      <main className="chat-main journey-layout" id="home">
+        <aside className="journey-sidebar" aria-label="راهنمای مسیر خرید">
+          <div className="journey-sidebar-top">
+            <span className="journey-sidebar-eyebrow"><Sparkles size={15} /> همراه تو در انتخاب</span>
+            <h2>خرید خوب، از یک سؤال خوب شروع می‌شود.</h2>
+            <p>نیازت را بگو؛ از پیدا کردن مدل تا انتخاب فروشگاه و برنامه مراجعه کنارت هستیم.</p>
+          </div>
+          <nav className="journey-steps" aria-label="مراحل راهنمای خرید">
+            <p className="journey-section-label">مسیر خرید</p>
+            <ol>
+              <li><span className="journey-step-icon"><Search size={17} /></span><span><strong>شناخت نیاز</strong><small>بودجه و ویژگی‌های مهم</small></span><b>۰۱</b></li>
+              <li><span className="journey-step-icon"><Store size={17} /></span><span><strong>کالا و فروشگاه</strong><small>مقایسه مدل‌ها و قیمت‌ها</small></span><b>۰۲</b></li>
+              <li><span className="journey-step-icon"><ShieldCheck size={17} /></span><span><strong>بررسی فروشنده</strong><small>استعلام شبیه‌سازی‌شده</small></span><b>۰۳</b></li>
+              <li><span className="journey-step-icon"><Route size={17} /></span><span><strong>آمادگی مراجعه</strong><small>نشانی و گزینه پشتیبان</small></span><b>۰۴</b></li>
+            </ol>
+          </nav>
+          <div className="journey-side-note">
+            <div className="journey-side-note-icon"><ShieldCheck size={19} /></div>
+            <strong>شفافیت، قبل از خرید</strong>
+            <p>قیمت‌ها از دیتاست ثبت‌شده هستند؛ موجودی فروشگاه در این نسخه به‌صورت نمایشی بررسی می‌شود.</p>
+            <a href="#conversation-composer">شروع گفتگوی خرید <ArrowUpLeft size={15} aria-hidden="true" /></a>
+          </div>
+          <p className="journey-sidebar-footer">نسخه آزمایشی · پوشش داده‌های فروشگاهی تهران</p>
+        </aside>
+        <div className="journey-workspace">
+          <div className="journey-mobile-ribbon" aria-label="مراحل خرید">
+            <span><Search size={14} /> انتخاب</span>
+            <span className="journey-ribbon-divider" aria-hidden="true" />
+            <span><Store size={14} /> مقایسه</span>
+            <span className="journey-ribbon-divider" aria-hidden="true" />
+            <span><Route size={14} /> مراجعه</span>
+          </div>
+          <MissionPanel budget={maxPriceToman} mustHaveCredit={mustHaveCredit} location={location} radiusM={radiusM} sort={sort} onLocationChange={setLocation} onRestoreConstraints={restoreMissionFilters} />
+        </div>
       </main>
     </div>
   )
