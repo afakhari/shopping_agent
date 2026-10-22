@@ -27,6 +27,18 @@ _GREETING = frozenset({
     "سلام احوال شما", "سلام حالتون چطوره", "سلام چه خبر",
     "hi", "hello", "hey",
 })
+_SOCIAL_TOKENS = frozenset({
+    "سلام", "درود", "حال", "حالت", "حالتون", "حالتان", "احوال",
+    "احوالتون", "احوالتان", "احوالات", "شما", "خودتون",
+    "چطوره", "چطور", "چطورید", "چطورین", "چطوری", "چگونه",
+    "هستید", "هستین", "هستی", "خوب", "خوبه", "خوبین", "خوبید",
+    "خوبی", "است", "چه", "خبر", "خبرا", "روز", "امروز", "تون",
+    "تان", "همه", "چی", "روبه", "راه", "و", "بخیر", "عزیز",
+})
+_GREETING_SIGNALS = frozenset({
+    "سلام", "درود", "حال", "حالت", "حالتون", "حالتان", "احوال",
+    "احوالتون", "احوالتان", "احوالات", "چطورید", "چطورین", "چطوری", "خوبی",
+})
 _HELP = frozenset({
     "راهنما", "کمک", "روش استفاده", "چطور ازت استفاده کنم",
     "چجوری ازت استفاده کنم", "چطور از این برنامه استفاده کنم",
@@ -45,6 +57,10 @@ def classify_conversation_intent(message: str) -> ConversationIntent | None:
     normalized = normalize_persian_text(_DIACRITICS.sub("", message))
     normalized = _PUNCTUATION.sub(" ", normalized).strip()
     if normalized in _GREETING:
+        return "greeting"
+    tokens = normalized.split()
+    if (len(tokens) <= 8 and all(token in _SOCIAL_TOKENS for token in tokens)
+            and any(token in _GREETING_SIGNALS for token in tokens)):
         return "greeting"
     if normalized in _HELP:
         return "help"

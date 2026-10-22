@@ -9,7 +9,8 @@ class ConversationGuardTests(SimpleTestCase):
     def test_greetings_do_not_leak_to_product_query(self):
         for phrase in [
             "احوال شما؟", "احوالِ شما؟؟", "احوالتون چطوره؟",
-            "سلام، حال شما چطوره؟", "چطوری؟", "مرسی", "خداحافظ!",
+            "سلام، حال شما چطوره؟", "حالِ شما چطور است؟", "حال شما خوبه؟",
+            "احوال شما امروز چطوره؟", "چطوری؟", "مرسی", "خداحافظ!",
             "چطور ازت استفاده کنم؟",
         ]:
             with self.subTest(phrase=phrase):

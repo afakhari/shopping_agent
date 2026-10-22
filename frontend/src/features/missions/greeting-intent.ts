@@ -27,6 +27,19 @@ const greetings = new Set([
   'سلام احوال شما', 'سلام حالتون چطوره', 'سلام چه خبر',
   'hi', 'hello', 'hey',
 ])
+// Use a bounded, full-message vocabulary, never partial substrings.
+const socialTokens = new Set([
+  'سلام', 'درود', 'حال', 'حالت', 'حالتون', 'حالتان', 'احوال',
+  'احوالتون', 'احوالتان', 'احوالات', 'شما', 'خودتون',
+  'چطوره', 'چطور', 'چطورید', 'چطورین', 'چطوری', 'چگونه',
+  'هستید', 'هستین', 'هستی', 'خوب', 'خوبه', 'خوبین', 'خوبید',
+  'خوبی', 'است', 'چه', 'خبر', 'خبرا', 'روز', 'امروز', 'تون',
+  'تان', 'همه', 'چی', 'روبه', 'راه', 'و', 'بخیر', 'عزیز',
+])
+const greetingSignals = new Set([
+  'سلام', 'درود', 'حال', 'حالت', 'حالتون', 'حالتان', 'احوال',
+  'احوالتون', 'احوالتان', 'احوالات', 'چطورید', 'چطورین', 'چطوری', 'خوبی',
+])
 const helpRequests = new Set([
   'راهنما', 'کمک', 'روش استفاده', 'چطور ازت استفاده کنم',
   'چجوری ازت استفاده کنم', 'چطور از این برنامه استفاده کنم',
@@ -42,6 +55,9 @@ export function classifyLocalConversation(message: string): LocalConversationInt
   if (message.length > 200) return null
   const value = normalizeConversationalText(message)
   if (greetings.has(value)) return 'greeting'
+  const tokens = value.split(' ')
+  if (tokens.length <= 8 && tokens.every((token) => socialTokens.has(token))
+    && tokens.some((token) => greetingSignals.has(token))) return 'greeting'
   if (helpRequests.has(value)) return 'help'
   if (thanks.has(value)) return 'thanks'
   if (goodbyes.has(value)) return 'goodbye'

@@ -7,6 +7,8 @@ describe('local conversational intent never wastes an LLM purchase request', () 
     ['سلام، خوبی؟', 'greeting'], ['چطوری', 'greeting'], ['چطوری؟', 'greeting'],
     ['خوبی؟', 'greeting'], ['چه خبر؟', 'greeting'], ['احوال شما؟', 'greeting'],
     ['احوالِ شما؟؟', 'greeting'], ['احوالتون چطوره؟', 'greeting'], ['سلام، حال شما چطوره؟', 'greeting'],
+    ['حالِ شما چطور است؟', 'greeting'], ['حال شما خوبه؟', 'greeting'],
+    ['احوال شما امروز چطوره؟', 'greeting'],
     ['شما چطورید؟', 'greeting'], ['حالتون خوبه؟', 'greeting'],
     ['صبح بخیر', 'greeting'],
     ['Hi', 'greeting'], ['hello', 'greeting'], ['سلام عليكم', 'greeting'],
