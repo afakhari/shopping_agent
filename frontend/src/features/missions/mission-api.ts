@@ -40,6 +40,24 @@ export interface ContactAttemptRecord {
   source_type: 'demo_simulation'
   scenario_index: number
   created_at: string
+  requested_questions?: Array<'stock' | 'price' | 'hours'>
+  evidence?: {
+    stock?: { status: string; source: string; verified_in_real_world: boolean }
+    price?: {
+      status: string
+      registered_price_toman: string | null
+      last_price_changed_at: string | null
+      source: string
+      verified_in_real_world: boolean
+    }
+    hours?: {
+      status: string
+      weekly_hours: string
+      opening_status: { status: string; label: string }
+      source: string
+      verified_in_real_world: boolean
+    }
+  }
 }
 
 export interface ContactAttemptResponse {
@@ -152,7 +170,7 @@ export async function sendMissionTurn(
 
 export async function createContactAttempt(
   missionId: string,
-  input: { shopId: string; offerId: string; purpose?: 'verify_availability' | 'verify_price' | 'verify_hours'; clientRequestId?: string },
+  input: { shopId: string; offerId: string; purpose?: 'verify_availability' | 'verify_price' | 'verify_hours'; questions?: Array<'stock' | 'price' | 'hours'>; clientRequestId?: string },
   signal?: AbortSignal,
 ): Promise<ContactAttemptResponse> {
   const response = await fetch(`/api/v1/missions/${encodeURIComponent(missionId)}/contact-attempts/`, {
@@ -163,6 +181,7 @@ export async function createContactAttempt(
       shop_id: input.shopId,
       offer_id: input.offerId,
       purpose: input.purpose ?? 'verify_availability',
+      questions: input.questions ?? ['stock', 'price', 'hours'],
       client_request_id: input.clientRequestId ?? globalThis.crypto.randomUUID(),
     }),
   })

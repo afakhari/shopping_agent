@@ -17,6 +17,7 @@ from rest_framework.response import Response
 from apps.agent.graph import _query_from_message, run_purchase_graph
 from apps.agent.llm import extract_intent
 from apps.agent.simulator import serialize_contact_attempt, simulate_contact
+from apps.agent.contact_evidence import build_contact_evidence
 from apps.catalog.models import Offer, Product
 from apps.missions.models import ContactAttempt, PurchaseMission
 from apps.missions.renderers import ServerSentEventRenderer
@@ -268,6 +269,13 @@ def create_contact_attempt(request, mission_id: str):
                     raise ValidationError({
                         "client_request_id": "نتیجه استعلام قبلی هنوز آماده نیست."
                     })
+                recorded_questions = existing.response_snapshot.get("attempt", {}).get(
+                    "requested_questions", ["stock", "price", "hours"]
+                )
+                if recorded_questions != data["questions"] or existing.purpose != data["purpose"]:
+                    raise ValidationError({
+                        "client_request_id": "این شناسه برای سؤال یا نوع استعلام متفاوتی ثبت شده است."
+                    })
                 return Response(existing.response_snapshot, status=200)
         offer = get_object_or_404(Offer.objects.select_related("shop", "product"), source_id=data["offer_id"])
         if offer.shop_id != data["shop_id"]:
@@ -290,6 +298,10 @@ def create_contact_attempt(request, mission_id: str):
             client_request_id=request_id,
         )
         attempt_payload = serialize_contact_attempt(result.attempt)
+        attempt_payload["requested_questions"] = data["questions"]
+        attempt_payload["evidence"] = build_contact_evidence(
+            offer, result.attempt.outcome, data["questions"]
+        )
         alternatives: list[dict[str, Any]] = []
         alternative_products: list[dict[str, Any]] = []
         if result.attempt.outcome != "confirmed_available":
