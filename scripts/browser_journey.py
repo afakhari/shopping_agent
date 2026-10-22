@@ -147,6 +147,22 @@ def main() -> None:
                     assert_no_horizontal_overflow(page, width)
                     page.screenshot(path=str(OUTPUT / "empty-result-mobile.png"), full_page=True)
 
+                    # A temporary proxy failure must not delete the draft or
+                    # silently submit twice. Recover via GET instead of POST.
+                    page.route(
+                        "**/api/v1/missions/*/turns/",
+                        lambda route: route.fulfill(status=502, content_type="text/html", body="<html>upstream</html>"),
+                    )
+                    composer.fill("هدفون بی سیم تست مرورگر")
+                    page.get_by_role("button", name="ارسال پیام").click()
+                    page.locator(".conversation-error").get_by_text("ارتباط با سرور", exact=False).wait_for()
+                    assert composer.input_value() == "هدفون بی سیم تست مرورگر"
+                    page.unroute("**/api/v1/missions/*/turns/")
+                    page.get_by_role("button", name="بازیابی وضعیت").click()
+                    page.locator(".conversation-error").wait_for(state="detached")
+                    assert_no_horizontal_overflow(page, width)
+                    page.screenshot(path=str(OUTPUT / "upstream-recovery-mobile.png"), full_page=True)
+
                 context.close()
             print("BROWSER_JOURNEY=PASS; Chromium RTL 320/390/1440; synthetic fixtures.")
         finally:

@@ -170,9 +170,14 @@ function describeMissionEvent(event: MissionEvent): { title: string; detail?: st
       : status === 'waiting_for_user'
         ? 'منتظر انتخاب تو'
         : 'بررسی درخواست کامل شد'
-    const detail = typeof total === 'number' && Number.isFinite(total)
-      ? `${money.format(total)} محصول با شروط جاری بررسی شد`
-      : undefined
+    const facts = []
+    if (typeof total === 'number' && Number.isFinite(total)) {
+      facts.push(`${money.format(total)} محصول با شروط جاری بررسی شد`)
+    }
+    const parser = readText(event.payload, 'intent_parser')
+    if (parser === 'llm') facts.push('نیت خرید با مدل تحلیل شد')
+    else if (parser === 'heuristic') facts.push('نیت خرید با روش قاعده‌محور تحلیل شد')
+    const detail = facts.join('؛ ')
     return { title, ...(detail ? { detail } : {}) }
   }
   return null
