@@ -13,8 +13,8 @@ describe('category-specific comparison', () => {
       product('b', [{ key: 'رنگ', value: 'سفید' }]),
     ])
     expect(data.columns.map((c) => c.label)).toEqual(['رنگ'])
-    expect(data.valuesByProduct[0].spec_0).toBe('مشکی')
-    expect(data.valuesByProduct[1].spec_0).toBe('سفید')
+    expect(data.valuesByProduct[0]?.spec_0).toBe('مشکی')
+    expect(data.valuesByProduct[1]?.spec_0).toBe('سفید')
   })
 
   it('uses unknown for missing values when two of three products have the attribute', () => {
@@ -23,8 +23,8 @@ describe('category-specific comparison', () => {
       product('b', [{ key: 'باتری', value: '۶ ساعت' }]),
       product('c', []),
     ])
-    expect(data.columns[0].label).toBe('باتری')
-    expect(data.valuesByProduct[2].spec_0).toBe('نامشخص')
+    expect(data.columns[0]?.label).toBe('باتری')
+    expect(data.valuesByProduct[2]?.spec_0).toBe('نامشخص')
   })
 
   it('ignores unshared irrelevant product-title attributes', () => {
