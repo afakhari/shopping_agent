@@ -93,11 +93,11 @@ try {
     } else {
         Invoke-Checked 'Preflight without DB writes' @(
             'compose','exec','-T','backend','python','manage.py','import_dataset',
-            '--archive',"/app/data/$ArchiveName",'--dry-run','--strict-json'
+            '--archive',"/app/data/$ArchiveName",'--dry-run','--strict-json','--report-dir','/tmp/bazaar-import-reports'
         )
         Invoke-Checked 'Import ZIP into PostgreSQL' @(
             'compose','exec','-T','backend','python','manage.py','import_dataset',
-            '--archive',"/app/data/$ArchiveName",'--strict-json'
+            '--archive',"/app/data/$ArchiveName",'--strict-json','--report-dir','/tmp/bazaar-import-reports'
         )
     }
     Invoke-Checked 'Check actual imported counts and sample IDs' (@('compose','exec','-T','backend','python','manage.py') + $counts)
