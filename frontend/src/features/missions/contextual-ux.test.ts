@@ -33,6 +33,16 @@ describe('evidence-first purchase flow', () => {
     expect(mission).toContain('mission-compare-tray')
     expect(mission).toContain('setComparisonOpen(')
   })
+  it('renders one explanatory heading for a missing result instead of three repeated warnings', () => {
+    const genUI = readFileSync(new URL('./GenUIRenderer.tsx', import.meta.url), 'utf8')
+    expect(mission).toContain("!item.components.some((component) => component.type === 'empty_state')")
+    expect(genUI).toContain("data: { ...data, title: undefined, description: undefined }")
+    expect(genUI).toContain('genui-empty-heading')
+  })
+  it('routes short help and greetings without starting a paid LLM request', () => {
+    expect(mission).toContain('isGreetingOnly(trimmed) || isAssistantHelpRequest(trimmed)')
+    expect(mission).toContain('چطور ازت استفاده کنم')
+  })
   it('keeps seller details optional instead of expanding every long address', () => {
     expect(mission).toContain('<details className="mission-seller-details">')
     expect(styles).toContain('.mission-seller-details summary')

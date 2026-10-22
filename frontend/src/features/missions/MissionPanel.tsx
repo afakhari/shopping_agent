@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { AlertCircle, ArrowLeft, CheckCircle2, ChevronDown, ChevronUp, Clock3, CreditCard, ExternalLink, Headphones, Laptop, LoaderCircle, LocateFixed, MapPin, MapPinOff, Send, ShieldCheck, SlidersHorizontal, Sparkles, Store, RotateCcw, X } from 'lucide-react'
 import { getProductOffers, type CatalogOffer, type CatalogSearchResult, type ProductOffersResponse } from '../search/catalog-api'
 import { buildComparisonSpecColumns } from './comparison-specs'
-import { isGreetingOnly } from './greeting-intent'
+import { isAssistantHelpRequest, isGreetingOnly } from './greeting-intent'
 import { findCurrentSearchMessage, shouldFollowConversation } from './conversation-behavior'
 import { GenUIRenderer } from './GenUIRenderer'
 import { formatDistance, formatLastPriceChange, getPriceQualityLabel, openStreetMapUrl } from './ui-formatters'
@@ -726,7 +726,7 @@ export function MissionPanel({
     shouldAutoScrollRef.current = true
     // A salutation is not a catalog query. Avoid irrelevant product recommendations
     // and avoid creating a misleading purchase mission until a product intent exists.
-    if (isGreetingOnly(trimmed)) {
+    if (isGreetingOnly(trimmed) || isAssistantHelpRequest(trimmed)) {
       turnCounter.current += 1
       const greetingId = `hello-${Date.now()}-${turnCounter.current}`
       setChatMessages((current) => [
@@ -735,7 +735,9 @@ export function MissionPanel({
         {
           id: `assistant-${greetingId}`,
           role: 'assistant',
-          text: 'سلام! خوش اومدی. 🌱 دنبال چه محصولی هستی؟ می‌تونی مدل، کاربرد یا حدود بودجه رو بگی تا گزینه‌های مناسب و فروشگاه‌های تهران رو بررسی کنیم.',
+          text: isAssistantHelpRequest(trimmed)
+            ? 'برای شروع، نام یا کاربرد محصول را بنویس؛ مثلاً «هدفون بی‌سیم تا ۳ میلیون تومان». بعد می‌توانی مدل‌ها را مقایسه کنی، فروشگاه‌های تهران را ببینی و استعلام نمایشی را انجام بدهی. خرید اعتباری و محدوده مکانی هم قابل تنظیم‌اند.'
+            : 'سلام! خوش اومدی. 🌱 دنبال چه محصولی هستی؟ می‌تونی مدل، کاربرد یا حدود بودجه رو بگی تا گزینه‌های مناسب و فروشگاه‌های تهران رو بررسی کنیم.',
           components: [],
         },
       ])
@@ -1219,7 +1221,7 @@ export function MissionPanel({
           return (
             <article className={`chat-message chat-message-assistant ${item.pending ? 'pending' : ''}`} key={item.id}>
               <div className="assistant-message-heading"><span className="assistant-mini-avatar"><Sparkles size={15} /></span><strong>دستیار خرید</strong>{item.pending && <span className="assistant-working"><i /><i /><i /> در حال بررسی</span>}</div>
-              {item.text && (item.results && item.results.length > 0 && !item.pending
+              {item.text && !item.components.some((component) => component.type === 'empty_state') && (item.results && item.results.length > 0 && !item.pending
                 ? <details className="assistant-explanation"><summary>درباره این نتایج <ChevronDown size={13} aria-hidden="true" /></summary><p>{item.text}</p></details>
                 : <div className="assistant-message-copy">{item.text}</div>)}
               {preComponents.length > 0 && <GenUIRenderer components={preComponents} defaults={{ query: lastQuery, max_price_toman: budget, must_have_in_person_credit: mustHaveCredit, sort: constraints.sort ?? 'relevance' }} disabled={isRunning || isRestoring || !isCurrent} onAction={handleGenUIAction} />}
