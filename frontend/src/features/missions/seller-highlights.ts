@@ -10,7 +10,7 @@ export function sellerHighlights(offers: CatalogOffer[]): SellerHighlights {
   let closest: { id: string; meters: number } | null = null
   for (const offer of offers) {
     if (offer.price_toman && /^\d+(?:\.0+)?$/.test(offer.price_toman)) {
-      const price = BigInt(offer.price_toman.split('.')[0])
+      const price = BigInt(offer.price_toman.split('.')[0]!)
       if (!cheapest || price < cheapest.price) cheapest = { id: offer.id, price }
     }
     const distance = offer.shop.distance_m

@@ -6,7 +6,7 @@ export function formatCatalogPrice(price: string | null | undefined): string {
   if (price === null || price === undefined || price === '') return 'قیمت ثبت نشده'
   if (!WHOLE_TOMAN.test(price)) return 'قیمت نامشخص'
   try {
-    return `${money.format(BigInt(price.split('.')[0]))} تومان`
+    return `${money.format(BigInt(price.split('.')[0]!))} تومان`
   } catch {
     return 'قیمت نامشخص'
   }
