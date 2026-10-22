@@ -29,13 +29,29 @@ describe('controlled Generative UI protocol', () => {
         { data: {} },
       ],
     }))
-    expect(components.map((component) => component.type)).toEqual(['category_choice', 'product_results', '<script>'])
+    expect(components.map((component) => component.type)).toEqual(['category_choice', 'product_results'])
     expect(getResultPayload(components)).toMatchObject({ query: 'فشارسنج', total: 2 })
+  })
+
+  it('accepts known recovery UI from the backend', () => {
+    expect(getUIComponents(event('alternative_options', { alternatives: [] }))[0]?.type)
+      .toBe('alternative_options')
+  })
+
+  it('limits one incoming component stack to twelve entries', () => {
+    const components = getUIComponents(event('component_stack', {
+      components: Array.from({ length: 30 }, () => ({ type: 'notice', data: { message: 'notice' } })),
+    }))
+    expect(components).toHaveLength(12)
   })
 
   it('ignores malformed event envelopes and non-UI events', () => {
     const notUI = { ...event('notice', {}), type: 'assistant.message' } as MissionEvent
     expect(getUIComponents(notUI)).toEqual([])
     expect(getUIComponents(event('', {}))).toEqual([])
+    expect(getUIComponents(event('<script>', {}))).toEqual([])
+    expect(getUIComponents(event('component_stack', {
+      components: [{ type: 'component_stack', data: { components: [] } }],
+    }))).toEqual([])
   })
 })

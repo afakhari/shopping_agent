@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { AlertCircle, ArrowLeft, CheckCircle2, ChevronDown, ChevronUp, Clock3, CreditCard, ExternalLink, Headphones, Laptop, LoaderCircle, LocateFixed, MapPin, MapPinOff, PhoneCall, Send, ShieldCheck, SlidersHorizontal, Sparkles, Store, RotateCcw, X } from 'lucide-react'
+import { AlertCircle, ArrowLeft, CheckCircle2, ChevronDown, ChevronUp, Clock3, CreditCard, ExternalLink, Headphones, Laptop, LoaderCircle, LocateFixed, MapPin, MapPinOff, Send, ShieldCheck, SlidersHorizontal, Sparkles, Store, RotateCcw, X } from 'lucide-react'
 import { getProductOffers, type CatalogOffer, type CatalogSearchResult, type ProductOffersResponse } from '../search/catalog-api'
 import { buildComparisonSpecColumns } from './comparison-specs'
 import { isGreetingOnly } from './greeting-intent'
@@ -8,6 +8,11 @@ import { GenUIRenderer } from './GenUIRenderer'
 import { formatDistance, formatLastPriceChange, getPriceQualityLabel, openStreetMapUrl } from './ui-formatters'
 import { osmEmbedUrl, TEHRAN_REGION_SAMPLES } from './shop-map'
 import { getResultPayload, getUIComponents, type GenUIAction, type GenUIComponent } from './genui-types'
+import { resolveRecoveryOffer } from './recovery-options'
+import { chooseProductHighlights } from './product-highlights'
+import { ActiveShoppingFilters } from './ActiveShoppingFilters'
+import { sellerHighlights } from './seller-highlights'
+import { formatCatalogPrice } from './catalog-pricing'
 import {
   createContactAttempt,
   createMission,
@@ -31,8 +36,7 @@ const OUTCOME_LABELS: Record<ContactAttemptResponse['attempt']['outcome'], strin
 }
 
 function formatPrice(price: string | null): string {
-  if (!price) return 'قیمت ثبت نشده'
-  try { return `${money.format(BigInt(price))} تومان` } catch { return 'قیمت نامشخص' }
+  return formatCatalogPrice(price)
 }
 
 function formatRegisteredWarranty(warranty: CatalogOffer['warranty']): string | null {
@@ -224,6 +228,7 @@ function ProductResults({
         const offer = result.best_offer
         const contact = contactByOffer[offer.id]
         const offerView = offerViews[result.product.id]
+        const relativeTags = sellerHighlights(offerView?.offers ?? [])
         const offersPanelId = `seller-offers-${result.product.id.replace(/[^a-zA-Z0-9_-]/g, '-')}`
         const imageUrl = result.product.images.find((value) => /^https?:\/\//i.test(value))
         const address = offer.shop.address ?? offer.shop.location_label ?? 'نشانی ثبت نشده'
@@ -232,6 +237,7 @@ function ProductResults({
         const distanceLabel = formatDistance(offer.shop.distance_m)
         const mapUrl = openStreetMapUrl(offer.shop.lat, offer.shop.lon)
         const isCompared = selectedCompareProductIds.includes(result.product.id)
+        const highlights = chooseProductHighlights(result.product)
         return (
           <article className={`mission-product-card ${isCompared ? 'is-compared' : ''} ${allowActions && offerView?.expanded ? 'is-offers-expanded' : ''}`} key={result.product.id}>
             <div className="mission-product-image">
@@ -253,6 +259,11 @@ function ProductResults({
                   <span className="mission-credit-confirmed"><CreditCard size={12} /> اعتباری</span>
                 )}
               </div>
+              {highlights.length > 0 && <dl className="mission-product-highlights" aria-label="مشخصات مهم ثبت‌شده">
+                {highlights.map((item) => (
+                  <div key={item.key}><dt>{item.key}</dt><dd>{item.value}</dd></div>
+                ))}
+              </dl>}
               <details className="mission-product-details">
                 <summary>
                   جزئیات
@@ -323,6 +334,9 @@ function ProductResults({
                   {offerView.loading && offerView.offers.length === 0 && <div className="mission-offer-state"><LoaderCircle size={17} className="spin" /> در حال دریافت فروشگاه‌های واجد شرایط…</div>}
                   {offerView.error && <div className="mission-offer-error" role="alert"><span>{offerView.error}</span><button type="button" onClick={() => onToggleOffers(result)}>تلاش دوباره</button></div>}
                   {!offerView.loading && !offerView.error && offerView.offers.length === 0 && <p className="mission-offer-state">فروشگاهی با این شروط برای این مدل پیدا نشد.</p>}
+                  {offerView.offers.length > 1 && (
+                    <p className="mission-offer-shortlist-note">برچسب‌های مقایسه فقط بین فروشگاه‌های بارگذاری‌شده هستند؛ فاصله‌ها مستقیم و ساعت کار طبق داده ثبت‌شده است.</p>
+                  )}
                   {offerView.offers.map((sellerOffer) => {
                     const attempt = contactByOffer[sellerOffer.id]
                     const sellerDistance = formatDistance(sellerOffer.shop.distance_m)
@@ -332,25 +346,37 @@ function ProductResults({
                     return (
                       <article className="mission-offer-row" key={sellerOffer.id}>
                         <div className="mission-offer-copy">
-                          <strong>{sellerOffer.shop.name}</strong>
-                          <span className="mission-offer-price">{formatPrice(sellerOffer.price_toman)}</span>
-                          {sellerOffer.seller_title && <small>عنوان ثبت‌شده فروشنده: {sellerOffer.seller_title}</small>}
-                          {formatRegisteredWarranty(sellerOffer.warranty) && <small>گارانتی ثبت‌شده: {formatRegisteredWarranty(sellerOffer.warranty)}</small>}
-                          <small><MapPin size={12} />{sellerOffer.shop.address ?? sellerOffer.shop.location_label ?? 'نشانی ثبت نشده'}</small>
-                          {sellerOffer.shop.opening_status && <small>{sellerOffer.shop.opening_status.label} (طبق ساعات ثبت‌شده، نه تأیید واقعی)</small>}
-                          {sellerOffer.shop.indoor_hints && [sellerOffer.shop.indoor_hints.mall, sellerOffer.shop.indoor_hints.floor, sellerOffer.shop.indoor_hints.unit].filter(Boolean).length > 0 && (
-                            <small>داخل مجتمع: {[sellerOffer.shop.indoor_hints.mall, sellerOffer.shop.indoor_hints.floor, sellerOffer.shop.indoor_hints.unit].filter(Boolean).join('، ')}</small>
-                          )}
-                          {sellerDistance && <small><LocateFixed size={12} />فاصله مستقیم: {sellerDistance}</small>}
-                          {sellerMapUrl && <a className="mission-offer-map" href={sellerMapUrl} target="_blank" rel="noopener noreferrer"><MapPin size={12} /> نمایش روی نقشه <ExternalLink size={11} /></a>}
-                          {inlineMapUrl && <button className="mission-inline-map-toggle" type="button" aria-expanded={openMapOfferId === sellerOffer.id} onClick={() => setOpenMapOfferId(current => current === sellerOffer.id ? null : sellerOffer.id)}>
-                            <MapPin size={12} />{openMapOfferId === sellerOffer.id ? 'بستن نقشه' : 'نقشه در همین صفحه'}
-                          </button>}
+                          <div className="mission-seller-heading">
+                            <strong>{sellerOffer.shop.name}</strong>
+                            <span className="mission-offer-price">{formatPrice(sellerOffer.price_toman)}</span>
+                          </div>
+                          <div className="mission-seller-quick-facts">
+                            {sellerOffer.id === relativeTags.cheapestOfferId && <span className="mission-seller-tag">ارزان‌ترین در فهرست</span>}
+                            {sellerOffer.id === relativeTags.closestOfferId && <span className="mission-seller-tag">نزدیک‌ترین در فهرست</span>}
+                            {sellerDistance && <span><LocateFixed size={12} aria-hidden="true" />{sellerDistance} فاصله مستقیم</span>}
+                            {sellerOffer.in_person_credit_eligible && <span><CreditCard size={12} aria-hidden="true" />اعتبار حضوری این آفر</span>}
+                          </div>
                           <div className="mission-offer-badges">
                             <span className={`mission-price-quality ${sellerOffer.price_quality}`}><i />{getPriceQualityLabel(sellerOffer.price_quality)}</span>
-                            <span className={`mission-shop-credit ${sellerOffer.in_person_credit_eligible ? 'registered' : 'unknown'}`}><CreditCard size={12} />{sellerOffer.in_person_credit_eligible ? 'اعتبار حضوری ثبت شده' : 'اعتبار حضوری برای این آفر ثبت نشده'}</span>
+                            {sellerOffer.shop.opening_status && <span>{sellerOffer.shop.opening_status.label}</span>}
                           </div>
-                          {sellerUpdatedAt && <small className="mission-offer-updated"><Clock3 size={12} />آخرین تغییر: {sellerUpdatedAt}</small>}
+                          <details className="mission-seller-details">
+                            <summary>آدرس، گارانتی و اطلاعات تکمیلی</summary>
+                            <div>
+                              {sellerOffer.seller_title && <small>عنوان فروشنده: {sellerOffer.seller_title}</small>}
+                              {formatRegisteredWarranty(sellerOffer.warranty) && <small>گارانتی ثبت‌شده: {formatRegisteredWarranty(sellerOffer.warranty)}</small>}
+                              <small><MapPin size={12} aria-hidden="true" />{sellerOffer.shop.address ?? sellerOffer.shop.location_label ?? 'نشانی ثبت نشده'}</small>
+                              {sellerOffer.shop.indoor_hints && [sellerOffer.shop.indoor_hints.mall, sellerOffer.shop.indoor_hints.floor, sellerOffer.shop.indoor_hints.unit].filter(Boolean).length > 0 && (
+                                <small>داخل مجتمع: {[sellerOffer.shop.indoor_hints.mall, sellerOffer.shop.indoor_hints.floor, sellerOffer.shop.indoor_hints.unit].filter(Boolean).join('، ')}</small>
+                              )}
+                              <small>اعتبار حضوری: {sellerOffer.in_person_credit_eligible ? 'برای این آفر ثبت‌شده' : 'برای این آفر ثبت نشده'}</small>
+                              {sellerUpdatedAt && <small><Clock3 size={12} aria-hidden="true" />آخرین تغییر قیمت ثبت‌شده: {sellerUpdatedAt}</small>}
+                              {sellerMapUrl && <a className="mission-offer-map" href={sellerMapUrl} target="_blank" rel="noopener noreferrer"><MapPin size={12} /> موقعیت روی نقشه <ExternalLink size={11} /></a>}
+                              {inlineMapUrl && <button className="mission-inline-map-toggle" type="button" aria-expanded={openMapOfferId === sellerOffer.id} onClick={() => setOpenMapOfferId(current => current === sellerOffer.id ? null : sellerOffer.id)}>
+                                <MapPin size={12} />{openMapOfferId === sellerOffer.id ? 'بستن نقشه' : 'نقشه در همین صفحه'}
+                              </button>}
+                            </div>
+                          </details>
                         </div>
                         {inlineMapUrl && openMapOfferId === sellerOffer.id && (
                           <div className="mission-inline-map" role="region" aria-label={`پیش‌نمایش نقشه فروشگاه ${sellerOffer.shop.name}`}>
@@ -365,7 +391,7 @@ function ProductResults({
                           disabled={contactingOfferId === sellerOffer.id || !missionId}
                         >
                           {contactingOfferId === sellerOffer.id ? <LoaderCircle size={15} className="spin" /> : <ShieldCheck size={15} />}
-                          {contactingOfferId === sellerOffer.id ? 'در حال بررسی…' : 'بررسی پیش از مراجعه'}
+                          {contactingOfferId === sellerOffer.id ? 'در حال بررسی…' : 'استعلام آزمایشی فروشنده'}
                         </button>
                         {attempt && sellerOffer.id !== offer.id && <div className={`mission-offer-attempt ${attempt.attempt.outcome === 'confirmed_available' ? 'success' : 'warning'}`} aria-live="polite"><strong>{OUTCOME_LABELS[attempt.attempt.outcome]}</strong><span>{attempt.attempt.response_text}</span></div>}
                       </article>
@@ -383,49 +409,6 @@ function ProductResults({
                 <div className={`mission-contact-result ${contact.attempt.outcome === 'confirmed_available' ? 'success' : 'warning'}`} aria-live="polite">
                   <strong>{OUTCOME_LABELS[contact.attempt.outcome]}</strong>
                   <span>{contact.attempt.response_text}</span>
-                  {contact.alternatives.length > 0 && (
-                    <div className="mission-alternatives">
-                      <b>گزینه‌های جایگزین</b>
-                      {contact.alternatives.slice(0, 3).map((alternative: CatalogOffer) => (
-                        <div key={alternative.id}><span>{alternative.shop.name}</span><strong>{formatPrice(alternative.price_toman)}</strong></div>
-                      ))}
-                    </div>
-                  )}
-                  {contact.alternative_products?.length > 0 && (
-                    <div className="mission-alternative-products">
-                      <b>مدل‌های جایگزین با شروط مشابه</b>
-                      {contact.alternative_products.slice(0, 3).map((alternative) => {
-                        const alternativeOffer = alternative.best_offer
-                        const alternativeAttempt = contactByOffer[alternativeOffer.id]
-                        const alternativeImage = alternative.product.images.find((value) => /^https?:\/\//i.test(value))
-                        return (
-                          <div className="mission-alternative-product" key={alternative.product.id}>
-                            <div className="mission-alternative-thumb">
-                              {alternativeImage
-                                ? <img src={alternativeImage} alt="" loading="lazy" />
-                                : <Store size={17} />}
-                            </div>
-                            <div className="mission-alternative-copy">
-                              <strong>{alternative.product.title}</strong>
-                              <span>{alternativeOffer.shop.name} · {formatPrice(alternativeOffer.price_toman)}</span>
-                              {alternativeAttempt && <small>{OUTCOME_LABELS[alternativeAttempt.attempt.outcome]}</small>}
-                            </div>
-                            <button
-                              type="button"
-                              className="mission-alternative-action"
-                              onClick={() => onContact(alternative)}
-                              disabled={contactingOfferId === alternativeOffer.id || !missionId}
-                            >
-                              {contactingOfferId === alternativeOffer.id
-                                ? <LoaderCircle size={14} className="spin" />
-                                : <PhoneCall size={14} />}
-                              بررسی
-                            </button>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )}
                 </div>
               )}
             </div>
@@ -573,6 +556,7 @@ export function MissionPanel({
   const [chatMessages, setChatMessages] = useState<MissionChatMessage[]>([])
   const [lastQuery, setLastQuery] = useState('')
   const [selectedCompareProductIds, setSelectedCompareProductIds] = useState<string[]>([])
+  const [comparisonOpen, setComparisonOpen] = useState(false)
   const [isRunning, setIsRunning] = useState(false)
   const [contactingOfferId, setContactingOfferId] = useState<string | null>(null)
   const [contactByOffer, setContactByOffer] = useState<Record<string, ContactAttemptResponse>>({})
@@ -685,6 +669,11 @@ export function MissionPanel({
       ? current
       : [...current, event].sort((left, right) => left.seq - right.seq))
 
+    if (event.type === 'turn.completed' && isRecord(event.payload.constraints)) {
+      // Reconcile inferred natural-language constraints with the visible filters.
+      // The server decides eligibility; the client must not silently present stale filters.
+      onRestoreConstraints(event.payload.constraints as MissionConstraints, lastQuery)
+    }
     if (event.type === 'stage') {
       const label = readText(event.payload, 'label')
       if (label) setStageLabel(label)
@@ -716,6 +705,7 @@ export function MissionPanel({
       setChatMessages((current) => mergeUIEventIntoMessages(current, event))
       if (incoming.some((component) => PRIMARY_SEARCH_COMPONENTS.has(component.type))) {
         setSelectedCompareProductIds([])
+        setComparisonOpen(false)
         offerRequestControllers.current.forEach((controller) => controller.abort())
         offerRequestControllers.current.clear()
         setOfferViews({})
@@ -896,13 +886,16 @@ export function MissionPanel({
   }
 
   const toggleComparedProduct = (result: CatalogSearchResult) => {
-    if (!selectedCompareProductIds.includes(result.product.id) && selectedCompareProductIds.length >= 3) {
-      setError('برای مقایسه، حداکثر سه گزینه را انتخاب کن. ابتدا یکی را از مقایسه حذف کن.')
+    const exists = selectedCompareProductIds.includes(result.product.id)
+    if (!exists && selectedCompareProductIds.length >= 3) {
+      setError('حداکثر سه مدل را می‌توانی هم‌زمان مقایسه کنی. یکی را از انتخاب خارج کن.')
       return
     }
-    setSelectedCompareProductIds((current) => current.includes(result.product.id)
-      ? current.filter((id) => id !== result.product.id)
-      : [...current, result.product.id])
+    const next = exists
+      ? selectedCompareProductIds.filter((id) => id !== result.product.id)
+      : [...selectedCompareProductIds, result.product.id]
+    setSelectedCompareProductIds(next)
+    setComparisonOpen(next.length >= 2)
   }
 
   const fetchProductOffers = async (result: CatalogSearchResult, page: number, append: boolean) => {
@@ -999,8 +992,42 @@ export function MissionPanel({
     void fetchProductOffers(result, current.page + 1, true)
   }
 
+  const contact = async (result: CatalogSearchResult | CatalogOffer) => {
+    if (!missionId || contactingOfferId || isRunning) return
+    const offer = 'best_offer' in result ? result.best_offer : result
+    setContactingOfferId(offer.id)
+    setError(null)
+    try {
+      const response = await createContactAttempt(missionId, { shopId: offer.shop.id, offerId: offer.id })
+      setContactByOffer((current) => ({ ...current, [offer.id]: response }))
+      if (response.events?.length) {
+        setEvents((current) => {
+          const bySequence = new Map(current.map((event) => [event.seq, event]))
+          response.events?.forEach((event) => bySequence.set(event.seq, event))
+          return [...bySequence.values()].sort((left, right) => left.seq - right.seq)
+        })
+        setChatMessages((current) => response.events!.reduce((messages, event) =>
+          event.type === 'ui.component' ? mergeUIEventIntoMessages(messages, event) : messages, current))
+      }
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'استعلام ناموفق بود.')
+    } finally {
+      setContactingOfferId(null)
+    }
+  }
+
   const handleGenUIAction = (action: GenUIAction) => {
     if (isRunning || isRestoring) return
+    if (action.type === 'verify_offer') {
+      // Only allow options returned for this session's prior contact attempts.
+      const offer = resolveRecoveryOffer(contactByOffer, action.offerId, action.shopId)
+      if (!offer) {
+        setError('این گزینه دیگر در پیشنهادهای معتبر مأموریت وجود ندارد. نتایج را دوباره بررسی کن.')
+        return
+      }
+      void contact(offer)
+      return
+    }
     if (action.type === 'fill_query') {
       setMessage(action.query || lastQuery)
       composerInputRef.current?.focus()
@@ -1085,30 +1112,6 @@ export function MissionPanel({
     await runTurn(message, constraints)
   }
 
-  const contact = async (result: CatalogSearchResult) => {
-    if (!missionId || contactingOfferId || isRunning) return
-    const offer = result.best_offer
-    setContactingOfferId(offer.id)
-    setError(null)
-    try {
-      const response = await createContactAttempt(missionId, { shopId: offer.shop.id, offerId: offer.id })
-      setContactByOffer((current) => ({ ...current, [offer.id]: response }))
-      if (response.events?.length) {
-        setEvents((current) => {
-          const bySequence = new Map(current.map((event) => [event.seq, event]))
-          response.events?.forEach((event) => bySequence.set(event.seq, event))
-          return [...bySequence.values()].sort((left, right) => left.seq - right.seq)
-        })
-        setChatMessages((current) => response.events!.reduce((messages, event) =>
-          event.type === 'ui.component' ? mergeUIEventIntoMessages(messages, event) : messages, current))
-      }
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'استعلام ناموفق بود.')
-    } finally {
-      setContactingOfferId(null)
-    }
-  }
-
   const startNewMission = () => {
     offerRequestControllers.current.forEach((controller) => controller.abort())
     offerRequestControllers.current.clear()
@@ -1120,6 +1123,7 @@ export function MissionPanel({
     setChatMessages([])
     setLastQuery('')
     setSelectedCompareProductIds([])
+    setComparisonOpen(false)
     setContactByOffer({})
     setActiveFilterForm(null)
     shouldAutoScrollRef.current = true
@@ -1152,26 +1156,19 @@ export function MissionPanel({
       price: formatPrice(offer.price_toman),
       shop: offer.shop.name,
       address: offer.shop.address ?? offer.shop.location_label ?? 'نشانی ثبت نشده',
-      credit: offer.shop.accepts_in_person_credit ? 'ثبت شده' : 'ثبت نشده',
+      credit: offer.in_person_credit_eligible ? 'برای این آفر ثبت‌شده' : 'برای این آفر ثبت نشده',
       updated,
       distance: formatDistance(offer.shop.distance_m) ?? 'محاسبه نشده',
       ...specComparison.valuesByProduct[index],
     }
   })
   const comparisonComponents: GenUIComponent[] = selectedCompareResults.length >= 2
-    ? [{
-      type: 'comparison_table',
-      id: 'live-selected-product-comparison',
-      data: {
-        title: 'مقایسه گزینه‌های انتخاب‌شده',
-        description: 'مقایسه بر پایه بهترین آفر موجود در همین نتایج؛ قیمت و پذیرش اعتباری مطابق داده ثبت‌شده است.',
-        columns: comparisonColumns,
-        rows: comparisonRows,
-      },
-    }]
-    : selectedCompareResults.length === 1
-      ? [{ type: 'notice', id: 'comparison-next-step', data: { message: 'یک گزینه انتخاب شده است. برای نمایش جدول مقایسه، یک یا دو محصول دیگر هم انتخاب کن.' } }]
-      : []
+    ? [{ type: 'comparison_table', id: 'live-selected-product-comparison', data: {
+      title: 'مقایسه مدل‌های منتخب',
+      columns: comparisonColumns,
+      rows: comparisonRows,
+    } }]
+    : []
 
   const quickPrompts = [
     { label: 'لپ‌تاپ برای کار', detail: 'بودجه و مشخصات مهم را مقایسه کن', icon: <Laptop size={18} />, prompt: 'برای برنامه‌نویسی یک لپ‌تاپ مناسب در تهران پیدا کن؛ گزینه‌ها را با قیمت و مزایا مقایسه کن.' },
@@ -1229,14 +1226,33 @@ export function MissionPanel({
               {item.results && item.results.length > 0 && (
                 <div className="mission-results-block conversation-results-block">
                   <div className="mission-results-header">
-                    <div><h3>نتایج پیشنهادی</h3></div>
+                    <div><h3>مدل‌هایی که می‌توانی بررسی کنی</h3>{isCurrentResult && <p className="mission-results-guidance">مدل را مقایسه کن یا فروشگاه‌هایش را ببین.</p>}</div>
                     <div className="mission-results-header-actions">
                       <span>{money.format(item.resultCount ?? item.results.length)} محصول</span>
                       {isCurrentResult && <button type="button" className="mission-edit-filters" onClick={() => handleGenUIAction({ type: 'open_filter_form' })} disabled={isRunning || isRestoring}><SlidersHorizontal size={15} /> تغییر شرایط</button>}
                     </div>
                   </div>
-                  {isCurrentResult && selectedCompareProductIds.length > 0 && <p className="mission-compare-hint">{money.format(selectedCompareProductIds.length)} گزینه برای مقایسه انتخاب شده؛ حداکثر ۳ گزینه.</p>}
-                  {isCurrentResult && comparisonComponents.length > 0 && <GenUIRenderer components={comparisonComponents} defaults={{ query: lastQuery, max_price_toman: budget, must_have_in_person_credit: mustHaveCredit, sort: constraints.sort ?? 'relevance' }} disabled={isRunning || isRestoring} onAction={handleGenUIAction} />}
+                  {isCurrentResult && <ActiveShoppingFilters constraints={constraints} disabled={isRunning || isRestoring}
+                    onEdit={() => handleGenUIAction({type:'open_filter_form'})} />}
+                  {isCurrentResult && selectedCompareResults.length > 0 && (
+                    <div className="mission-compare-tray" role="region" aria-label="انتخاب‌های مقایسه">
+                      <div className="mission-compare-tray-copy">
+                        <strong>{money.format(selectedCompareResults.length)} مدل برای مقایسه</strong>
+                        <span>{selectedCompareResults.length === 1 ? 'یک مدل دیگر انتخاب کن.' : 'تفاوت قیمت و مشخصات را ببین.'}</span>
+                      </div>
+                      <div className="mission-compare-tray-actions">
+                        {selectedCompareResults.length >= 2 && <button type="button" className="mission-compare-toggle"
+                          aria-expanded={comparisonOpen} onClick={() => setComparisonOpen((open) => !open)}>
+                          {comparisonOpen ? 'بستن مقایسه' : 'نمایش مقایسه'}
+                        </button>}
+                        <button type="button" className="mission-compare-clear" aria-label="پاک کردن انتخاب‌های مقایسه"
+                          onClick={() => { setSelectedCompareProductIds([]); setComparisonOpen(false) }}>
+                          پاک کردن
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {isCurrentResult && comparisonOpen && comparisonComponents.length > 0 && <GenUIRenderer components={comparisonComponents} defaults={{ query: lastQuery, max_price_toman: budget, must_have_in_person_credit: mustHaveCredit, sort: constraints.sort ?? 'relevance' }} disabled={isRunning || isRestoring} onAction={handleGenUIAction} />}
                   <ProductResults
                     results={item.results}
                     missionId={missionId ?? ''}

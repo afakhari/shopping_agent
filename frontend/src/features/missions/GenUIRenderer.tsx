@@ -12,6 +12,8 @@ import {
   Store,
 } from 'lucide-react'
 import type { GenUIAction, GenUIComponent, GenUIFormValues, GenUIValue } from './genui-types'
+import { RecoveryOptions } from './RecoveryOptions'
+import { buildComparisonFields, visibleComparisonFields } from './comparison-view'
 
 interface GenUIDefaults {
   query: string
@@ -263,19 +265,56 @@ function EmptyState({ component, defaults, onAction, disabled }: { component: Ge
 }
 
 function ComparisonTable({ component }: { component: GenUIComponent }) {
-  const columns = Array.isArray(component.data.columns) ? component.data.columns.filter(isRecord) : []
-  const rows = Array.isArray(component.data.rows) ? component.data.rows.filter(isRecord) : []
-  if (!columns.length || !rows.length) return <FallbackCard component={component} />
+  const [onlyDifferences, setOnlyDifferences] = useState(true)
+  const columns = Array.isArray(component.data.columns) ? component.data.columns.filter(isRecord)
+    .filter((item) => typeof item.key === 'string' && typeof item.label === 'string')
+    .slice(0, 16) as Array<{key:string;label:string}> : []
+  const rows = Array.isArray(component.data.rows) ? component.data.rows.filter(isRecord).slice(0,3) : []
+  if (!columns.length || rows.length < 2) return <FallbackCard component={component} />
+  const normalizedRows = rows.map((row) => Object.fromEntries(Object.entries(row).map(([key,value]) =>
+    [key, typeof value === 'string' || typeof value === 'number' ? String(value) : 'ثبت نشده']
+  )))
+  const fields = buildComparisonFields(columns, normalizedRows)
+  const visible = visibleComparisonFields(fields, onlyDifferences)
   return (
-    <section className="genui-structured-card">
-      <div className="genui-card-heading"><span className="genui-icon"><Store size={17} /></span><div><h4>{text(component.data.title, 'مقایسه گزینه‌ها')}</h4>{text(component.data.description) && <p>{text(component.data.description)}</p>}</div></div>
-      <div className="genui-table-wrap"><table className="genui-table"><thead><tr>{columns.map((column, index) => <th key={String(column.key ?? index)}>{text(column.label, 'مشخصه')}</th>)}</tr></thead><tbody>{rows.map((row, rowIndex) => <tr key={String(row.id ?? rowIndex)}>{columns.map((column, columnIndex) => {const key = text(column.key); const value = key ? row[key] : ''; return <td key={key || columnIndex}>{typeof value === 'string' || typeof value === 'number' ? String(value) : value === null ? 'ثبت نشده' : '—'}</td>})}</tr>)}</tbody></table></div>
+    <section className="genui-structured-card genui-comparison" aria-label="مقایسه محصولات منتخب">
+      <div className="genui-card-heading"><span className="genui-icon"><Store size={17} /></span><div>
+        <h4>{text(component.data.title,'مقایسه محصولات')}</h4>
+        <p>اختلاف قیمت و مشخصات ثبت‌شده را کنار هم ببین. «ثبت نشده» به معنای نبود ویژگی نیست.</p>
+      </div></div>
+      <div className="genui-comparison-toolbar">
+        <span>{new Intl.NumberFormat('fa-IR').format(rows.length)} محصول انتخاب شده</span>
+        <button type="button" onClick={() => setOnlyDifferences((value) => !value)}
+          aria-pressed={onlyDifferences}>
+          {onlyDifferences ? 'نمایش همه ویژگی‌ها' : 'نمایش فقط تفاوت‌ها'}
+        </button>
+      </div>
+      <div className="genui-table-wrap">
+        <table className="genui-table genui-comparison-table">
+          <caption>مقایسه ویژگی‌به‌ویژگی محصولات انتخاب‌شده</caption>
+          <thead><tr>
+            <th scope="col">مشخصه</th>
+            {normalizedRows.map((row,index) => <th scope="col" key={String(row.id ?? index)}>{row.product ?? 'محصول'}</th>)}
+          </tr></thead>
+          <tbody>{visible.map((field) => (
+            <tr key={field.key} className={field.different ? 'is-different' : undefined}>
+              <th scope="row">{field.label}</th>
+              {field.values.map((value,index) => <td key={index}>{value}</td>)}
+            </tr>
+          ))}</tbody>
+        </table>
+      </div>
+      {!visible.length && <p className="genui-data-caveat">در ویژگی‌های ثبت‌شده اختلافی پیدا نشد؛ همه ویژگی‌ها را باز کن.</p>}
+      <p className="genui-data-caveat">قیمت و موجودی این جدول تاریخی‌اند؛ استعلام شبیه‌سازی‌شده جای تأیید واقعی نیست.</p>
     </section>
   )
 }
 
 function VisitPlan({ component }: { component: GenUIComponent }) {
   const details = Array.isArray(component.data.details) ? component.data.details.filter(isRecord) : []
+  const majorKeys = new Set(['product','shop','price','address','opening_status'])
+  const essentials = details.filter((item) => majorKeys.has(text(item.key)))
+  const supplementary = details.filter((item) => !majorKeys.has(text(item.key)))
   const rawLocation = text(component.data.navigation_url)
   let safeLocation: string | null = null
   try {
@@ -284,22 +323,42 @@ function VisitPlan({ component }: { component: GenUIComponent }) {
       safeLocation = parsed.toString()
     }
   } catch {
-    // Ignore missing or invalid map URLs.
+    // No route or actual travel time can be inferred from missing coordinates.
   }
   const backup = isRecord(component.data.backup_seller) ? component.data.backup_seller : null
+  const displayDetail = (detail: Record<string, unknown>, index: number) => {
+    let value = text(detail.value, 'ثبت نشده')
+    if (detail.key === 'last_price_changed_at' && value && value !== 'زمان تغییر قیمت ثبت نشده') {
+      const date = new Date(value)
+      if (!Number.isNaN(date.getTime())) value = new Intl.DateTimeFormat('fa-IR', {
+        dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Tehran',
+      }).format(date)
+    }
+    return <div key={String(detail.key ?? index)}><dt>{text(detail.label, 'اطلاعات')}</dt><dd>{value}</dd></div>
+  }
   return (
-    <section className="genui-visit-plan">
-      <div className="genui-card-heading"><span className="genui-icon"><MapPin size={17} /></span><div><h4>{text(component.data.title, 'برنامه مراجعه')}</h4><p>{text(component.data.description, 'پیش از حرکت، اطلاعات زیر را مرور کن.')}</p></div></div>
+    <section className="genui-visit-plan" aria-label="خلاصه برنامه مراجعه">
+      <div className="genui-card-heading">
+        <span className="genui-icon"><MapPin size={17} /></span>
+        <div><h4>{text(component.data.title, 'برنامه مراجعه')}</h4>
+          <p>قبل از مراجعه، قیمت و ساعت کاری را مستقل از شبیه‌سازی تأیید کن.</p>
+        </div>
+      </div>
       {text(component.data.status) && <span className="genui-status-chip"><BadgeCheck size={14} />{text(component.data.status)}</span>}
       {text(component.data.source_label) && <p className="genui-data-caveat">{text(component.data.source_label)}</p>}
-      <dl>{details.map((detail, index) => {
-        let value = text(detail.value, 'ثبت نشده')
-        if (detail.key === 'last_price_changed_at' && value && value !== 'زمان تغییر قیمت ثبت نشده') {
-          const date = new Date(value)
-          if (!Number.isNaN(date.getTime())) value = new Intl.DateTimeFormat('fa-IR', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Tehran' }).format(date)
-        }
-        return <div key={String(detail.key ?? index)}><dt>{text(detail.label, 'اطلاعات')}</dt><dd>{value}</dd></div>
-      })}</dl>
+      <dl className="genui-visit-key-facts">{essentials.map(displayDetail)}</dl>
+      {safeLocation && (
+        <a className="genui-primary-action genui-visit-navigation" href={safeLocation} target="_blank" rel="noopener noreferrer">
+          <MapPin size={16} /> دیدن موقعیت فروشگاه روی نقشه <ArrowLeft size={15} />
+        </a>
+      )}
+      <p className="genui-visit-location-note">این لینک موقعیت ثبت‌شده را نشان می‌دهد؛ مسیر رانندگی یا زمان سفر محاسبه نشده است.</p>
+      {supplementary.length > 0 && (
+        <details className="genui-visit-extra">
+          <summary>جزئیات بیشتر: ساعت هفتگی، طبقه، اعتبار و تاریخ قیمت</summary>
+          <dl>{supplementary.map(displayDetail)}</dl>
+        </details>
+      )}
       <section className="genui-visit-backup" aria-label="فروشنده پشتیبان">
         <strong>فروشنده پشتیبان</strong>
         {backup ? (
@@ -308,14 +367,9 @@ function VisitPlan({ component }: { component: GenUIComponent }) {
             <small>{text(backup.address, 'نشانی ثبت نشده')}</small>
             <small>{text(backup.status, 'موجودی استعلام نشده')}</small>
           </div>
-        ) : <small>در داده‌های تحت پوشش فروشنده پشتیبان واجد شرایط دیگری پیدا نشد.</small>}
+        ) : <small>در داده‌های تحت پوشش، فروشنده پشتیبان واجد شرایط دیگری پیدا نشد.</small>}
       </section>
-      {safeLocation && (
-        <a className="genui-primary-action genui-visit-navigation" href={safeLocation} target="_blank" rel="noopener noreferrer">
-          <MapPin size={16} /> نمایش موقعیت فروشگاه روی نقشه <ArrowLeft size={15} />
-        </a>
-      )}
-      <p className="genui-data-caveat">قیمت فهرست‌شده، به‌تنهایی تأیید موجودی خارج از سناریوی دمو نیست.</p>
+      <p className="genui-data-caveat">این اطلاعات بر پایه دیتاست مسابقه و استعلام نمایشی است؛ تماس واقعی انجام نشده است.</p>
     </section>
   )
 }
@@ -349,9 +403,16 @@ function ContactStatus({ component }: { component: GenUIComponent }) {
       <div>
         <strong>{text(component.data.title, copy.title)}</strong>
         <p>{text(component.data.message, copy.message)}</p>
-        {stockEvidence && <small>موجودی: {copy.title} (فقط سناریوی دمو)</small>}
-        {priceEvidence && <small>قیمت ثبت‌شده: {registeredPrice ? `${registeredPrice} تومان` : 'نامشخص'}؛ {text(priceEvidence.status) === 'simulated_change_amount_unknown' ? 'در دمو تغییر قیمت گزارش شده، مبلغ جدید نامشخص است' : 'قیمت لحظه‌ای تأیید نشده است'}</small>}
-        {hoursEvidence && <small>ساعات ثبت‌شده: {registeredHours || 'نامشخص'}؛ بازبودن واقعی تأیید نشده است.</small>}
+        {(stockEvidence || priceEvidence || hoursEvidence) && (
+          <details className="genui-contact-evidence">
+            <summary>جزئیات شواهد استعلام</summary>
+            <div>
+              {stockEvidence && <small>موجودی: {copy.title} (فقط سناریوی دمو)</small>}
+              {priceEvidence && <small>قیمت ثبت‌شده: {registeredPrice ? `${registeredPrice} تومان` : 'نامشخص'}؛ {text(priceEvidence.status) === 'simulated_change_amount_unknown' ? 'در دمو تغییر قیمت گزارش شده، مبلغ جدید نامشخص است' : 'قیمت لحظه‌ای تأیید نشده است'}</small>}
+              {hoursEvidence && <small>ساعات ثبت‌شده: {registeredHours || 'نامشخص'}؛ بازبودن واقعی تأیید نشده است.</small>}
+            </div>
+          </details>
+        )}
         <small>شبیه‌سازی کنترل‌شده؛ تماس واقعی ارسال نشده است.</small>
       </div>
     </section>
@@ -387,7 +448,7 @@ function renderComponent(component: GenUIComponent, defaults: GenUIDefaults, onA
     case 'notice':
       return <section className="genui-notice"><ClipboardList size={17} /><span>{text(component.data.message, text(component.data.title))}</span></section>
     case 'alternative_options':
-      return <FallbackCard key={component.id ?? component.type} component={component} />
+      return <RecoveryOptions key={component.id ?? component.type} component={component} onAction={onAction} disabled={disabled} />
     default:
       return <FallbackCard key={component.id ?? component.type} component={component} />
   }

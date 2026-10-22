@@ -79,13 +79,25 @@ def main() -> None:
                 )
                 page.get_by_role("button", name="ارسال پیام").click()
                 page.locator(".mission-product-card").first.wait_for()
+                assert page.locator(".mission-product-highlights").first.is_visible()
                 assert_no_horizontal_overflow(page, width)
                 page.screenshot(path=str(OUTPUT / f"products-{width}.png"), full_page=True)
 
                 if width == 390:
+                    # Comparison remains a user-controlled, difference-first tool.
+                    page.locator(".mission-compare-button").first.click()
+                    page.locator(".mission-compare-button").nth(1).click()
+                    page.locator(".genui-comparison-table").first.wait_for()
+                    assert page.locator(".genui-comparison-table tbody tr").count() >= 2
+                    page.get_by_role("button", name="نمایش همه ویژگی‌ها").click()
+                    page.get_by_role("button", name="نمایش فقط تفاوت‌ها").click()
+                    page.locator(".mission-compare-clear").first.click()
+                    page.screenshot(path=str(OUTPUT / "comparison-mobile.png"), full_page=True)
+
                     page.locator(".mission-offers-toggle").first.click()
                     page.locator(".mission-offer-row").nth(1).wait_for()
                     assert page.locator(".mission-offer-row").count() == 2
+                    page.locator(".mission-seller-details summary").first.click()
                     page.locator(".mission-inline-map-toggle").first.click()
                     page.locator(".mission-inline-map iframe").first.wait_for()
                     # External tiles are optional; only the iframe's safe URL matters.
@@ -100,6 +112,18 @@ def main() -> None:
                     page.locator(".genui-visit-plan").first.wait_for()
                     page.screenshot(path=str(OUTPUT / "visit-plan-mobile.png"), full_page=True)
                     assert_no_horizontal_overflow(page, width)
+
+                    # The server must return inferred natural-language budget as
+                    # effective constraints so the editable UI reflects hard filters.
+                    page.locator('textarea[aria-label="پیام به دستیار خرید"]').fill(
+                        "هدفون بی سیم تست مرورگر تا سقف ۱ میلیون تومان"
+                    )
+                    page.get_by_role("button", name="ارسال پیام").click()
+                    page.locator(".mission-active-filters").first.wait_for()
+                    assert "شرایط همین جست‌وجو" in page.locator(".mission-active-filters").first.inner_text()
+                    assert "۱" in page.locator(".mission-active-filters").first.inner_text()
+                    assert_no_horizontal_overflow(page, width)
+                    page.screenshot(path=str(OUTPUT / "inferred-budget-mobile.png"), full_page=True)
 
                 context.close()
             print("BROWSER_JOURNEY=PASS; Chromium RTL 320/390/1440; synthetic fixtures.")
