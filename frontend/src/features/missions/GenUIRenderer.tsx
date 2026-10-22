@@ -312,6 +312,9 @@ function ComparisonTable({ component }: { component: GenUIComponent }) {
 
 function VisitPlan({ component }: { component: GenUIComponent }) {
   const details = Array.isArray(component.data.details) ? component.data.details.filter(isRecord) : []
+  const majorKeys = new Set(['product','shop','price','address','opening_status'])
+  const essentials = details.filter((item) => majorKeys.has(text(item.key)))
+  const supplementary = details.filter((item) => !majorKeys.has(text(item.key)))
   const rawLocation = text(component.data.navigation_url)
   let safeLocation: string | null = null
   try {
@@ -320,22 +323,42 @@ function VisitPlan({ component }: { component: GenUIComponent }) {
       safeLocation = parsed.toString()
     }
   } catch {
-    // Ignore missing or invalid map URLs.
+    // No route or actual travel time can be inferred from missing coordinates.
   }
   const backup = isRecord(component.data.backup_seller) ? component.data.backup_seller : null
+  const displayDetail = (detail: Record<string, unknown>, index: number) => {
+    let value = text(detail.value, 'ثبت نشده')
+    if (detail.key === 'last_price_changed_at' && value && value !== 'زمان تغییر قیمت ثبت نشده') {
+      const date = new Date(value)
+      if (!Number.isNaN(date.getTime())) value = new Intl.DateTimeFormat('fa-IR', {
+        dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Tehran',
+      }).format(date)
+    }
+    return <div key={String(detail.key ?? index)}><dt>{text(detail.label, 'اطلاعات')}</dt><dd>{value}</dd></div>
+  }
   return (
-    <section className="genui-visit-plan">
-      <div className="genui-card-heading"><span className="genui-icon"><MapPin size={17} /></span><div><h4>{text(component.data.title, 'برنامه مراجعه')}</h4><p>{text(component.data.description, 'پیش از حرکت، اطلاعات زیر را مرور کن.')}</p></div></div>
+    <section className="genui-visit-plan" aria-label="خلاصه برنامه مراجعه">
+      <div className="genui-card-heading">
+        <span className="genui-icon"><MapPin size={17} /></span>
+        <div><h4>{text(component.data.title, 'برنامه مراجعه')}</h4>
+          <p>قبل از مراجعه، قیمت و ساعت کاری را مستقل از شبیه‌سازی تأیید کن.</p>
+        </div>
+      </div>
       {text(component.data.status) && <span className="genui-status-chip"><BadgeCheck size={14} />{text(component.data.status)}</span>}
       {text(component.data.source_label) && <p className="genui-data-caveat">{text(component.data.source_label)}</p>}
-      <dl>{details.map((detail, index) => {
-        let value = text(detail.value, 'ثبت نشده')
-        if (detail.key === 'last_price_changed_at' && value && value !== 'زمان تغییر قیمت ثبت نشده') {
-          const date = new Date(value)
-          if (!Number.isNaN(date.getTime())) value = new Intl.DateTimeFormat('fa-IR', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Tehran' }).format(date)
-        }
-        return <div key={String(detail.key ?? index)}><dt>{text(detail.label, 'اطلاعات')}</dt><dd>{value}</dd></div>
-      })}</dl>
+      <dl className="genui-visit-key-facts">{essentials.map(displayDetail)}</dl>
+      {safeLocation && (
+        <a className="genui-primary-action genui-visit-navigation" href={safeLocation} target="_blank" rel="noopener noreferrer">
+          <MapPin size={16} /> دیدن موقعیت فروشگاه روی نقشه <ArrowLeft size={15} />
+        </a>
+      )}
+      <p className="genui-visit-location-note">این لینک موقعیت ثبت‌شده را نشان می‌دهد؛ مسیر رانندگی یا زمان سفر محاسبه نشده است.</p>
+      {supplementary.length > 0 && (
+        <details className="genui-visit-extra">
+          <summary>جزئیات بیشتر: ساعت هفتگی، طبقه، اعتبار و تاریخ قیمت</summary>
+          <dl>{supplementary.map(displayDetail)}</dl>
+        </details>
+      )}
       <section className="genui-visit-backup" aria-label="فروشنده پشتیبان">
         <strong>فروشنده پشتیبان</strong>
         {backup ? (
@@ -344,14 +367,9 @@ function VisitPlan({ component }: { component: GenUIComponent }) {
             <small>{text(backup.address, 'نشانی ثبت نشده')}</small>
             <small>{text(backup.status, 'موجودی استعلام نشده')}</small>
           </div>
-        ) : <small>در داده‌های تحت پوشش فروشنده پشتیبان واجد شرایط دیگری پیدا نشد.</small>}
+        ) : <small>در داده‌های تحت پوشش، فروشنده پشتیبان واجد شرایط دیگری پیدا نشد.</small>}
       </section>
-      {safeLocation && (
-        <a className="genui-primary-action genui-visit-navigation" href={safeLocation} target="_blank" rel="noopener noreferrer">
-          <MapPin size={16} /> نمایش موقعیت فروشگاه روی نقشه <ArrowLeft size={15} />
-        </a>
-      )}
-      <p className="genui-data-caveat">قیمت فهرست‌شده، به‌تنهایی تأیید موجودی خارج از سناریوی دمو نیست.</p>
+      <p className="genui-data-caveat">این اطلاعات بر پایه دیتاست مسابقه و استعلام نمایشی است؛ تماس واقعی انجام نشده است.</p>
     </section>
   )
 }

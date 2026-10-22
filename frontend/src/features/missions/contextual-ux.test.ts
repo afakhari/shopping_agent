@@ -27,6 +27,18 @@ describe('progressive shopping surface', () => {
   })
 })
 
+describe('evidence-first purchase flow', () => {
+  it('presents editable filters and a user-controlled comparison tray', () => {
+    expect(mission).toContain('<ActiveShoppingFilters')
+    expect(mission).toContain('mission-compare-tray')
+    expect(mission).toContain('setComparisonOpen(')
+  })
+  it('keeps seller details optional instead of expanding every long address', () => {
+    expect(mission).toContain('<details className="mission-seller-details">')
+    expect(styles).toContain('.mission-seller-details summary')
+  })
+})
+
 describe('mobile viewport containment', () => {
   it('bounds the nested RTL flex/grid layout rather than cropping content', () => {
     expect(styles).toContain('Mobile overflow guard:')
