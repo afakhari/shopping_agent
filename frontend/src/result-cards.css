@@ -150,6 +150,49 @@
 .conversation-results-block .mission-product-card:focus-within {
   border-color: #a8c8b4;
 }
+/* Seller comparison deserves an entire grid row, not a cramped half-card.
+   The expanded card retains its original product summary and interactive actions. */
+.conversation-results-block .mission-product-card.is-offers-expanded {
+  grid-column: 1 / -1;
+  border-color: #bad6c6;
+  background: #fcfefc;
+  box-shadow: 0 4px 16px rgba(22, 85, 54, .055);
+}
+.conversation-results-block .mission-product-card.is-offers-expanded .mission-product-main {
+  min-width: 0;
+}
+.conversation-results-block .mission-product-card.is-offers-expanded .mission-offer-list {
+  width: 100%;
+  min-width: 0;
+  margin-top: 16px;
+  padding: clamp(11px, 1.8vw, 17px);
+  border-color: #d5e4da;
+  background: #f5f9f6;
+}
+.conversation-results-block .mission-product-card.is-offers-expanded .mission-offer-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px 20px;
+  min-width: 0;
+  padding: 16px 18px;
+}
+.conversation-results-block .mission-product-card.is-offers-expanded .mission-offer-copy {
+  min-width: 0;
+}
+.conversation-results-block .mission-product-card.is-offers-expanded .mission-offer-verify {
+  justify-self: end;
+}
+@media (max-width: 600px) {
+  .conversation-results-block .mission-product-card.is-offers-expanded .mission-offer-row {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 12px;
+  }
+  .conversation-results-block .mission-product-card.is-offers-expanded .mission-offer-verify {
+    justify-self: stretch;
+    width: 100%;
+    min-width: 0;
+  }
+}
 @media (max-width: 780px) {
   .conversation-results-block .mission-product-results {
     grid-template-columns: minmax(0, 1fr);

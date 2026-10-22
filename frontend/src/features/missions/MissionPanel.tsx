@@ -217,7 +217,7 @@ function ProductResults({
         const mapUrl = openStreetMapUrl(offer.shop.lat, offer.shop.lon)
         const isCompared = selectedCompareProductIds.includes(result.product.id)
         return (
-          <article className={`mission-product-card ${isCompared ? 'is-compared' : ''}`} key={result.product.id}>
+          <article className={`mission-product-card ${isCompared ? 'is-compared' : ''} ${allowActions && offerView?.expanded ? 'is-offers-expanded' : ''}`} key={result.product.id}>
             <div className="mission-product-image">
               <ProductThumbnail src={imageUrl} title={result.product.title} />
             </div>
