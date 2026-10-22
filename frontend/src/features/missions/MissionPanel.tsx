@@ -24,6 +24,7 @@ const OUTCOME_LABELS: Record<ContactAttemptResponse['attempt']['outcome'], strin
   no_answer: 'فروشگاه در سناریوی دمو پاسخ نداد',
   closed: 'فروشگاه در سناریوی دمو بسته است',
   error: 'استعلام در سناریوی دمو ناموفق بود',
+  price_changed: 'تغییر قیمت در سناریوی دمو گزارش شد؛ مبلغ جدید مشخص نیست',
 }
 
 function formatPrice(price: string | null): string {

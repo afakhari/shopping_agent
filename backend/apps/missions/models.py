@@ -73,6 +73,7 @@ class ContactAttempt(models.Model):
         NO_ANSWER = "no_answer", "بدون پاسخ"
         CLOSED = "closed", "بسته"
         ERROR = "error", "خطا"
+        PRICE_CHANGED = "price_changed", "تغییر قیمت گزارش‌شده در شبیه‌سازی"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     mission = models.ForeignKey(

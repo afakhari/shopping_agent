@@ -117,7 +117,7 @@ DATASET_IMPORT_BATCH_SIZE = int(os.environ.get("DATASET_IMPORT_BATCH_SIZE", "200
 DATASET_REPORT_DIR = Path(os.environ.get("DATASET_REPORT_DIR", str(BASE_DIR.parent / "reports")))
 MAX_REASONABLE_PRICE_TOMAN = int(os.environ.get("MAX_REASONABLE_PRICE_TOMAN", "100000000000"))
 DEMO_CONTACT_OUTCOMES = os.environ.get(
-    "DEMO_CONTACT_OUTCOMES", "no_answer,confirmed_available,unavailable,closed,error"
+    "DEMO_CONTACT_OUTCOMES", "no_answer,confirmed_available,unavailable,closed,error,price_changed"
 )
 LLM_ENABLED = os.environ.get("LLM_ENABLED", "1").strip().lower() in {"1", "true", "yes", "on"}
 LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "openai_compatible").strip()

@@ -17,6 +17,7 @@ _RESPONSE_TEXT = {
     "no_answer": "در سناریوی دمو، فروشگاه پاسخ نداد؛ گزینه جایگزین بررسی می‌شود.",
     "closed": "در سناریوی دمو، فروشگاه بسته است؛ گزینه جایگزین بررسی می‌شود.",
     "error": "استعلام در سناریوی دمو با خطا مواجه شد؛ می‌توان گزینه دیگری را بررسی کرد.",
+    "price_changed": "در سناریوی دمو تغییر قیمت گزارش شد؛ قیمت جدید ثبت یا تأیید نشده و نباید از سقف بودجه نتیجه‌گیری کرد.",
 }
 _ALLOWED_OUTCOMES = set(_RESPONSE_TEXT)
 
@@ -28,10 +29,10 @@ class SimulationResult:
 
 
 def configured_outcomes() -> list[str]:
-    raw = getattr(settings, "DEMO_CONTACT_OUTCOMES", "no_answer,confirmed_available,unavailable,closed,error")
+    raw = getattr(settings, "DEMO_CONTACT_OUTCOMES", "no_answer,confirmed_available,unavailable,closed,error,price_changed")
     outcomes = [item.strip() for item in str(raw).split(",") if item.strip()]
     outcomes = [item for item in outcomes if item in _ALLOWED_OUTCOMES]
-    return outcomes or ["no_answer", "confirmed_available", "unavailable", "closed", "error"]
+    return outcomes or ["no_answer", "confirmed_available", "unavailable", "closed", "error", "price_changed"]
 
 
 def simulate_contact(

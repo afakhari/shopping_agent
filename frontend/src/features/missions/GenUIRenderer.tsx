@@ -333,6 +333,7 @@ function ContactStatus({ component }: { component: GenUIComponent }) {
     no_answer: { title: 'فروشگاه در سناریوی دمو پاسخ نداد', message: 'نتیجه به‌معنای ناموجود بودن کالا نیست؛ می‌توانی فروشگاه یا مدل دیگری را بررسی کنی.' },
     closed: { title: 'فروشگاه در سناریوی دمو بسته است', message: 'می‌توانی برای مراجعه در زمان دیگر برنامه‌ریزی کنی یا گزینه دیگری را ببینی.' },
     error: { title: 'استعلام در سناریوی دمو ناموفق بود', message: 'این خطا موجودی کالا را مشخص نمی‌کند؛ گزینه دیگری را بررسی کن.' },
+    price_changed: { title: 'قیمت در سناریوی دمو تغییر کرده است', message: 'مبلغ جدید مشخص نیست؛ برای حفظ سقف بودجه باید آفر جایگزین را بررسی کنی.' },
     pending: fallbackCopy,
   }
   const copy = messages[status] ?? fallbackCopy

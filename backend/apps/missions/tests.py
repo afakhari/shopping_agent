@@ -371,3 +371,24 @@ class MissionApiTests(TestCase):
             APIClient().get(f"/api/v1/missions/{mission_id}/visit-plan/").status_code,
             404,
         )
+
+    @override_settings(DEMO_CONTACT_OUTCOMES="price_changed")
+    def test_price_change_requires_rechecking_budget_and_does_not_create_visit_plan(self):
+        mission_id = self._create_mission_and_search()
+        contact = self.client.post(
+            f"/api/v1/missions/{mission_id}/contact-attempts/",
+            {"shop_id": self.shop_a.source_id, "offer_id": self.offer_a.source_id},
+            format="json",
+        )
+        self.assertEqual(contact.status_code, 201, contact.content)
+        self.assertEqual(contact.json()["attempt"]["outcome"], "price_changed")
+        self.assertIn("قیمت جدید", contact.json()["attempt"]["response_text"])
+        self.assertFalse(any(
+            event["payload"].get("component") == "visit_plan"
+            for event in contact.json()["events"]
+            if event["type"] == "ui.component"
+        ))
+        self.assertEqual(
+            self.client.get(f"/api/v1/missions/{mission_id}/visit-plan/").status_code,
+            404,
+        )

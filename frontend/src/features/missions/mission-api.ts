@@ -35,7 +35,7 @@ export interface ContactAttemptRecord {
   shop_name: string
   offer_id: string
   purpose: string
-  outcome: 'confirmed_available' | 'unavailable' | 'no_answer' | 'closed' | 'error'
+  outcome: 'confirmed_available' | 'unavailable' | 'no_answer' | 'closed' | 'error' | 'price_changed'
   response_text: string
   source_type: 'demo_simulation'
   scenario_index: number
