@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { AlertCircle, ArrowLeft, CheckCircle2, ChevronDown, ChevronUp, Clock3, CreditCard, ExternalLink, Headphones, Laptop, LoaderCircle, LocateFixed, MapPin, MapPinOff, PhoneCall, Send, ShieldCheck, SlidersHorizontal, Sparkles, Store, RotateCcw, X } from 'lucide-react'
+import { AlertCircle, ArrowLeft, CheckCircle2, ChevronDown, ChevronUp, Clock3, CreditCard, ExternalLink, Headphones, Laptop, LoaderCircle, LocateFixed, MapPin, MapPinOff, Send, ShieldCheck, SlidersHorizontal, Sparkles, Store, RotateCcw, X } from 'lucide-react'
 import { getProductOffers, type CatalogOffer, type CatalogSearchResult, type ProductOffersResponse } from '../search/catalog-api'
 import { buildComparisonSpecColumns } from './comparison-specs'
 import { isGreetingOnly } from './greeting-intent'
@@ -8,6 +8,7 @@ import { GenUIRenderer } from './GenUIRenderer'
 import { formatDistance, formatLastPriceChange, getPriceQualityLabel, openStreetMapUrl } from './ui-formatters'
 import { osmEmbedUrl, TEHRAN_REGION_SAMPLES } from './shop-map'
 import { getResultPayload, getUIComponents, type GenUIAction, type GenUIComponent } from './genui-types'
+import { resolveRecoveryOffer } from './recovery-options'
 import {
   createContactAttempt,
   createMission,
@@ -365,7 +366,7 @@ function ProductResults({
                           disabled={contactingOfferId === sellerOffer.id || !missionId}
                         >
                           {contactingOfferId === sellerOffer.id ? <LoaderCircle size={15} className="spin" /> : <ShieldCheck size={15} />}
-                          {contactingOfferId === sellerOffer.id ? 'در حال بررسی…' : 'بررسی پیش از مراجعه'}
+                          {contactingOfferId === sellerOffer.id ? 'در حال بررسی…' : 'استعلام آزمایشی فروشنده'}
                         </button>
                         {attempt && sellerOffer.id !== offer.id && <div className={`mission-offer-attempt ${attempt.attempt.outcome === 'confirmed_available' ? 'success' : 'warning'}`} aria-live="polite"><strong>{OUTCOME_LABELS[attempt.attempt.outcome]}</strong><span>{attempt.attempt.response_text}</span></div>}
                       </article>
@@ -383,49 +384,6 @@ function ProductResults({
                 <div className={`mission-contact-result ${contact.attempt.outcome === 'confirmed_available' ? 'success' : 'warning'}`} aria-live="polite">
                   <strong>{OUTCOME_LABELS[contact.attempt.outcome]}</strong>
                   <span>{contact.attempt.response_text}</span>
-                  {contact.alternatives.length > 0 && (
-                    <div className="mission-alternatives">
-                      <b>گزینه‌های جایگزین</b>
-                      {contact.alternatives.slice(0, 3).map((alternative: CatalogOffer) => (
-                        <div key={alternative.id}><span>{alternative.shop.name}</span><strong>{formatPrice(alternative.price_toman)}</strong></div>
-                      ))}
-                    </div>
-                  )}
-                  {contact.alternative_products?.length > 0 && (
-                    <div className="mission-alternative-products">
-                      <b>مدل‌های جایگزین با شروط مشابه</b>
-                      {contact.alternative_products.slice(0, 3).map((alternative) => {
-                        const alternativeOffer = alternative.best_offer
-                        const alternativeAttempt = contactByOffer[alternativeOffer.id]
-                        const alternativeImage = alternative.product.images.find((value) => /^https?:\/\//i.test(value))
-                        return (
-                          <div className="mission-alternative-product" key={alternative.product.id}>
-                            <div className="mission-alternative-thumb">
-                              {alternativeImage
-                                ? <img src={alternativeImage} alt="" loading="lazy" />
-                                : <Store size={17} />}
-                            </div>
-                            <div className="mission-alternative-copy">
-                              <strong>{alternative.product.title}</strong>
-                              <span>{alternativeOffer.shop.name} · {formatPrice(alternativeOffer.price_toman)}</span>
-                              {alternativeAttempt && <small>{OUTCOME_LABELS[alternativeAttempt.attempt.outcome]}</small>}
-                            </div>
-                            <button
-                              type="button"
-                              className="mission-alternative-action"
-                              onClick={() => onContact(alternative)}
-                              disabled={contactingOfferId === alternativeOffer.id || !missionId}
-                            >
-                              {contactingOfferId === alternativeOffer.id
-                                ? <LoaderCircle size={14} className="spin" />
-                                : <PhoneCall size={14} />}
-                              بررسی
-                            </button>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )}
                 </div>
               )}
             </div>
@@ -999,8 +957,42 @@ export function MissionPanel({
     void fetchProductOffers(result, current.page + 1, true)
   }
 
+  const contact = async (result: CatalogSearchResult | CatalogOffer) => {
+    if (!missionId || contactingOfferId || isRunning) return
+    const offer = 'best_offer' in result ? result.best_offer : result
+    setContactingOfferId(offer.id)
+    setError(null)
+    try {
+      const response = await createContactAttempt(missionId, { shopId: offer.shop.id, offerId: offer.id })
+      setContactByOffer((current) => ({ ...current, [offer.id]: response }))
+      if (response.events?.length) {
+        setEvents((current) => {
+          const bySequence = new Map(current.map((event) => [event.seq, event]))
+          response.events?.forEach((event) => bySequence.set(event.seq, event))
+          return [...bySequence.values()].sort((left, right) => left.seq - right.seq)
+        })
+        setChatMessages((current) => response.events!.reduce((messages, event) =>
+          event.type === 'ui.component' ? mergeUIEventIntoMessages(messages, event) : messages, current))
+      }
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'استعلام ناموفق بود.')
+    } finally {
+      setContactingOfferId(null)
+    }
+  }
+
   const handleGenUIAction = (action: GenUIAction) => {
     if (isRunning || isRestoring) return
+    if (action.type === 'verify_offer') {
+      // Only allow options returned for this session's prior contact attempts.
+      const offer = resolveRecoveryOffer(contactByOffer, action.offerId, action.shopId)
+      if (!offer) {
+        setError('این گزینه دیگر در پیشنهادهای معتبر مأموریت وجود ندارد. نتایج را دوباره بررسی کن.')
+        return
+      }
+      void contact(offer)
+      return
+    }
     if (action.type === 'fill_query') {
       setMessage(action.query || lastQuery)
       composerInputRef.current?.focus()
@@ -1083,30 +1075,6 @@ export function MissionPanel({
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     await runTurn(message, constraints)
-  }
-
-  const contact = async (result: CatalogSearchResult) => {
-    if (!missionId || contactingOfferId || isRunning) return
-    const offer = result.best_offer
-    setContactingOfferId(offer.id)
-    setError(null)
-    try {
-      const response = await createContactAttempt(missionId, { shopId: offer.shop.id, offerId: offer.id })
-      setContactByOffer((current) => ({ ...current, [offer.id]: response }))
-      if (response.events?.length) {
-        setEvents((current) => {
-          const bySequence = new Map(current.map((event) => [event.seq, event]))
-          response.events?.forEach((event) => bySequence.set(event.seq, event))
-          return [...bySequence.values()].sort((left, right) => left.seq - right.seq)
-        })
-        setChatMessages((current) => response.events!.reduce((messages, event) =>
-          event.type === 'ui.component' ? mergeUIEventIntoMessages(messages, event) : messages, current))
-      }
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'استعلام ناموفق بود.')
-    } finally {
-      setContactingOfferId(null)
-    }
   }
 
   const startNewMission = () => {

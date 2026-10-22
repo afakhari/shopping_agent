@@ -12,6 +12,7 @@ import {
   Store,
 } from 'lucide-react'
 import type { GenUIAction, GenUIComponent, GenUIFormValues, GenUIValue } from './genui-types'
+import { RecoveryOptions } from './RecoveryOptions'
 
 interface GenUIDefaults {
   query: string
@@ -349,9 +350,16 @@ function ContactStatus({ component }: { component: GenUIComponent }) {
       <div>
         <strong>{text(component.data.title, copy.title)}</strong>
         <p>{text(component.data.message, copy.message)}</p>
-        {stockEvidence && <small>موجودی: {copy.title} (فقط سناریوی دمو)</small>}
-        {priceEvidence && <small>قیمت ثبت‌شده: {registeredPrice ? `${registeredPrice} تومان` : 'نامشخص'}؛ {text(priceEvidence.status) === 'simulated_change_amount_unknown' ? 'در دمو تغییر قیمت گزارش شده، مبلغ جدید نامشخص است' : 'قیمت لحظه‌ای تأیید نشده است'}</small>}
-        {hoursEvidence && <small>ساعات ثبت‌شده: {registeredHours || 'نامشخص'}؛ بازبودن واقعی تأیید نشده است.</small>}
+        {(stockEvidence || priceEvidence || hoursEvidence) && (
+          <details className="genui-contact-evidence">
+            <summary>جزئیات شواهد استعلام</summary>
+            <div>
+              {stockEvidence && <small>موجودی: {copy.title} (فقط سناریوی دمو)</small>}
+              {priceEvidence && <small>قیمت ثبت‌شده: {registeredPrice ? `${registeredPrice} تومان` : 'نامشخص'}؛ {text(priceEvidence.status) === 'simulated_change_amount_unknown' ? 'در دمو تغییر قیمت گزارش شده، مبلغ جدید نامشخص است' : 'قیمت لحظه‌ای تأیید نشده است'}</small>}
+              {hoursEvidence && <small>ساعات ثبت‌شده: {registeredHours || 'نامشخص'}؛ بازبودن واقعی تأیید نشده است.</small>}
+            </div>
+          </details>
+        )}
         <small>شبیه‌سازی کنترل‌شده؛ تماس واقعی ارسال نشده است.</small>
       </div>
     </section>
@@ -387,7 +395,7 @@ function renderComponent(component: GenUIComponent, defaults: GenUIDefaults, onA
     case 'notice':
       return <section className="genui-notice"><ClipboardList size={17} /><span>{text(component.data.message, text(component.data.title))}</span></section>
     case 'alternative_options':
-      return <FallbackCard key={component.id ?? component.type} component={component} />
+      return <RecoveryOptions key={component.id ?? component.type} component={component} onAction={onAction} disabled={disabled} />
     default:
       return <FallbackCard key={component.id ?? component.type} component={component} />
   }
