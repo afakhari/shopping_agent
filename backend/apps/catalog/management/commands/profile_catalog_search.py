@@ -51,7 +51,12 @@ class Command(BaseCommand):
                 with transaction.atomic():
                     if connection.vendor == "postgresql":
                         with connection.cursor() as cursor:
-                            cursor.execute("SET LOCAL statement_timeout = %s", [timeout_ms])
+                            # SET does not accept a driver-bound parameter;
+                            # set_config() does and remains transaction-local.
+                            cursor.execute(
+                                "SELECT set_config('statement_timeout', %s, true)",
+                                [f"{timeout_ms}ms"],
+                            )
                     value = operation()
                 return {"status": "ok", "elapsed_ms": round((time.perf_counter() - start)*1000, 1), "value": value}
             except DatabaseError as exc:
