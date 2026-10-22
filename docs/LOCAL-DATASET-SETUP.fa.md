@@ -26,6 +26,26 @@ Docker Desktop روشن (WSL2)، Git و فایل starcoach-dataset-v16-cap300-cs
 نتیجه قابل‌قبول: Dataset counts and sample relationships verified و Search smoke test passed.
 نشانی برنامه: http://localhost:8080 (یا APP_PORT تنظیم‌شده).
 
+## رفع خطای PostgreSQL در Volume قدیمی
+
+اگر در لاگ backend عبارت `password authentication failed for user "bazaar_compass"` و در لاگ db عبارت `Skipping initialization` دیده شد، به این معنی است که رمز PostgreSQL در Volume قبلی مانده، اما فایل `.env` رمز جدیدی دارد. **دیتابیس خراب نیست و نباید Volume را پاک کنید.**
+
+ابتدا تازه‌ترین اسکریپت را دریافت کنید:
+
+```powershell
+git pull --ff-only origin main
+```
+
+سپس برای **هماهنگ‌کردن رمز کاربر محلی با .env به‌صورت صریح** اجرا کنید:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup-dataset.ps1 -ArchivePath "$HOME\Downloads\starcoach-dataset-v16-cap300-csv.zip" -RepairDbPassword
+```
+
+این عملیات فقط زمانی وارد مرحله تغییر رمز می‌شود که آزمون TCP با رمز فعلی شکست بخورد، اتصال ادمین از طریق سوکت محلی برقرار باشد، و نام دیتابیس/کاربر و شکل رمز با تنظیمات خودکار پروژه یکسان باشند. رمز از طریق stdin به PostgreSQL فرستاده می‌شود و در لاگ عمومی چاپ نمی‌شود. PostgreSQL Volume، جدول‌ها و رکوردها حفظ می‌شوند.
+
+اگر این مسیر هم خطا داد، خروجی `docker compose ps` و `docker compose logs --tail 80 backend db` را بدون محتوای فایل `.env` گزارش کنید. **دستور `docker compose down -v` اجرا نکنید.** این روش مخصوص محیط توسعه محلی است و برای تغییر رمز PostgreSQL محیط production طراحی نشده است.
+
 ## بررسی و مدیریت
 
     docker compose exec -T backend python manage.py verify_dataset --products 225903 --shops 6476 --offers 331506
