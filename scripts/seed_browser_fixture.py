@@ -66,6 +66,30 @@ def main() -> None:
                     "warranty": {"provider": "گارانتی آزمایشی", "period_months": 12},
                 },
             )
+        comparison_name = "هدفون بی سیم تست مرورگر مدل دوم"
+        comparison_product, _ = Product.objects.update_or_create(
+            source_id="browser-product-headset-comparison",
+            defaults={
+                "persian_title": comparison_name,
+                "normalized_title": normalize_persian_text(comparison_name),
+                "category_name": "هدفون",
+                "brand_name": "برند آزمایشی",
+                "specs": [
+                    {"key": "نوع اتصال", "section": "صدا", "value": "بی سیم"},
+                    {"key": "مدت شارژ", "section": "صدا", "value": "۶ ساعت"},
+                ],
+            },
+        )
+        Offer.objects.update_or_create(
+            source_id="browser-offer-comparison",
+            defaults={
+                "shop": Shop.objects.get(pk="browser-shop-b"),
+                "product": comparison_product,
+                "price_toman": Decimal("1250000"),
+                "seller_title": "هدفون آزمایشی مدل دوم",
+                "warranty": {"provider": "گارانتی آزمایشی", "period_months": 6},
+            },
+        )
     print("Synthetic browser test catalog seeded; no competition data copied.")
 
 

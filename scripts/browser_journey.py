@@ -84,6 +84,16 @@ def main() -> None:
                 page.screenshot(path=str(OUTPUT / f"products-{width}.png"), full_page=True)
 
                 if width == 390:
+                    # Comparison remains a user-controlled, difference-first tool.
+                    page.locator(".mission-compare-button").first.click()
+                    page.locator(".mission-compare-button").nth(1).click()
+                    page.locator(".genui-comparison-table").first.wait_for()
+                    assert page.locator(".genui-comparison-table tbody tr").count() >= 2
+                    page.get_by_role("button", name="نمایش همه ویژگی‌ها").click()
+                    page.get_by_role("button", name="نمایش فقط تفاوت‌ها").click()
+                    page.locator(".mission-compare-clear").first.click()
+                    page.screenshot(path=str(OUTPUT / "comparison-mobile.png"), full_page=True)
+
                     page.locator(".mission-offers-toggle").first.click()
                     page.locator(".mission-offer-row").nth(1).wait_for()
                     assert page.locator(".mission-offer-row").count() == 2
