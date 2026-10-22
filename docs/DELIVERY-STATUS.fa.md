@@ -86,3 +86,17 @@
 ۴. [Issue #7](https://github.com/afakhari/shopping_agent/issues/7) و [#8](https://github.com/afakhari/shopping_agent/issues/8): برنامه مراجعه، تست واقعی، دیپلوی و ویدئوی دمو.
 
 **معیار گزارش‌دهی:** سبزبودن CI پایه نشان می‌دهد کد موجود build و test می‌شود؛ به معنی اتمام محصول مسابقه یا readiness عملیاتی نیست.
+
+
+## گزارش اجرایی ۲۳ اکتبر ۲۰۲۶ | PRهای #15 تا #19
+
+**کد و تست‌های ادغام‌شده روی main:**
+- [#15](https://github.com/afakhari/shopping_agent/pull/15) اعتبارسنجی سرویس اعتباری در سطح آفر، قیمت/دسته/کانال، نمایش گارانتی و readiness حداقلی production. CI سه‌گانه success.
+- [#16](https://github.com/afakhari/shopping_agent/pull/16) ساعت کاری هفتگی تهران و شیفت شب، نشانه‌های پاساژ/طبقه/واحد بدون ساخت اطلاعات. CI سه‌گانه success.
+- [#17](https://github.com/afakhari/shopping_agent/pull/17) شواهد تفکیک‌شده موجودی دمو، قیمت snapshot و ساعات ثبت‌شده در استعلام و snapshot. CI سه‌گانه success.
+- [#18](https://github.com/afakhari/shopping_agent/pull/18) انتخاب دستی محدوده تهران و نقشه اختیاری تک‌فروشگاهی؛ بدون ادعای ETA. CI سه‌گانه success.
+- [#19](https://github.com/afakhari/shopping_agent/pull/19) تست واقعی Chromium RTL در عرض‌های ۳۲۰/۳۹۰/۱۴۴۰ با دیتاست مصنوعی و مسیر no_answer → جایگزین → visit plan. CI چهارگانه success؛ تصاویر در artifact اجرای GitHub Actions.
+
+**مرزهای اعتبار:** نتایج browser فقط fixture ساختگی؛ راه‌اندازی قبلی دیتاست ۲۲۵٬۹۰۳/۶٬۴۷۶/۳۳۱٬۵۰۶ در Windows/Docker مربوط به پیش از این PRهاست و باید روی main جدید تکرار شود. API مدل با کلید حقیقی، تماس واقعی، نقشه چندپینی و مسیریابی، آزمون امنیت production، URL عمومی و دموی پنج‌دقیقه‌ای هنوز ادعای انجام‌شده ندارند.
+
+مرجع پذیرش به‌روز: [RELEASE-ACCEPTANCE-2026-10-23.fa.md](RELEASE-ACCEPTANCE-2026-10-23.fa.md).

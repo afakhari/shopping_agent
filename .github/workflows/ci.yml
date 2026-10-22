@@ -86,6 +86,19 @@ jobs:
       - run: python -m pytest
       - run: ruff check .
 
+  production-compose-config:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      DJANGO_SECRET_KEY: ci-nonsecret-synthetic-check-not-for-production
+      DJANGO_ALLOWED_HOSTS: example.invalid
+      DJANGO_CSRF_TRUSTED_ORIGINS: https://example.invalid
+      POSTGRES_PASSWORD: ci-disposable-postgres-password
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate production Compose configuration without credentials
+        run: docker compose -f compose.yaml -f compose.production.yaml config --quiet
+
   browser-journey:
     runs-on: ubuntu-latest
     timeout-minutes: 20

@@ -1,0 +1,16 @@
+# Add this overlay ONLY behind HTTPS termination on a controlled Docker host.
+# It is not a Liara deployment manifest: platform-specific credentials and storage
+# must be configured separately. Base Compose stays suitable for local development.
+services:
+  db:
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set private POSTGRES_PASSWORD before production}
+  backend:
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.production
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?Set private DJANGO_SECRET_KEY before production}
+      DJANGO_DEBUG: 'false'
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:?Set domain hosts for production}
+      DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-}
+  frontend:
+    restart: unless-stopped
