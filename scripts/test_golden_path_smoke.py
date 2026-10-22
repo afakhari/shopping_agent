@@ -84,5 +84,50 @@ class GoldenPathHelperTests(unittest.TestCase):
         self.assertEqual(state, "ACTIVE")
 
 
+    def test_sse_and_json_use_same_session_aware_transport(self) -> None:
+        """Regression: SSE must not bypass the opener that retains session cookies."""
+        from unittest.mock import patch
+
+        class Response:
+            def __init__(self, status: int, content_type: str, body: bytes) -> None:
+                self.status = status
+                self.headers = {"Content-Type": content_type}
+                self.body = body
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def read(self) -> bytes:
+                return self.body
+
+        json_response = Response(
+            201, "application/json", b'{"mission_id":"test-mission"}'
+        )
+        sse_response = Response(
+            200, "text/event-stream; charset=utf-8",
+            b'id: 1\ndata: {"seq":1,"type":"turn.completed","payload":{}}\n\n',
+        )
+        with patch.object(SMOKE, "_SESSION_OPENER") as opener:
+            opener.open.side_effect = [json_response, sse_response]
+            code, created, _ = SMOKE.request_json(
+                "http://frontend", "/api/v1/missions/",
+                method="POST", payload={"initial_message": "test"},
+            )
+            sse_code, events, _ = SMOKE.post_sse(
+                "http://frontend", "/api/v1/missions/test-mission/turns/",
+                {"message": "test"},
+            )
+            self.assertEqual(code, 201)
+            self.assertEqual(created["mission_id"], "test-mission")
+            self.assertEqual(sse_code, 200)
+            self.assertEqual([event["type"] for event in events], ["turn.completed"])
+            self.assertEqual(opener.open.call_count, 2)
+            self.assertEqual(opener.open.call_args_list[0].args[0].get_method(), "POST")
+            self.assertEqual(opener.open.call_args_list[1].args[0].get_header("Accept"), "text/event-stream")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

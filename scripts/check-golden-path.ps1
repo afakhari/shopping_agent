@@ -57,11 +57,19 @@ try {
     # 'compose cp' transfers the raw UTF-8 bytes without recoding Persian text.
     Invoke-Docker 'Copy UTF-8 golden path smoke helper into backend' @(
         'compose','cp',(Join-Path $root 'scripts\smoke-golden-path.py'),
-        'backend:/tmp/bazaar-golden-path-smoke.py'
+        'backend:/tmp/smoke-golden-path.py'
+    )
+    Invoke-Docker 'Copy smoke transport regression tests into backend' @(
+        'compose','cp',(Join-Path $root 'scripts\test_golden_path_smoke.py'),
+        'backend:/tmp/test_golden_path_smoke.py'
+    )
+    Invoke-Docker 'Check JSON + SSE share one session-aware HTTP transport' @(
+        'compose','exec','-T','backend','python',
+        '/tmp/test_golden_path_smoke.py'
     )
     Invoke-Docker 'Real HTTP mission + SSE + seller simulation through frontend gateway' @(
         'compose','exec','-T','backend','python',
-        '/tmp/bazaar-golden-path-smoke.py','--base-url','http://frontend',
+        '/tmp/smoke-golden-path.py','--base-url','http://frontend',
         '--query',[string]::Concat([char]0x0647,[char]0x062F,[char]0x0641,[char]0x0648,[char]0x0646)
     )
     Write-Host 'ALL REQUESTED LOCAL CHECKS PASSED. No CI used; DB volume preserved.' -ForegroundColor Green

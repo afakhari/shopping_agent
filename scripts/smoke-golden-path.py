@@ -78,7 +78,7 @@ def post_sse(base_url: str, path: str, payload: dict[str, Any], timeout: float =
         },
     )
     try:
-        with urlopen(request, timeout=timeout) as response:
+        with _SESSION_OPENER.open(request, timeout=timeout) as response:
             status = response.status
             content_type = response.headers.get("Content-Type", "")
             raw = response.read().decode("utf-8", errors="replace")
