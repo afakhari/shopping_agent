@@ -23,6 +23,7 @@ from django.db.models.functions import ASin, Cos, Least, Power, Radians, Sin, Sq
 from django.utils import timezone
 
 from apps.catalog.models import Offer, Product, Shop
+from apps.catalog.services.visit_context import opening_status, indoor_address_hints
 from apps.search.credit import eligible_credit_offer_query, offer_supports_in_person_credit
 from apps.search.intents import CategoryScope, resolve_category_scope
 
@@ -325,6 +326,8 @@ def serialize_shop(shop: Shop, distance_m: float | None = None) -> dict[str, Any
         "lon": shop.lon,
         "distance_m": round(float(distance_m)) if distance_m is not None else None,
         "accepts_in_person_credit": shop.accepts_in_person_credit,
+        "opening_status": opening_status(shop.weekly_hours),
+        "indoor_hints": indoor_address_hints(shop.address or shop.location_label),
     }
 
 

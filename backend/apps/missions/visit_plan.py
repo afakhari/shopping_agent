@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from urllib.parse import urlencode
 from apps.catalog.models import Offer
+from apps.catalog.services.visit_context import opening_status, indoor_address_hints
+from apps.search.credit import offer_supports_in_person_credit
 
 DAYS = (("sat", "شنبه"), ("sun", "یکشنبه"), ("mon", "دوشنبه"),
         ("tue", "سه‌شنبه"), ("wed", "چهارشنبه"), ("thu", "پنجشنبه"), ("fri", "جمعه"))
@@ -56,6 +58,9 @@ def build_visit_plan(offer: Offer, attempt_id: str, backup_offer: dict | None) -
             "status": "آفر ثبت‌شده؛ موجودی فروشگاه پشتیبان استعلام نشده",
         }
     price = f"{offer.price_toman:,.0f} تومان" if offer.price_toman is not None else "قیمت ثبت نشده"
+    location_hints = indoor_address_hints(offer.shop.address or offer.shop.location_label)
+    hours_status = opening_status(offer.shop.weekly_hours)
+
     return {
         "title": "برنامه مراجعه آماده است",
         "description": "پیش از حرکت اطلاعات ثبت‌شده را مرور کن؛ زمان سفر و بازبودن فعلی تأیید نشده‌اند.",
@@ -75,9 +80,20 @@ def build_visit_plan(offer: Offer, attempt_id: str, backup_offer: dict | None) -
              "value": offer.last_price_changed_at.isoformat() if offer.last_price_changed_at else "زمان تغییر قیمت ثبت نشده"},
             {"key": "address", "label": "نشانی ثبت‌شده",
              "value": offer.shop.address or offer.shop.location_label or "نشانی ثبت نشده"},
+            *[
+                {"key": key, "label": label, "value": location_hints[key]}
+                for key, label in (
+                    ("mall", "مرکز خرید یا پاساژ ثبت‌شده"),
+                    ("floor", "طبقه ثبت‌شده"),
+                    ("unit", "واحد ثبت‌شده"),
+                )
+                if key in location_hints
+            ],
+            {"key": "opening_status", "label": "وضعیت بر اساس برنامه ثبت‌شده",
+             "value": hours_status["label"]},
             {"key": "weekly_hours", "label": "ساعات ثبت‌شده به وقت تهران",
              "value": format_weekly_hours(offer.shop.weekly_hours)},
             {"key": "in_person_credit", "label": "خرید اعتباری حضوری",
-             "value": "پذیرش ثبت شده" if offer.shop.accepts_in_person_credit else "پذیرش ثبت نشده"},
+             "value": "آفر واجد شرایط ثبت‌شده" if offer_supports_in_person_credit(offer) else "برای این آفر واجد شرایط ثبت نشده"},
         ],
     }
