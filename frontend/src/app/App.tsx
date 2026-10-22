@@ -105,15 +105,15 @@ export default function App() {
             <h2>خرید خوب، از یک سؤال خوب شروع می‌شود.</h2>
             <p>نیازت را بگو؛ از پیدا کردن مدل تا انتخاب فروشگاه و برنامه مراجعه کنارت هستیم.</p>
           </div>
-          <nav className="journey-steps" aria-label="مراحل راهنمای خرید">
-            <p className="journey-section-label">مسیر خرید</p>
+          <section className="journey-steps" aria-labelledby="journey-steps-heading">
+            <h3 className="journey-section-label" id="journey-steps-heading">مسیر خرید</h3>
             <ol>
               <li><span className="journey-step-icon"><Search size={17} /></span><span><strong>شناخت نیاز</strong><small>بودجه و ویژگی‌های مهم</small></span><b>۰۱</b></li>
               <li><span className="journey-step-icon"><Store size={17} /></span><span><strong>کالا و فروشگاه</strong><small>مقایسه مدل‌ها و قیمت‌ها</small></span><b>۰۲</b></li>
               <li><span className="journey-step-icon"><ShieldCheck size={17} /></span><span><strong>بررسی فروشنده</strong><small>استعلام شبیه‌سازی‌شده</small></span><b>۰۳</b></li>
               <li><span className="journey-step-icon"><Route size={17} /></span><span><strong>آمادگی مراجعه</strong><small>نشانی و گزینه پشتیبان</small></span><b>۰۴</b></li>
             </ol>
-          </nav>
+          </section>
           <div className="journey-side-note">
             <div className="journey-side-note-icon"><ShieldCheck size={19} /></div>
             <strong>شفافیت، قبل از خرید</strong>
