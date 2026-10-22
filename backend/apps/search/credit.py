@@ -67,3 +67,39 @@ def eligible_credit_offer_query() -> Q:
                 clause &= Q(product__category_name__in=exact_categories)
             allowed |= clause
     return allowed
+
+
+def offer_supports_in_person_credit(offer) -> bool:
+    """Display only credit verified by the same offer-level conditions used in search."""
+    shop = offer.shop
+    if not shop.accepts_in_person_credit or not isinstance(shop.payment_options, list):
+        return False
+    for option in shop.payment_options:
+        if not isinstance(option, dict) or option.get("channel") != "in_person":
+            continue
+        try:
+            min_price = _positive_bound(option.get("min_price_toman"))
+            max_price = _positive_bound(option.get("max_price_toman"))
+        except ValueError:
+            continue
+        if min_price is not None and max_price is not None and min_price > max_price:
+            continue
+        categories = option.get("category_names", [])
+        if not isinstance(categories, list) or any(
+            not isinstance(name, str) for name in categories
+        ):
+            continue
+        if categories and offer.product.category_name not in [
+            name.strip() for name in categories if name.strip()
+        ]:
+            continue
+        if min_price is not None and (
+            offer.price_toman is None or offer.price_toman < min_price
+        ):
+            continue
+        if max_price is not None and (
+            offer.price_toman is None or offer.price_toman > max_price
+        ):
+            continue
+        return True
+    return False

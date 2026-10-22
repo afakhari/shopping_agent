@@ -119,3 +119,13 @@ class OfferLevelCreditEligibilityTests(TestCase):
         self.assertEqual(selected["seller_title"], "هدفون با گارانتی")
         self.assertEqual(selected["warranty"]["period_months"], 12)
         self.assertEqual(selected["warranty"]["provider"], "شرکتی")
+        self.assertTrue(selected["in_person_credit_eligible"])
+
+    def test_credit_badge_depends_on_offer_not_only_store(self):
+        from apps.search.services import serialize_offer
+
+        self.assertFalse(serialize_offer(Offer.objects.get(pk="o-cheap"))["in_person_credit_eligible"])
+        self.assertTrue(serialize_offer(Offer.objects.get(pk="o-eligible"))["in_person_credit_eligible"])
+        self.assertFalse(serialize_offer(Offer.objects.get(pk="o-wrong-category"))["in_person_credit_eligible"])
+
+ 
