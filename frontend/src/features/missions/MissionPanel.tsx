@@ -1252,7 +1252,7 @@ export function MissionPanel({
           {location && <span><MapPin size={13} /> فاصله مستقیم تا {money.format(radiusM / 1000)} کیلومتر</span>}
           {isLocating && <span><LoaderCircle size={13} className="spin" /> دریافت موقعیت…</span>}
         </div>
-        <p className="conversation-disclaimer">قیمت‌ها از دادهٔ ثبت‌شده‌اند؛ استعلام موجودی در این دمو شبیه‌سازی می‌شود.</p>
+        <p className="conversation-disclaimer">قیمت‌ها تاریخی‌اند و استعلام موجودی نمایشی است. نام بیشتر فروشگاه‌ها و همه شماره‌های تماس در دیتاست مسابقه ساختگی‌اند.</p>
       </div>
     </section>
   )
