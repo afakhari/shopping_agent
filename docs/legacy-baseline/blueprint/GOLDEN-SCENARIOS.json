@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "status": "template_requires_real_dataset_fixtures",
+  "source_note": "Do not invent catalog IDs. Select existing product/shop/offer IDs after the official CSV import.",
+  "scenarios": [
+    {"id":"E01","name":"exact_model_multiple_shops","assertions":["valid offer shop link","price semantics"]},
+    {"id":"E02","name":"use_case_discovery","assertions":["relevant product candidates","clarification only when needed"]},
+    {"id":"E03","name":"strict_budget","assertions":["zero budget violations"]},
+    {"id":"E04","name":"credit_purchase","assertions":["in_person channel","provider price and category conditions"]},
+    {"id":"E05","name":"empty_results","assertions":["explain blocking conditions","no silent relaxation"]},
+    {"id":"E06","name":"location_denied","assertions":["manual region fallback"]},
+    {"id":"E07","name":"unknown_price","assertions":["unknown price state","offer not labeled verified"]},
+    {"id":"E08","name":"seller_no_answer","assertions":["server owned contact outcome","eligible backup"]},
+    {"id":"E09","name":"seller_price_changed","assertions":["revalidate budget","request approval"]},
+    {"id":"E10","name":"closed_or_unknown_hours","assertions":["correct Tehran timezone","unknown not closed"]},
+    {"id":"E11","name":"mall_floor_unit","assertions":["address text evidence","no invented indoor route"]},
+    {"id":"E12","name":"duplicate_and_reconnect","assertions":["single contact side effect","event replay"]},
+    {"id":"E13","name":"map_provider_failure","assertions":["shop list remains usable"]},
+    {"id":"E14","name":"mission_reload","assertions":["state persists","no forced restart"]}
+  ]
+}

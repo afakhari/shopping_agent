@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "status": "planned_not_implemented",
+  "note": "Every task is a deliverable, not a claim that it is complete.",
+  "tasks": [
+    {"id":"BC-001","priority":"P0","phase":"F0","title":"Verified CSV import and dataset readiness","depends_on":[],"acceptance":["import is repeatable","orphan offers=0","readiness checks dataset version"]},
+    {"id":"BC-002","priority":"P0","phase":"F1","title":"Offer-level in-person credit eligibility","depends_on":["BC-001"],"acceptance":["channel,min,max,category enforced","unknown different from ineligible","unit tests cover edge prices"]},
+    {"id":"BC-003","priority":"P0","phase":"F1","title":"Persian lexical retrieval and model-aware ranking","depends_on":["BC-001"],"acceptance":["brand/model exact match preserved","hard constraints not violated","benchmark versus baseline published"]},
+    {"id":"BC-004","priority":"P0","phase":"F1","title":"Complete Offer DTO and provenance","depends_on":["BC-002"],"acceptance":["price as decimal string","warranty and seller description available","unverified stock not marked verified"]},
+    {"id":"BC-005","priority":"P0","phase":"F2","title":"Accessible Persian RTL design system","depends_on":[],"acceptance":["keyboard navigation","responsive at 320..1440","logical CSS direction and tested portals"]},
+    {"id":"BC-006","priority":"P0","phase":"F2","title":"Discovery and category-specific comparison","depends_on":["BC-003","BC-004","BC-005"],"acceptance":["comparison uses actual specs","missing attributes explicit","no fabricated reasons"]},
+    {"id":"BC-007","priority":"P0","phase":"F3","title":"Shop map/list synchronized selection","depends_on":["BC-004","BC-005"],"acceptance":["pin/card selection sync","no-map fallback","direct distance vs ETA labeled"]},
+    {"id":"BC-008","priority":"P0","phase":"F3","title":"Payment, hours and mall address services","depends_on":["BC-002","BC-007"],"acceptance":["Tehran shifts interpreted","mall/floor/unit evidence preserved","unknown hours handled"]},
+    {"id":"BC-009","priority":"P0","phase":"F4","title":"Durable mission state and approval actions","depends_on":["BC-005"],"acceptance":["resume after refresh","mission revision checked","checkpoint persisted"]},
+    {"id":"BC-010","priority":"P0","phase":"F4","title":"Deterministic contact simulator and recovery","depends_on":["BC-008","BC-009"],"acceptance":["stock/price/hours purposes","idempotent attempts","no-answer/closed/unavailable recovery"]},
+    {"id":"BC-011","priority":"P0","phase":"F5","title":"Standalone actionable visit plan","depends_on":["BC-008","BC-010"],"acceptance":["primary and fallback sellers","verification timestamp","usable without transcript"]},
+    {"id":"BC-012","priority":"P0","phase":"F6","title":"End-to-end testing, deployment and demo","depends_on":["BC-001","BC-006","BC-007","BC-011"],"acceptance":["golden e2e passed","production URL smoke passed","five-minute demo recorded"]}
+  ]
+}

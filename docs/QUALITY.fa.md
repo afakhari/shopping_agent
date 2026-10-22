@@ -1,0 +1,41 @@
+# استاندارد آزمون، پذیرش و ارزیابی
+
+## Quality gates
+Backend: Django check, migrations check, pytest, Ruff, import dry-run. Frontend: npm ci, typecheck, ESLint, unit tests, build. Integration: DB populated and 12 end-to-end journeys. Visual: screenshots width 360/390/768/1440، RTL، کنتراست، focus، keyboard، reduced-motion.
+
+## مسیر طلایی
+فارسی طبیعی → پیشنهاد مدل → جدول مقایسه → آفرهای معتبر → اصلاح بودجه یا شعاع → استعلام شبیه‌سازی‌شده → نتیجه ناموفق قابل‌بازتولید → گزینه پشتیبان → برنامه مراجعه.
+
+## سناریوهای الزامی
+۱) درخواست مدل دقیق
+۲) درخواست بر اساس کاربرد
+۳) درخواست مبهم و clarification
+۴) صفر نتیجه و توضیح علت
+۵) سقف بودجه سخت
+۶) خرید اعتباری با محدودیت دسته/قیمت
+۷) قیمت ثبت‌نشده
+۸) فروشگاه صرفاً category-related بدون Offer
+۹) ساعت کاری نامشخص/بسته
+۱۰) پاسخ موفق seller simulator
+۱۱) عدم پاسخ seller و fallback
+۱۲) تغییر قیمت و validation دوباره
+۱۳) پایان موجودی
+۱۴) چند آفر با warranty متفاوت
+۱۵) جابه‌جایی فیلتر هنگام request طولانی
+۱۶) قطع شبکه و بازیابی snapshot
+۱۷) مجوز موقعیت رد شد
+۱۸) خطا در نقشه و fallback
+۱۹) آدرس پاساژ بدون طبقه/واحد
+۲۰) refresh حین استعلام بدون side effect تکراری
+
+## سنجش جست‌وجو
+پیشنهاد ۵۰ query برچسب‌دار از خود دیتاست؛ ارزیابی MRR@10، Recall@10، hard-filter violations (باید صفر)، latency p95. شرط قبول تغییر retrieval: رشد معنیدار نسبت به baseline بدون افزایش نقض شروط سخت.
+
+## Product / UX
+تست سناریو با کاربر بدون راهنمای شفاهی، success rate، تعداد تعامل تا انتخاب و زمان انجام کار. شکست به‌صورت واضح ثبت شود، نه اینکه در نمایش دمو پنهان شود.
+
+## Performance
+Core Web Vitals و p95 جست‌وجو در محیط مستقر سنجیده شود. هدف‌ها بعد از baseline ثبت شوند؛ ادعای تأیید آزمایش تا پیش از اجرای CI/Playwright ممنوع.
+
+## امنیت/حریم خصوصی
+تست جلوگیری از انتشار .env، API keys، شماره‌های حساس، دسترسی غیرمجاز به mission id، تزریق prompt، SSRF در URLهای خارجی، XSS در متن آفر و اجرای ابزار بدون approval.
