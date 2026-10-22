@@ -218,6 +218,62 @@ class MissionApiTests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(ContactAttempt.objects.count(), 0)
 
+    def test_contact_answers_stock_and_exposes_registered_price_hours_separately(self):
+        mission_id = self._create_mission_and_search()
+        self.shop_a.weekly_hours = {"sat": {"status": "declared", "shifts": [
+            {"start_time": "09:00:00", "end_time": "19:00:00"}
+        ]}}
+        self.shop_a.save(update_fields=["weekly_hours"])
+        response = self.client.post(
+            f"/api/v1/missions/{mission_id}/contact-attempts/",
+            {"shop_id": self.shop_a.source_id, "offer_id": self.offer_a.source_id,
+             "client_request_id": "questions-a1",
+             "questions": ["stock", "price", "hours"]},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201, response.content)
+        attempt = response.json()["attempt"]
+        self.assertEqual(attempt["requested_questions"], ["stock", "price", "hours"])
+        self.assertEqual(attempt["evidence"]["stock"]["source"], "demo_simulation")
+        self.assertFalse(attempt["evidence"]["stock"]["verified_in_real_world"])
+        self.assertEqual(attempt["evidence"]["price"]["registered_price_toman"], "750000")
+        self.assertEqual(attempt["evidence"]["price"]["status"], "registered_not_live_verified")
+        self.assertEqual(attempt["evidence"]["hours"]["source"], "dataset_snapshot")
+        self.assertIn("شنبه", attempt["evidence"]["hours"]["weekly_hours"])
+        self.assertEqual(
+            attempt["evidence"]["hours"]["opening_status"]["source"], "registered_schedule"
+        )
+        restored = self.client.get(f"/api/v1/missions/{mission_id}/").json()["events"]
+        contact_event = next(item for item in restored if item["type"] == "contact.completed")
+        self.assertEqual(contact_event["payload"]["attempt"]["evidence"], attempt["evidence"])
+
+    def test_repeating_contact_key_with_changed_questions_is_rejected_without_side_effects(self):
+        mission_id = self._create_mission_and_search()
+        endpoint = f"/api/v1/missions/{mission_id}/contact-attempts/"
+        payload = {"shop_id": self.shop_a.source_id, "offer_id": self.offer_a.source_id,
+                   "client_request_id": "same-key", "questions": ["stock", "price"]}
+        first = self.client.post(endpoint, payload, format="json")
+        self.assertEqual(first.status_code, 201, first.content)
+        repeat = self.client.post(endpoint, payload, format="json")
+        self.assertEqual(repeat.status_code, 200)
+        self.assertEqual(repeat.json()["attempt"]["id"], first.json()["attempt"]["id"])
+        changed = self.client.post(
+            endpoint, {**payload, "questions": ["stock", "hours"]}, format="json"
+        )
+        self.assertEqual(changed.status_code, 400)
+        self.assertEqual(ContactAttempt.objects.count(), 1)
+
+    def test_contact_rejects_request_without_stock_or_duplicate_questions(self):
+        mission_id = self._create_mission_and_search()
+        endpoint = f"/api/v1/missions/{mission_id}/contact-attempts/"
+        base = {"shop_id": self.shop_a.source_id, "offer_id": self.offer_a.source_id}
+        for questions in (["price", "hours"], ["stock", "stock"], ["unknown"]):
+            response = self.client.post(
+                endpoint, {**base, "questions": questions}, format="json"
+            )
+            self.assertEqual(response.status_code, 400)
+        self.assertEqual(ContactAttempt.objects.count(), 0)
+
     def test_natural_language_credit_requirement_overrides_unchecked_ui_toggle(self):
         response = self.client.post(
             "/api/v1/missions/",

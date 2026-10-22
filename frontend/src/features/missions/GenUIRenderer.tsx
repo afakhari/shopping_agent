@@ -337,10 +337,23 @@ function ContactStatus({ component }: { component: GenUIComponent }) {
     pending: fallbackCopy,
   }
   const copy = messages[status] ?? fallbackCopy
+  const evidence = isRecord(firstAttempt?.evidence) ? firstAttempt.evidence : null
+  const stockEvidence = evidence && isRecord(evidence.stock) ? evidence.stock : null
+  const priceEvidence = evidence && isRecord(evidence.price) ? evidence.price : null
+  const hoursEvidence = evidence && isRecord(evidence.hours) ? evidence.hours : null
+  const registeredPrice = priceEvidence ? text(priceEvidence.registered_price_toman) : ''
+  const registeredHours = hoursEvidence ? text(hoursEvidence.weekly_hours) : ''
   return (
     <section className={`genui-contact-status ${positive ? 'positive' : 'caution'}`}>
       {positive ? <CheckCircle2 size={20} /> : <HelpCircle size={20} />}
-      <div><strong>{text(component.data.title, copy.title)}</strong><p>{text(component.data.message, copy.message)}</p><small>شبیه‌سازی کنترل‌شده؛ تماس واقعی ارسال نشده است.</small></div>
+      <div>
+        <strong>{text(component.data.title, copy.title)}</strong>
+        <p>{text(component.data.message, copy.message)}</p>
+        {stockEvidence && <small>موجودی: {copy.title} (فقط سناریوی دمو)</small>}
+        {priceEvidence && <small>قیمت ثبت‌شده: {registeredPrice ? `${registeredPrice} تومان` : 'نامشخص'}؛ {text(priceEvidence.status) === 'simulated_change_amount_unknown' ? 'در دمو تغییر قیمت گزارش شده، مبلغ جدید نامشخص است' : 'قیمت لحظه‌ای تأیید نشده است'}</small>}
+        {hoursEvidence && <small>ساعات ثبت‌شده: {registeredHours || 'نامشخص'}؛ بازبودن واقعی تأیید نشده است.</small>}
+        <small>شبیه‌سازی کنترل‌شده؛ تماس واقعی ارسال نشده است.</small>
+      </div>
     </section>
   )
 }

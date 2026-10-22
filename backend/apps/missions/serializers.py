@@ -90,6 +90,24 @@ class ContactAttemptCreateSerializer(serializers.Serializer):
         default="verify_availability",
         choices=("verify_availability",),
     )
+    # Stock is the demo outcome; price and hours are separate registered evidence.
+    questions = serializers.ListField(
+        child=serializers.ChoiceField(choices=("stock", "price", "hours")),
+        min_length=1,
+        max_length=3,
+        required=False,
+        default=lambda: ["stock", "price", "hours"],
+    )
+
+    def validate_questions(self, values: list[str]) -> list[str]:
+        if len(values) != len(set(values)):
+            raise serializers.ValidationError("سؤال تکراری در استعلام مجاز نیست.")
+        if "stock" not in values:
+            raise serializers.ValidationError(
+                "در نسخه فعلی نتیجه شبیه‌سازی مربوط به موجودی است؛ سؤال موجودی باید انتخاب شود."
+            )
+        return values
+
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         forbidden = {"outcome", "response_text", "scenario_result", "scenario_index"}
