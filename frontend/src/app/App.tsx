@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
 import { useCallback, useEffect, useState } from 'react'
-import { Compass, MapPin } from 'lucide-react'
 import { MissionPanel } from '../features/missions/MissionPanel'
 import type { MissionConstraints } from '../features/missions/mission-api'
 import { getHealth } from '../shared/api/health'
@@ -74,29 +73,13 @@ export default function App() {
       : constraints.sort ?? 'relevance')
   }, [])
 
-  const serviceStatus = health.data?.status === 'ready'
-    ? 'online'
-    : health.isError || health.data?.status === 'not_ready'
-      ? 'offline'
-      : 'checking'
+  const serviceUnavailable = health.isError || health.data?.status === 'not_ready'
   return (
     <div className="chat-app redesign-v2">
       <a className="skip-link" href="#conversation-heading">رفتن به گفتگوی خرید</a>
-      <header className="chat-topbar">
-        <div className="chat-topbar-inner">
-          <a className="chat-brand" href="#home" aria-label="بازارکامپس، دستیار خرید">
-            <span className="chat-brand-mark"><Compass size={21} strokeWidth={2.3} /></span>
-            <span className="chat-brand-copy"><strong>بازارکامپس</strong><small>دستیار هوشمند خرید حضوری</small></span>
-          </a>
-          <div className="chat-topbar-status">
-            <span className="chat-location"><MapPin size={14} /> تهران</span>
-            <span className={`chat-service-status ${serviceStatus}`} aria-live="polite">
-              <i />
-              {serviceStatus === 'online' ? 'دستیار آماده' : serviceStatus === 'offline' ? 'اتصال برقرار نیست' : 'در حال اتصال'}
-            </span>
-          </div>
-        </div>
-      </header>
+      {serviceUnavailable && (
+        <p className="ux-connection-alert" role="status">اتصال به سرویس برقرار نیست. هنگام ارسال درخواست می‌توانی دوباره تلاش کنی.</p>
+      )}
 
       <main className="chat-main journey-layout" id="home">
         <div className="journey-workspace">

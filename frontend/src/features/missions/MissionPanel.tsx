@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { AlertCircle, ArrowLeft, CheckCircle2, ChevronDown, ChevronUp, Clock3, CreditCard, ExternalLink, Headphones, HeartPulse, Laptop, LoaderCircle, LocateFixed, MapPin, MapPinOff, PhoneCall, Send, ShieldCheck, SlidersHorizontal, Sparkles, Store, RotateCcw } from 'lucide-react'
+import { AlertCircle, ArrowLeft, CheckCircle2, ChevronDown, ChevronUp, Clock3, CreditCard, ExternalLink, Headphones, Laptop, LoaderCircle, LocateFixed, MapPin, MapPinOff, PhoneCall, Send, ShieldCheck, SlidersHorizontal, Sparkles, Store, RotateCcw, X } from 'lucide-react'
 import { getProductOffers, type CatalogOffer, type CatalogSearchResult, type ProductOffersResponse } from '../search/catalog-api'
 import { buildComparisonSpecColumns } from './comparison-specs'
 import { isGreetingOnly } from './greeting-intent'
+import { findCurrentSearchMessage, shouldFollowConversation } from './conversation-behavior'
 import { GenUIRenderer } from './GenUIRenderer'
 import { formatDistance, formatLastPriceChange, getPriceQualityLabel, openStreetMapUrl } from './ui-formatters'
 import { getResultPayload, getUIComponents, type GenUIAction, type GenUIComponent } from './genui-types'
@@ -514,28 +515,6 @@ function rebuildChatFromEvents(events: MissionEvent[]): MissionChatMessage[] {
   return messages
 }
 
-function appendLocalComponent(messages: MissionChatMessage[], component: GenUIComponent): MissionChatMessage[] {
-  const next = [...messages]
-  let index = -1
-  for (let cursor = next.length - 1; cursor >= 0; cursor -= 1) {
-    if (next[cursor]?.role === 'assistant') {
-      index = cursor
-      break
-    }
-  }
-  if (index < 0) {
-    next.push({ id: `assistant-local-${Date.now()}`, role: 'assistant', text: 'می‌توانیم شرایط جست‌وجو را دقیق‌تر کنیم.', components: [component] })
-    return next
-  }
-  const current = next[index]
-  if (!current) return messages
-  next[index] = {
-    ...current,
-    components: [...current.components.filter((saved) => saved.type !== component.type), component],
-  }
-  return next
-}
-
 export function MissionPanel({
   budget,
   mustHaveCredit,
@@ -565,11 +544,14 @@ export function MissionPanel({
   const [contactingOfferId, setContactingOfferId] = useState<string | null>(null)
   const [contactByOffer, setContactByOffer] = useState<Record<string, ContactAttemptResponse>>({})
   const [offerViews, setOfferViews] = useState<Record<string, ProductOfferView>>({})
+  const [activeFilterForm, setActiveFilterForm] = useState<GenUIComponent | null>(null)
+  const filterDialogRef = useRef<HTMLDialogElement | null>(null)
+  const transcriptRef = useRef<HTMLDivElement | null>(null)
+  const shouldAutoScrollRef = useRef(true)
   const offerRequestControllers = useRef(new Map<string, AbortController>())
   const [error, setError] = useState<string | null>(null)
   const [stageLabel, setStageLabel] = useState<string | null>(null)
   const [isLocating, setIsLocating] = useState(false)
-  const transcriptEndRef = useRef<HTMLDivElement | null>(null)
   const composerInputRef = useRef<HTMLTextAreaElement | null>(null)
   const turnCounter = useRef(0)
 
@@ -582,7 +564,9 @@ export function MissionPanel({
   }
 
   const currentAssistantMessage = [...chatMessages].reverse().find((item) => item.role === 'assistant')
-  const results = currentAssistantMessage?.results ?? []
+  // A follow-up answer without a catalog payload must not erase product selection.
+  const currentResultsMessage = findCurrentSearchMessage(chatMessages)
+  const results = currentResultsMessage?.results ?? []
 
   useEffect(() => {
     const restoreId = initialMissionId
@@ -634,8 +618,18 @@ export function MissionPanel({
   }, [initialMissionId, onRestoreConstraints])
 
   useEffect(() => {
-    transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+    const transcript = transcriptRef.current
+    if (transcript && shouldAutoScrollRef.current) {
+      transcript.scrollTop = transcript.scrollHeight
+    }
   }, [chatMessages, isRunning])
+
+  useEffect(() => {
+    const dialog = filterDialogRef.current
+    if (!dialog) return
+    if (activeFilterForm && !dialog.open) dialog.showModal()
+    if (!activeFilterForm && dialog.open) dialog.close()
+  }, [activeFilterForm])
 
   useEffect(() => {
     const input = composerInputRef.current
@@ -704,6 +698,7 @@ export function MissionPanel({
   const runTurn = async (turnMessage: string, turnConstraints: MissionConstraints = constraints, displayQuery = turnMessage) => {
     const trimmed = turnMessage.trim()
     if (!trimmed || isRunning || isRestoring) return
+    shouldAutoScrollRef.current = true
     // A salutation is not a catalog query. Avoid irrelevant product recommendations
     // and avoid creating a misleading purchase mission until a product intent exists.
     if (isGreetingOnly(trimmed)) {
@@ -726,7 +721,7 @@ export function MissionPanel({
     setError(null)
     setIsRunning(true)
     setStageLabel('در حال آماده‌سازی مأموریت خرید...')
-    setLastQuery(displayQuery.trim())
+    if (!results.length) setLastQuery(displayQuery.trim())
     turnCounter.current += 1
     const turnId = `${Date.now()}-${turnCounter.current}`
     setChatMessages((current) => [
@@ -947,7 +942,7 @@ export function MissionPanel({
       return
     }
     if (action.type === 'open_filter_form') {
-      setChatMessages((current) => appendLocalComponent(current, {
+      setActiveFilterForm({
         type: 'filter_form',
         id: `local-filter-form-${Date.now()}`,
         data: {
@@ -973,7 +968,7 @@ export function MissionPanel({
             ] },
           ],
         },
-      }))
+      })
       return
     }
     if (action.type === 'run_query') {
@@ -1015,6 +1010,7 @@ export function MissionPanel({
         return
       }
       onRestoreConstraints(nextConstraints, query)
+      setActiveFilterForm(null)
       void runTurn(query, nextConstraints, query)
     }
   }
@@ -1060,6 +1056,8 @@ export function MissionPanel({
     setLastQuery('')
     setSelectedCompareProductIds([])
     setContactByOffer({})
+    setActiveFilterForm(null)
+    shouldAutoScrollRef.current = true
     setError(null)
     setStageLabel(null)
   }
@@ -1112,7 +1110,6 @@ export function MissionPanel({
 
   const quickPrompts = [
     { label: 'لپ‌تاپ برای کار', detail: 'بودجه و مشخصات مهم را مقایسه کن', icon: <Laptop size={18} />, prompt: 'برای برنامه‌نویسی یک لپ‌تاپ مناسب در تهران پیدا کن؛ گزینه‌ها را با قیمت و مزایا مقایسه کن.' },
-    { label: 'فشارسنج خانگی', detail: 'مدل‌های مناسب مصرف خانگی', icon: <HeartPulse size={18} />, prompt: 'یک فشارسنج دیجیتال بازویی برای مصرف خانگی در تهران می‌خواهم.' },
     { label: 'هدفون اقتصادی', detail: 'فروشگاه‌های ارزان‌تر را پیدا کن', icon: <Headphones size={18} />, prompt: 'هدفون بی‌سیم اقتصادی در تهران پیدا کن و ارزان‌ترین فروشگاه‌ها را مقایسه کن.' },
     { label: 'خرید اعتباری', detail: 'فقط پیشنهادهای دارای شرط اعتبار ثبت‌شده', icon: <CreditCard size={18} />, prompt: 'یک هدفون بی‌سیم در تهران می‌خواهم؛ فقط گزینه‌های فروشگاه‌هایی را نشان بده که خرید اعتباری حضوری می‌پذیرند.' },
   ]
@@ -1122,12 +1119,15 @@ export function MissionPanel({
     <section className={`conversation-panel${isEmptyConversation ? ' conversation-panel-empty' : ''}`} aria-labelledby="conversation-heading">
       <div className="conversation-panel-header">
         <div className="conversation-header-copy">
-          <h2 id={!isEmptyConversation ? 'conversation-heading' : undefined}>گفتگوی خرید</h2>
+          <h2 id={!isEmptyConversation ? 'conversation-heading' : undefined}>دستیار خرید حضوری</h2>
         </div>
         {chatMessages.length > 0 && <button className="conversation-reset" type="button" disabled={isRunning || isRestoring || contactingOfferId !== null} onClick={startNewMission}><RotateCcw size={15} /> گفتگوی تازه</button>}
       </div>
 
-      <div className="conversation-transcript" aria-label="گفتگوی مأموریت خرید" aria-live="off" aria-busy={isRunning || isRestoring}>
+      <div className="conversation-transcript" ref={transcriptRef} onScroll={(event) => {
+        const transcript = event.currentTarget
+        shouldAutoScrollRef.current = shouldFollowConversation(transcript.scrollHeight, transcript.scrollTop, transcript.clientHeight)
+      }} aria-label="گفتگوی مأموریت خرید" aria-live="off" aria-busy={isRunning || isRestoring}>
         {isEmptyConversation && (
           <div className="conversation-welcome">
             <h3 id="conversation-heading">چی می‌خوای بخری؟</h3>
@@ -1150,12 +1150,13 @@ export function MissionPanel({
             return <div className="chat-message chat-message-user" key={item.id}><div className="user-bubble">{item.text}</div></div>
           }
           const isCurrent = currentAssistantMessage?.id === item.id
+          const isCurrentResult = currentResultsMessage?.id === item.id
           const preComponents = item.components.filter((component) => PRE_RESULT_COMPONENTS.has(component.type))
           const postComponents = item.components.filter((component) => !PRE_RESULT_COMPONENTS.has(component.type))
           const hasDedicatedEmptyState = item.components.some((component) => ['empty_state', 'clarification_form'].includes(component.type))
           return (
             <article className={`chat-message chat-message-assistant ${item.pending ? 'pending' : ''}`} key={item.id}>
-              <div className="assistant-message-heading"><span className="assistant-mini-avatar"><Sparkles size={15} /></span><strong>بازارکامپس</strong>{item.pending && <span className="assistant-working"><i /><i /><i /> در حال بررسی</span>}</div>
+              <div className="assistant-message-heading"><span className="assistant-mini-avatar"><Sparkles size={15} /></span><strong>دستیار خرید</strong>{item.pending && <span className="assistant-working"><i /><i /><i /> در حال بررسی</span>}</div>
               {item.text && (item.results && item.results.length > 0 && !item.pending
                 ? <details className="assistant-explanation"><summary>درباره این نتایج <ChevronDown size={13} aria-hidden="true" /></summary><p>{item.text}</p></details>
                 : <div className="assistant-message-copy">{item.text}</div>)}
@@ -1166,23 +1167,23 @@ export function MissionPanel({
                     <div><h3>نتایج پیشنهادی</h3></div>
                     <div className="mission-results-header-actions">
                       <span>{money.format(item.resultCount ?? item.results.length)} محصول</span>
-                      {isCurrent && <button type="button" className="mission-edit-filters" onClick={() => handleGenUIAction({ type: 'open_filter_form' })} disabled={isRunning || isRestoring}><SlidersHorizontal size={15} /> تغییر شرایط</button>}
+                      {isCurrentResult && <button type="button" className="mission-edit-filters" onClick={() => handleGenUIAction({ type: 'open_filter_form' })} disabled={isRunning || isRestoring}><SlidersHorizontal size={15} /> تغییر شرایط</button>}
                     </div>
                   </div>
-                  {isCurrent && selectedCompareProductIds.length > 0 && <p className="mission-compare-hint">{money.format(selectedCompareProductIds.length)} گزینه برای مقایسه انتخاب شده؛ حداکثر ۳ گزینه.</p>}
-                  {isCurrent && comparisonComponents.length > 0 && <GenUIRenderer components={comparisonComponents} defaults={{ query: lastQuery, max_price_toman: budget, must_have_in_person_credit: mustHaveCredit, sort: constraints.sort ?? 'relevance' }} disabled={isRunning || isRestoring} onAction={handleGenUIAction} />}
+                  {isCurrentResult && selectedCompareProductIds.length > 0 && <p className="mission-compare-hint">{money.format(selectedCompareProductIds.length)} گزینه برای مقایسه انتخاب شده؛ حداکثر ۳ گزینه.</p>}
+                  {isCurrentResult && comparisonComponents.length > 0 && <GenUIRenderer components={comparisonComponents} defaults={{ query: lastQuery, max_price_toman: budget, must_have_in_person_credit: mustHaveCredit, sort: constraints.sort ?? 'relevance' }} disabled={isRunning || isRestoring} onAction={handleGenUIAction} />}
                   <ProductResults
                     results={item.results}
                     missionId={missionId ?? ''}
                     onContact={contact}
                     contactingOfferId={contactingOfferId}
                     contactByOffer={contactByOffer}
-                    selectedCompareProductIds={isCurrent ? selectedCompareProductIds : []}
+                    selectedCompareProductIds={isCurrentResult ? selectedCompareProductIds : []}
                     onToggleCompare={toggleComparedProduct}
                     offerViews={offerViews}
                     onToggleOffers={toggleProductOffers}
                     onLoadMoreOffers={loadMoreProductOffers}
-                    allowActions={isCurrent}
+                    allowActions={isCurrentResult}
                   />
                 </div>
               )}
@@ -1210,8 +1211,15 @@ export function MissionPanel({
             })}</ol>
           </details>
         )}
-        <div ref={transcriptEndRef} />
       </div>
+
+      <dialog ref={filterDialogRef} className="mission-filter-dialog" onClose={() => setActiveFilterForm(null)} aria-labelledby="filter-dialog-title">
+        <div className="mission-filter-dialog-head">
+          <h2 id="filter-dialog-title">تغییر شرایط خرید</h2>
+          <button type="button" aria-label="بستن تنظیمات" onClick={() => setActiveFilterForm(null)}><X size={20} /></button>
+        </div>
+        {activeFilterForm && <GenUIRenderer key={activeFilterForm.id} components={[activeFilterForm]} defaults={{ query: lastQuery, max_price_toman: budget, must_have_in_person_credit: mustHaveCredit, sort: constraints.sort ?? 'relevance' }} disabled={isRunning || isRestoring} onAction={handleGenUIAction} />}
+      </dialog>
 
       {error && <div className="conversation-error" role="alert"><AlertCircle size={17} /><span>{error}</span><button type="button" onClick={() => setError(null)}>بستن</button></div>}
       {isRunning && <div className="conversation-running-note" role="status" aria-live="polite"><span className="mission-progress-dot" />{stageLabel ?? 'در حال بررسی درخواست'}<span className="conversation-running-sub">اطلاعات محصول و شروط خرید در حال بررسی است</span></div>}
