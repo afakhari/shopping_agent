@@ -12,6 +12,7 @@ import { resolveRecoveryOffer } from './recovery-options'
 import { chooseProductHighlights } from './product-highlights'
 import { ActiveShoppingFilters } from './ActiveShoppingFilters'
 import { sellerHighlights } from './seller-highlights'
+import { formatCatalogPrice } from './catalog-pricing'
 import {
   createContactAttempt,
   createMission,
@@ -35,11 +36,7 @@ const OUTCOME_LABELS: Record<ContactAttemptResponse['attempt']['outcome'], strin
 }
 
 function formatPrice(price: string | null): string {
-  if (!price) return 'قیمت ثبت نشده'
-  try {
-    if (!/^\\d+(?:\\.0+)?$/.test(price)) return 'قیمت نامشخص'
-    return `${money.format(BigInt(price.split('.')[0]))} تومان`
-  } catch { return 'قیمت نامشخص' }
+  return formatCatalogPrice(price)
 }
 
 function formatRegisteredWarranty(warranty: CatalogOffer['warranty']): string | null {

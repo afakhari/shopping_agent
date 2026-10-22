@@ -1,16 +1,12 @@
 import { ArrowLeft, RotateCcw, ShieldCheck, Store } from 'lucide-react'
 import type { GenUIAction, GenUIComponent } from './genui-types'
 import { readRecoveryChoices, type RecoveryChoice } from './recovery-options'
+import { formatCatalogPrice } from './catalog-pricing'
 
 const toman = new Intl.NumberFormat('fa-IR', { maximumFractionDigits: 0 })
 
 function displayPrice(price: string | null): string {
-  if (!price) return 'قیمت ثبت نشده'
-  try {
-    return `${toman.format(BigInt(price.split('.')[0]))} تومان`
-  } catch {
-    return 'قیمت نامشخص'
-  }
+  return formatCatalogPrice(price)
 }
 
 function RecoveryRow({ choice, disabled, onAction }: {
