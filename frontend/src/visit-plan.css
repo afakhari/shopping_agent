@@ -1,0 +1,25 @@
+/* Complete visit plan: distinct primary and unverified backup, keyboard-friendly map action. */
+.genui-visit-backup {
+  display: grid;
+  gap: 6px;
+  margin: 14px 0;
+  padding: 14px;
+  border: 1px solid #dce6df;
+  border-radius: 12px;
+  background: #f7faf8;
+}
+.genui-visit-backup > strong { color: #204c37; font-size: 14px; }
+.genui-visit-backup > div { display: grid; gap: 4px; }
+.genui-visit-backup span { font-weight: 650; }
+.genui-visit-backup small { color: #63766a; font-size: 12px; line-height: 1.7; }
+.genui-visit-navigation {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 44px;
+  margin-block: 8px 12px;
+  padding-inline: 15px;
+  text-decoration: none;
+}
+.genui-visit-navigation:focus-visible { outline: 2px solid #176b4d; outline-offset: 3px; }

@@ -7,6 +7,7 @@ import './styles-polish.css'
 import './chat-shell.css'
 import './design-system.css'
 import './result-cards.css'
+import './visit-plan.css'
 
 const queryClient = new QueryClient({
   defaultOptions: {

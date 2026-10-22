@@ -276,6 +276,17 @@ function ComparisonTable({ component }: { component: GenUIComponent }) {
 
 function VisitPlan({ component }: { component: GenUIComponent }) {
   const details = Array.isArray(component.data.details) ? component.data.details.filter(isRecord) : []
+  const rawLocation = text(component.data.navigation_url)
+  let safeLocation: string | null = null
+  try {
+    const parsed = new URL(rawLocation)
+    if (parsed.protocol === 'https:' && parsed.hostname === 'www.openstreetmap.org') {
+      safeLocation = parsed.toString()
+    }
+  } catch {
+    // Ignore missing or invalid map URLs.
+  }
+  const backup = isRecord(component.data.backup_seller) ? component.data.backup_seller : null
   return (
     <section className="genui-visit-plan">
       <div className="genui-card-heading"><span className="genui-icon"><MapPin size={17} /></span><div><h4>{text(component.data.title, 'برنامه مراجعه')}</h4><p>{text(component.data.description, 'پیش از حرکت، اطلاعات زیر را مرور کن.')}</p></div></div>
@@ -289,6 +300,21 @@ function VisitPlan({ component }: { component: GenUIComponent }) {
         }
         return <div key={String(detail.key ?? index)}><dt>{text(detail.label, 'اطلاعات')}</dt><dd>{value}</dd></div>
       })}</dl>
+      <section className="genui-visit-backup" aria-label="فروشنده پشتیبان">
+        <strong>فروشنده پشتیبان</strong>
+        {backup ? (
+          <div>
+            <span>{text(backup.name, 'فروشگاه جایگزین')}</span>
+            <small>{text(backup.address, 'نشانی ثبت نشده')}</small>
+            <small>{text(backup.status, 'موجودی استعلام نشده')}</small>
+          </div>
+        ) : <small>در داده‌های تحت پوشش فروشنده پشتیبان واجد شرایط دیگری پیدا نشد.</small>}
+      </section>
+      {safeLocation && (
+        <a className="genui-primary-action genui-visit-navigation" href={safeLocation} target="_blank" rel="noopener noreferrer">
+          <MapPin size={16} /> نمایش موقعیت فروشگاه روی نقشه <ArrowLeft size={15} />
+        </a>
+      )}
       <p className="genui-data-caveat">قیمت فهرست‌شده، به‌تنهایی تأیید موجودی خارج از سناریوی دمو نیست.</p>
     </section>
   )
