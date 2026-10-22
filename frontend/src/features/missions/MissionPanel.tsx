@@ -11,6 +11,7 @@ import { getResultPayload, getUIComponents, type GenUIAction, type GenUIComponen
 import { resolveRecoveryOffer } from './recovery-options'
 import { chooseProductHighlights } from './product-highlights'
 import { ActiveShoppingFilters } from './ActiveShoppingFilters'
+import { sellerHighlights } from './seller-highlights'
 import {
   createContactAttempt,
   createMission,
@@ -332,34 +333,50 @@ function ProductResults({
                   {offerView.loading && offerView.offers.length === 0 && <div className="mission-offer-state"><LoaderCircle size={17} className="spin" /> در حال دریافت فروشگاه‌های واجد شرایط…</div>}
                   {offerView.error && <div className="mission-offer-error" role="alert"><span>{offerView.error}</span><button type="button" onClick={() => onToggleOffers(result)}>تلاش دوباره</button></div>}
                   {!offerView.loading && !offerView.error && offerView.offers.length === 0 && <p className="mission-offer-state">فروشگاهی با این شروط برای این مدل پیدا نشد.</p>}
+                  {offerView.offers.length > 1 && (
+                    <p className="mission-offer-shortlist-note">برچسب‌های مقایسه فقط بین فروشگاه‌های بارگذاری‌شده هستند؛ فاصله‌ها مستقیم و ساعت کار طبق داده ثبت‌شده است.</p>
+                  )}
                   {offerView.offers.map((sellerOffer) => {
                     const attempt = contactByOffer[sellerOffer.id]
                     const sellerDistance = formatDistance(sellerOffer.shop.distance_m)
                     const sellerUpdatedAt = formatPersianDateTime(sellerOffer.last_price_changed_at)
                     const sellerMapUrl = openStreetMapUrl(sellerOffer.shop.lat, sellerOffer.shop.lon)
                     const inlineMapUrl = osmEmbedUrl(sellerOffer.shop.lat, sellerOffer.shop.lon)
+                    const relativeTags = sellerHighlights(offerView.offers)
                     return (
                       <article className="mission-offer-row" key={sellerOffer.id}>
                         <div className="mission-offer-copy">
-                          <strong>{sellerOffer.shop.name}</strong>
-                          <span className="mission-offer-price">{formatPrice(sellerOffer.price_toman)}</span>
-                          {sellerOffer.seller_title && <small>عنوان ثبت‌شده فروشنده: {sellerOffer.seller_title}</small>}
-                          {formatRegisteredWarranty(sellerOffer.warranty) && <small>گارانتی ثبت‌شده: {formatRegisteredWarranty(sellerOffer.warranty)}</small>}
-                          <small><MapPin size={12} />{sellerOffer.shop.address ?? sellerOffer.shop.location_label ?? 'نشانی ثبت نشده'}</small>
-                          {sellerOffer.shop.opening_status && <small>{sellerOffer.shop.opening_status.label} (طبق ساعات ثبت‌شده، نه تأیید واقعی)</small>}
-                          {sellerOffer.shop.indoor_hints && [sellerOffer.shop.indoor_hints.mall, sellerOffer.shop.indoor_hints.floor, sellerOffer.shop.indoor_hints.unit].filter(Boolean).length > 0 && (
-                            <small>داخل مجتمع: {[sellerOffer.shop.indoor_hints.mall, sellerOffer.shop.indoor_hints.floor, sellerOffer.shop.indoor_hints.unit].filter(Boolean).join('، ')}</small>
-                          )}
-                          {sellerDistance && <small><LocateFixed size={12} />فاصله مستقیم: {sellerDistance}</small>}
-                          {sellerMapUrl && <a className="mission-offer-map" href={sellerMapUrl} target="_blank" rel="noopener noreferrer"><MapPin size={12} /> نمایش روی نقشه <ExternalLink size={11} /></a>}
-                          {inlineMapUrl && <button className="mission-inline-map-toggle" type="button" aria-expanded={openMapOfferId === sellerOffer.id} onClick={() => setOpenMapOfferId(current => current === sellerOffer.id ? null : sellerOffer.id)}>
-                            <MapPin size={12} />{openMapOfferId === sellerOffer.id ? 'بستن نقشه' : 'نقشه در همین صفحه'}
-                          </button>}
+                          <div className="mission-seller-heading">
+                            <strong>{sellerOffer.shop.name}</strong>
+                            <span className="mission-offer-price">{formatPrice(sellerOffer.price_toman)}</span>
+                          </div>
+                          <div className="mission-seller-quick-facts">
+                            {sellerOffer.id === relativeTags.cheapestOfferId && <span className="mission-seller-tag">ارزان‌ترین در فهرست</span>}
+                            {sellerOffer.id === relativeTags.closestOfferId && <span className="mission-seller-tag">نزدیک‌ترین در فهرست</span>}
+                            {sellerDistance && <span><LocateFixed size={12} aria-hidden="true" />{sellerDistance} فاصله مستقیم</span>}
+                            {sellerOffer.in_person_credit_eligible && <span><CreditCard size={12} aria-hidden="true" />اعتبار حضوری این آفر</span>}
+                          </div>
                           <div className="mission-offer-badges">
                             <span className={`mission-price-quality ${sellerOffer.price_quality}`}><i />{getPriceQualityLabel(sellerOffer.price_quality)}</span>
-                            <span className={`mission-shop-credit ${sellerOffer.in_person_credit_eligible ? 'registered' : 'unknown'}`}><CreditCard size={12} />{sellerOffer.in_person_credit_eligible ? 'اعتبار حضوری ثبت شده' : 'اعتبار حضوری برای این آفر ثبت نشده'}</span>
+                            {sellerOffer.shop.opening_status && <span>{sellerOffer.shop.opening_status.label}</span>}
                           </div>
-                          {sellerUpdatedAt && <small className="mission-offer-updated"><Clock3 size={12} />آخرین تغییر: {sellerUpdatedAt}</small>}
+                          <details className="mission-seller-details">
+                            <summary>آدرس، گارانتی و اطلاعات تکمیلی</summary>
+                            <div>
+                              {sellerOffer.seller_title && <small>عنوان فروشنده: {sellerOffer.seller_title}</small>}
+                              {formatRegisteredWarranty(sellerOffer.warranty) && <small>گارانتی ثبت‌شده: {formatRegisteredWarranty(sellerOffer.warranty)}</small>}
+                              <small><MapPin size={12} aria-hidden="true" />{sellerOffer.shop.address ?? sellerOffer.shop.location_label ?? 'نشانی ثبت نشده'}</small>
+                              {sellerOffer.shop.indoor_hints && [sellerOffer.shop.indoor_hints.mall, sellerOffer.shop.indoor_hints.floor, sellerOffer.shop.indoor_hints.unit].filter(Boolean).length > 0 && (
+                                <small>داخل مجتمع: {[sellerOffer.shop.indoor_hints.mall, sellerOffer.shop.indoor_hints.floor, sellerOffer.shop.indoor_hints.unit].filter(Boolean).join('، ')}</small>
+                              )}
+                              <small>اعتبار حضوری: {sellerOffer.in_person_credit_eligible ? 'برای این آفر ثبت‌شده' : 'برای این آفر ثبت نشده'}</small>
+                              {sellerUpdatedAt && <small><Clock3 size={12} aria-hidden="true" />آخرین تغییر قیمت ثبت‌شده: {sellerUpdatedAt}</small>}
+                              {sellerMapUrl && <a className="mission-offer-map" href={sellerMapUrl} target="_blank" rel="noopener noreferrer"><MapPin size={12} /> موقعیت روی نقشه <ExternalLink size={11} /></a>}
+                              {inlineMapUrl && <button className="mission-inline-map-toggle" type="button" aria-expanded={openMapOfferId === sellerOffer.id} onClick={() => setOpenMapOfferId(current => current === sellerOffer.id ? null : sellerOffer.id)}>
+                                <MapPin size={12} />{openMapOfferId === sellerOffer.id ? 'بستن نقشه' : 'نقشه در همین صفحه'}
+                              </button>}
+                            </div>
+                          </details>
                         </div>
                         {inlineMapUrl && openMapOfferId === sellerOffer.id && (
                           <div className="mission-inline-map" role="region" aria-label={`پیش‌نمایش نقشه فروشگاه ${sellerOffer.shop.name}`}>

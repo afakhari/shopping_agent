@@ -929,3 +929,31 @@
   .redesign-v2 .mission-compare-tray-actions .mission-compare-toggle { flex: 1; }
   .redesign-v2 .genui-comparison-table :is(th,td) { min-width: 118px; padding: 8px; }
 }
+
+
+/* Shop shortlists: scan the offers first, open merchant evidence only when useful. */
+.redesign-v2 .mission-offer-shortlist-note {
+  margin: 5px 0 10px; font-size: 11px; color: var(--bc-muted); line-height: 1.7;
+}
+.redesign-v2 .mission-seller-heading {
+  display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px;
+}
+.redesign-v2 .mission-seller-heading strong { font-size: 13px; color: var(--bc-ink); }
+.redesign-v2 .mission-seller-quick-facts { display: flex; flex-wrap: wrap; gap: 5px 10px; margin: 5px 0; }
+.redesign-v2 .mission-seller-quick-facts span {
+  display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--bc-muted);
+}
+.redesign-v2 .mission-seller-quick-facts .mission-seller-tag {
+  border-radius: 8px; background: #f5f4f2; color: #4f4b45; padding: 2px 7px;
+}
+.redesign-v2 .mission-seller-details { margin-top: 4px; min-width: 0; }
+.redesign-v2 .mission-seller-details summary {
+  min-height: 38px; display: inline-flex; align-items: center;
+  font-size: 11px; font-weight: 700; color: #902d3d; cursor: pointer;
+}
+.redesign-v2 .mission-seller-details > div { display: grid; gap: 4px; padding-bottom: 6px; }
+.redesign-v2 .mission-seller-details small { display: flex; gap: 5px; align-items: baseline; color: var(--bc-muted); overflow-wrap: anywhere; }
+@media (max-width: 550px) {
+  .redesign-v2 .mission-seller-heading { align-items: flex-start; }
+  .redesign-v2 .mission-seller-quick-facts { gap: 4px 7px; }
+}
