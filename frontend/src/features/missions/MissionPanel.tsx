@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { AlertCircle, ArrowLeft, CheckCircle2, ChevronDown, ChevronUp, Clock3, CreditCard, ExternalLink, Headphones, HeartPulse, Laptop, LoaderCircle, LocateFixed, MapPin, MapPinOff, PhoneCall, Send, ShieldCheck, SlidersHorizontal, Sparkles, Store, RotateCcw } from 'lucide-react'
 import { getProductOffers, type CatalogOffer, type CatalogSearchResult, type ProductOffersResponse } from '../search/catalog-api'
+import { buildComparisonSpecColumns } from './comparison-specs'
 import { GenUIRenderer } from './GenUIRenderer'
 import { formatDistance, formatLastPriceChange, getPriceQualityLabel, openStreetMapUrl } from './ui-formatters'
 import { getResultPayload, getUIComponents, type GenUIAction, type GenUIComponent } from './genui-types'
@@ -1047,6 +1048,7 @@ export function MissionPanel({
   }
 
   const selectedCompareResults = results.filter((result) => selectedCompareProductIds.includes(result.product.id))
+  const specComparison = buildComparisonSpecColumns(selectedCompareResults.map((result) => result.product))
   const comparisonColumns = [
     { key: 'product', label: 'محصول' },
     { key: 'price', label: 'قیمت ثبت‌شده' },
@@ -1055,8 +1057,9 @@ export function MissionPanel({
     { key: 'credit', label: 'خرید اعتباری حضوری' },
     { key: 'updated', label: 'آخرین تغییر قیمت' },
     { key: 'distance', label: 'فاصله مستقیم' },
+    ...specComparison.columns,
   ]
-  const comparisonRows = selectedCompareResults.map((result) => {
+  const comparisonRows = selectedCompareResults.map((result, index) => {
     const offer = result.best_offer
     let updated = 'زمان تغییر قیمت ثبت نشده'
     if (offer.last_price_changed_at) {
@@ -1072,6 +1075,7 @@ export function MissionPanel({
       credit: offer.shop.accepts_in_person_credit ? 'ثبت شده' : 'ثبت نشده',
       updated,
       distance: formatDistance(offer.shop.distance_m) ?? 'محاسبه نشده',
+      ...specComparison.valuesByProduct[index],
     }
   })
   const comparisonComponents: GenUIComponent[] = selectedCompareResults.length >= 2
