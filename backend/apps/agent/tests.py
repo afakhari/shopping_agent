@@ -135,6 +135,70 @@ class OptionalLLMAdapterTests(SimpleTestCase):
         self.assertEqual(request_body["max_completion_tokens"], 250)
         self.assertNotIn("max_tokens", request_body)
 
+    @override_settings(
+        LLM_ENABLED=True,
+        LLM_PROVIDER="boxapi",
+        LLM_API_KEY="test-secret-not-a-real-key",
+        LLM_MODEL="gpt-5.4-mini",
+        LLM_BASE_URL="https://ai.boxapi.ir/ai/v1",
+        LLM_TIMEOUT_SECONDS=15,
+    )
+    @patch("apps.agent.llm.urlopen")
+    def test_boxapi_hackathon_sends_only_documented_chat_fields(self, mocked_urlopen):
+        from apps.agent.llm import configuration_diagnostics, extract_intent
+
+        provider_payload = {
+            "choices": [{"message": {"content": json.dumps({
+                "search_query": "هدفون بی سیم",
+                "max_price_toman": 3000000,
+                "must_have_in_person_credit": True,
+                "sort": None,
+            }, ensure_ascii=False)}}]
+        }
+        mocked_urlopen.return_value = io.BytesIO(
+            json.dumps(provider_payload, ensure_ascii=False).encode("utf-8")
+        )
+        self.assertEqual(configuration_diagnostics()["status"], "configured")
+        result = extract_intent("هدفون بی سیم تا سقف ۳ میلیون تومان", {"city": "tehran"})
+        self.assertEqual(result["search_query"], "هدفون بی سیم")
+        self.assertEqual(result["max_price_toman"], "3000000")
+        request = mocked_urlopen.call_args.args[0]
+        self.assertEqual(request.full_url, "https://ai.boxapi.ir/ai/v1/chat/completions")
+        body = json.loads(request.data.decode("utf-8"))
+        self.assertEqual(set(body), {"model", "messages"})
+        self.assertEqual(body["model"], "gpt-5.4-mini")
+        self.assertEqual(mocked_urlopen.call_args.kwargs["timeout"], 15)
+
+    @override_settings(
+        LLM_ENABLED=True,
+        LLM_PROVIDER="boxapi",
+        LLM_API_KEY="test-secret",
+        LLM_MODEL="gpt-5.4-mini",
+        LLM_BASE_URL="https://attacker.example/ai/v1",
+    )
+    @patch("apps.agent.llm.urlopen")
+    def test_boxapi_key_is_never_sent_to_unexpected_host(self, mocked_urlopen):
+        from apps.agent.llm import configuration_diagnostics, extract_intent
+
+        self.assertEqual(configuration_diagnostics()["status"], "invalid_base_url")
+        self.assertIsNone(extract_intent("هدفون", {"city": "tehran"}))
+        mocked_urlopen.assert_not_called()
+
+    @override_settings(
+        LLM_ENABLED=True,
+        LLM_PROVIDER="boxapi",
+        LLM_API_KEY="test-secret",
+        LLM_MODEL="gpt-5.4-mini",
+        LLM_BASE_URL="http://ai.boxapi.ir/ai/v1",
+    )
+    @patch("apps.agent.llm.urlopen")
+    def test_boxapi_requires_https(self, mocked_urlopen):
+        from apps.agent.llm import configuration_diagnostics, extract_intent
+
+        self.assertEqual(configuration_diagnostics()["status"], "invalid_base_url")
+        self.assertIsNone(extract_intent("هدفون", {"city": "tehran"}))
+        mocked_urlopen.assert_not_called()
+
     @override_settings(LLM_ENABLED=True, LLM_PROVIDER="openai_compatible", LLM_API_KEY="", LLM_MODEL="")
     @patch("apps.agent.llm.urlopen")
     def test_unconfigured_adapter_returns_fallback_without_network(self, mocked_urlopen):
