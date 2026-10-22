@@ -8,7 +8,9 @@
 3. simulator باید server-owned، seedپذیر و قابل‌بازتولید باشد؛ تماس واقعی ادعا نشود.
 4. React UI فقط رویدادهای ساختاریافته و کامپوننت‌های allowlist را رندر کند؛ اجرای کد HTML/JS تولیدی LLM ممنوع.
 5. تمام ارقام فارسی/عربی/انگلیسی در ورودی نرمال شود؛ زمان مراجعه در Asia/Tehran سنجیده شود.
-6. تست‌ها، typecheck، lint و build باید در PR گزارش شوند. داده خام، .env، token یا mock secret هرگز commit نشود.
+6. در توسعه روزمره تست مرتبط و بررسی محلی کافی است و شکست موقت شاخه کاری قابل‌قبول است. پیش از ادغام تغییر بزرگ یا نسخه نهایی full quality-gates روی آخرین commit، تست مرورگر و گیت انتشار الزامی‌اند. داده خام، .env و token هرگز commit نشود.
 7. معماری و دیتاست فعلی قابل بازنگری‌اند. بازنویسی کامل فقط پس از benchmark و مقایسه هزینه/فایده؛ کد سالم را کورکورانه حذف نکن.
 8. هر PR باید user journey تحت‌تأثیر، acceptance criteria، تست انجام‌شده و screenshot موبایل/دسکتاپ (برای تغییر UI) را ذکر کند.
 9. اولویت: end-to-end golden path و UX و runtime deployment، نه معماری پرزرق‌وبرق.
+
+10. از اجرای غیرضروری GitHub Actions خودداری کن: فقط دستی در milestone، Ready for review و tag نسخه؛ workflow دیگر روی هر push اجرا نمی‌شود. docs/DEVELOPMENT-POLICY.fa.md را مطالعه کن.

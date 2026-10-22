@@ -1,12 +1,30 @@
+# Low-cost CI policy:
+# - NO automatic runs on ordinary branch/main pushes or PR synchronize.
+# - Full checks only when a draft PR becomes ready for review, on manual dispatch,
+#   or when a version tag is pushed.
+# - A manually dispatched run may not satisfy GitHub PR required status checks.
 name: quality-gates
+
 on:
-  push:
+  workflow_dispatch:
   pull_request:
+    types: [ready_for_review]
+    branches: [main]
+  push:
+    tags:
+      - 'v*'
+
 permissions:
   contents: read
+
+concurrency:
+  group: quality-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   frontend:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: frontend
@@ -22,8 +40,10 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run build
-  backend-static:
+
+  backend-static-and-docs:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -31,8 +51,12 @@ jobs:
           python-version: '3.13'
       - run: python -m compileall -q backend scripts
       - run: python scripts/verify_scaffold.py
+      - run: python scripts/verify_blueprint.py
+      - run: python -m unittest discover -s tests -p "test_contracts.py" -v
+
   backend-tests:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     services:
       postgres:
         image: postgres:16
@@ -56,6 +80,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
       - run: python -m pip install -r requirements-dev.txt
       - run: python -m pytest
       - run: ruff check .

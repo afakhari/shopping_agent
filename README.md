@@ -41,6 +41,10 @@ Scoring: Product 75, UX 75, Intelligence 50, Deployment 40, Engineering 40, Data
 
 - [Delivery status and outstanding steps](docs/DELIVERY-STATUS.fa.md)
 - [Implementation issues and acceptance criteria](https://github.com/afakhari/shopping_agent/issues)
-- [Workflow verification](https://github.com/afakhari/shopping_agent/actions/workflows/blueprint.yml)
+- [Workflow verification](https://github.com/afakhari/shopping_agent/actions/workflows/ci.yml)
 
-**Important:** CI now checks the React application build/tests and Django unit tests against PostgreSQL, but does not prove real dataset import, UX quality, end-to-end browser journeys or production deployment.
+**Important:** Full CI runs only on a PR becoming ready for review, manual dispatch, or version tags; it does not run on every development push. It still does not prove real dataset import, UX quality, browser journeys or production deployment. See [development policy](docs/DEVELOPMENT-POLICY.fa.md).
+
+## Fast development and efficient CI
+
+Development can be temporarily broken on feature branches. Run narrow local checks while iterating (`powershell -NoProfile -ExecutionPolicy Bypass -File scripts/quick-check.ps1 -Frontend` for Windows), then the full [quality-gates workflow](https://github.com/afakhari/shopping_agent/actions/workflows/ci.yml) at review/release milestones. The final candidate must be thoroughly verified. [سیاست تفصیلی](docs/DEVELOPMENT-POLICY.fa.md).
