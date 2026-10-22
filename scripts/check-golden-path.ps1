@@ -51,13 +51,13 @@ try {
             'apps.missions','apps.agent','apps.search','apps.health','apps.catalog','--noinput'
         )
     }
-    $containerId = (& docker compose ps -q backend | Select-Object -First 1).Trim()
-    if ($LASTEXITCODE -ne 0 -or -not $containerId) {
-        throw 'Backend container ID could not be obtained.'
-    }
-    # Copy the smoke helper into the existing container without rebuilding.
+    # Compose understands service names directly. Avoid resolving container IDs:
+    # Windows PowerShell 5.1 can treat a single/empty native pipeline value
+    # inconsistently, and Compose is already managing backend container identity.
+    # 'compose cp' transfers the raw UTF-8 bytes without recoding Persian text.
     Invoke-Docker 'Copy UTF-8 golden path smoke helper into backend' @(
-        'cp',(Join-Path $root 'scripts\smoke-golden-path.py'),"${containerId}:/tmp/bazaar-golden-path-smoke.py"
+        'compose','cp',(Join-Path $root 'scripts\smoke-golden-path.py'),
+        'backend:/tmp/bazaar-golden-path-smoke.py'
     )
     Invoke-Docker 'Real HTTP mission + SSE + seller simulation through frontend gateway' @(
         'compose','exec','-T','backend','python',
