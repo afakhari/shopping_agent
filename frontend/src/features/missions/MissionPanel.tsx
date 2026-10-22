@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { AlertCircle, ArrowLeft, CheckCircle2, ChevronDown, ChevronUp, Clock3, CreditCard, ExternalLink, Headphones, HeartPulse, Laptop, LoaderCircle, LocateFixed, MapPin, MapPinOff, PhoneCall, Send, ShieldCheck, SlidersHorizontal, Sparkles, Store, RotateCcw } from 'lucide-react'
 import { getProductOffers, type CatalogOffer, type CatalogSearchResult, type ProductOffersResponse } from '../search/catalog-api'
 import { buildComparisonSpecColumns } from './comparison-specs'
+import { isGreetingOnly } from './greeting-intent'
 import { GenUIRenderer } from './GenUIRenderer'
 import { formatDistance, formatLastPriceChange, getPriceQualityLabel, openStreetMapUrl } from './ui-formatters'
 import { getResultPayload, getUIComponents, type GenUIAction, type GenUIComponent } from './genui-types'
@@ -707,6 +708,25 @@ export function MissionPanel({
   const runTurn = async (turnMessage: string, turnConstraints: MissionConstraints = constraints, displayQuery = turnMessage) => {
     const trimmed = turnMessage.trim()
     if (!trimmed || isRunning || isRestoring) return
+    // A salutation is not a catalog query. Avoid irrelevant product recommendations
+    // and avoid creating a misleading purchase mission until a product intent exists.
+    if (isGreetingOnly(trimmed)) {
+      turnCounter.current += 1
+      const greetingId = `hello-${Date.now()}-${turnCounter.current}`
+      setChatMessages((current) => [
+        ...current,
+        { id: `user-${greetingId}`, role: 'user', text: trimmed, components: [] },
+        {
+          id: `assistant-${greetingId}`,
+          role: 'assistant',
+          text: 'سلام! خوش اومدی. 🌱 دنبال چه محصولی هستی؟ می‌تونی مدل، کاربرد یا حدود بودجه رو بگی تا گزینه‌های مناسب و فروشگاه‌های تهران رو بررسی کنیم.',
+          components: [],
+        },
+      ])
+      setMessage('')
+      setError(null)
+      return
+    }
     setError(null)
     setIsRunning(true)
     setStageLabel('در حال آماده‌سازی مأموریت خرید...')

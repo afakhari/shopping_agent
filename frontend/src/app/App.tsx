@@ -117,7 +117,7 @@ export default function App() {
           <div className="journey-side-note">
             <div className="journey-side-note-icon"><ShieldCheck size={19} /></div>
             <strong>شفافیت، قبل از خرید</strong>
-            <p>قیمت‌ها از دیتاست ثبت‌شده هستند؛ موجودی فروشگاه در این نسخه به‌صورت نمایشی بررسی می‌شود.</p>
+            <p>قیمت‌ها از دیتاست ثبت‌شده هستند؛ موجودی فروشگاه در این نسخه به‌صورت نمایشی بررسی می‌شود. بسیاری از نام‌ها و تمام شماره‌های تماس دیتاست مسابقه نیز ساختگی‌اند.</p>
             <a href="#conversation-composer">شروع گفتگوی خرید <ArrowUpLeft size={15} aria-hidden="true" /></a>
           </div>
           <p className="journey-sidebar-footer">نسخه آزمایشی · پوشش داده‌های فروشگاهی تهران</p>
