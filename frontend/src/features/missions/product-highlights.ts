@@ -15,6 +15,13 @@ const IMPORTANT_SPECS: Array<{match: RegExp; patterns: RegExp[]}> = [
 ]
 
 const EXCLUDED_KEYS = /^(?:نام محصول|عنوان محصول|کد محصول|شناسه کالا|بارکد|sku|مدل|برند|گارانتی)$/i
+const UNIVERSAL_PATTERNS = [
+  /ظرفیت|گنجایش|حجم|توان|قدرت/i,
+  /سایز|اندازه|ابعاد|قطر|طول/i,
+  /نوع|کاربرد|مناسب برای|عملکرد/i,
+  /جنس|متریال|وزن/i,
+  /رنگ/i,
+]
 
 /** Only show genuinely recorded catalog specifications. A missing field stays missing. */
 export function chooseProductHighlights(product: CatalogProduct, max = 2): ProductHighlight[] {
@@ -32,8 +39,10 @@ export function chooseProductHighlights(product: CatalogProduct, max = 2): Produ
   const category = `${product.category ?? ''} ${product.title ?? ''}`
   const patterns = IMPORTANT_SPECS.find((entry) => entry.match.test(category))?.patterns ?? []
   const score = (spec: ProductHighlight) => {
-    const index = patterns.findIndex((pattern) => pattern.test(spec.key))
-    return index < 0 ? patterns.length + 1 : index
+    const categoryIndex = patterns.findIndex((pattern) => pattern.test(spec.key))
+    if (categoryIndex >= 0) return categoryIndex
+    const universalIndex = UNIVERSAL_PATTERNS.findIndex((pattern) => pattern.test(spec.key))
+    return universalIndex >= 0 ? patterns.length + universalIndex : patterns.length + UNIVERSAL_PATTERNS.length
   }
   return specs
     .map((spec, index) => ({...spec, rank: score(spec), index}))

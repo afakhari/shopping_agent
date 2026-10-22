@@ -15,6 +15,15 @@ describe('catalog-grounded shopping highlights', () => {
     ]))
     expect(highlights).toEqual([{key:'شارژ باتری',value:'۱۲ ساعت'}, {key:'نوع اتصال',value:'بی‌سیم'}])
   })
+  it('favors useful size and type evidence for general shopping categories', () => {
+    const highlights = chooseProductHighlights(product([
+      {key:'کشور سازنده',value:'ایران'},
+      {key:'سایز کابل',value:'۲٫۵ میلی‌متر'},
+      {key:'نوع کابل',value:'افشان'},
+    ],'سیم و کابل برق ساختمان'))
+    expect(highlights.map(item=>item.key)).toEqual(['سایز کابل','نوع کابل'])
+  })
+
   it('does not invent values and ignores empty or placeholder specs', () => {
     expect(chooseProductHighlights(product([
       { key: 'باتری', value: 'نامشخص' }, { key: 'مدل', value: 'ساختگی' }, { key: 'رنگ', value: 'سفید' },
