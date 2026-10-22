@@ -47,7 +47,8 @@ export function getUIComponents(event: MissionEvent): GenUIComponent[] {
   const data = isRecord(event.payload.data) ? event.payload.data : {}
   if (type !== 'component_stack' && !ALLOWED_COMPONENT_TYPES.has(type)) return []
 
-  if (type === 'component_stack' && Array.isArray(data.components)) {
+  if (type === 'component_stack') {
+    if (!Array.isArray(data.components)) return []
     return data.components.slice(0, MAX_COMPONENTS_PER_EVENT).flatMap((item, index) => {
       if (!isRecord(item) || typeof item.type !== 'string'
         || !ALLOWED_COMPONENT_TYPES.has(item.type)) return []
