@@ -45,5 +45,8 @@ describe('safe contextual recovery UI', () => {
     expect(resolveRecoveryOffer(responses, 'offer-b', 'shop-wrong')).toBeNull()
     expect(resolveRecoveryOffer(responses, 'offer-not-listed', 'shop-b')).toBeNull()
     expect(resolveRecoveryOffer(responses, 'offer-model', 'shop-b')?.id).toBe('offer-model')
+    const malformed = { attempt: {}, alternatives: [null], alternative_products: [null] }
+      as unknown as ContactAttemptResponse
+    expect(resolveRecoveryOffer({ malformed }, 'offer-b', 'shop-b')).toBeNull()
   })
 })

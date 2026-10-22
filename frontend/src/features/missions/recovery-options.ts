@@ -72,14 +72,15 @@ export function resolveRecoveryOffer(
   shopId: string,
 ): CatalogOffer | null {
   for (const response of Object.values(responses)) {
-    const eligible: CatalogOffer[] = [
-      ...(Array.isArray(response.alternatives) ? response.alternatives : []),
-      ...(Array.isArray(response.alternative_products)
-        ? response.alternative_products.map((item) => item.best_offer)
-        : []),
-    ]
-    const found = eligible.find((item) => item && item.id === offerId && item.shop?.id === shopId)
-    if (found) return found
+    const alternateOffers: unknown[] = Array.isArray(response.alternatives)
+      ? response.alternatives : []
+    const models: unknown[] = Array.isArray(response.alternative_products)
+      ? response.alternative_products : []
+    for (const candidate of [...alternateOffers, ...models.map((item) => asRecord(item)?.best_offer)]) {
+      const offer = asRecord(candidate)
+      const shop = asRecord(offer?.shop)
+      if (offer?.id === offerId && shop?.id === shopId) return candidate as CatalogOffer
+    }
   }
   return null
 }
