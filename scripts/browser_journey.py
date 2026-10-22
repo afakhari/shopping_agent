@@ -73,7 +73,7 @@ def main() -> None:
                     assert page.locator(".genui-empty-state").count() == 0
                     composer.fill("راهنما")
                     page.get_by_role("button", name="ارسال پیام").click()
-                    page.get_by_text("برای شروع، نام یا کاربرد محصول را بنویس", exact=False).first.wait_for()
+                    page.get_by_text("برای شروع نام یا کاربرد محصول را بنویس", exact=False).first.wait_for()
                     assert_no_horizontal_overflow(page, width)
                     page.get_by_role("button", name="انتخاب دستی محدوده").click()
                     page.locator("#manual-tehran-region").select_option("jomhouri")

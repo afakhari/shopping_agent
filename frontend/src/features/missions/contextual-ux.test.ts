@@ -40,7 +40,7 @@ describe('evidence-first purchase flow', () => {
     expect(genUI).toContain('genui-empty-heading')
   })
   it('routes short help and greetings without starting a paid LLM request', () => {
-    expect(mission).toContain('isGreetingOnly(trimmed) || isAssistantHelpRequest(trimmed)')
+    expect(mission).toContain('const localIntent = classifyLocalConversation(trimmed)')
     const localIntents = readFileSync(new URL('./greeting-intent.ts', import.meta.url), 'utf8')
     expect(localIntents).toContain('چطور ازت استفاده کنم')
   })
