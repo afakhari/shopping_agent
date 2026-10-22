@@ -1,4 +1,0 @@
-Django==6.1.2
-djangorestframework==3.18.3
-psycopg[binary]==3.3.6
-langgraph==1.2.16

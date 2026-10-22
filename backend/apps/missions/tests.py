@@ -284,6 +284,6 @@ class MissionApiTests(TestCase):
             {"message": "هدفون", "constraints": {"max_price_toman": None}},
             format="json",
         )
-        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(response.status_code, 200)
         mission.refresh_from_db()
         self.assertIsNone(mission.constraints.get("max_price_toman"))
