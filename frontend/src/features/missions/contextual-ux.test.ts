@@ -26,3 +26,17 @@ describe('progressive shopping surface', () => {
     expect(mission).toContain('if (!results.length) setLastQuery(displayQuery.trim())')
   })
 })
+
+describe('mobile viewport containment', () => {
+  it('bounds the nested RTL flex/grid layout rather than cropping content', () => {
+    expect(styles).toContain('Mobile overflow guard:')
+    expect(styles).toContain('.redesign-v2 .journey-workspace,')
+    expect(styles).toContain('.redesign-v2 .conversation-panel,')
+    expect(styles).toContain('.redesign-v2 .conversation-welcome,')
+    expect(styles).toContain('.redesign-v2 .conversation-composer,')
+    expect(styles).toContain('min-inline-size: 0;')
+    expect(styles).toContain('max-inline-size: 100%;')
+    expect(styles).toContain('inline-size: calc(100% - 20px);')
+    expect(styles).toContain('grid-template-columns: minmax(0, 1fr);')
+  })
+})
