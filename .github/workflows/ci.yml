@@ -85,3 +85,62 @@ jobs:
       - run: python -m pip install -r requirements-dev.txt
       - run: python -m pytest
       - run: ruff check .
+
+  browser-journey:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: bazaar_compass_browser
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+    env:
+      DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/bazaar_compass_browser
+      DJANGO_SETTINGS_MODULE: config.settings.local
+      DJANGO_SECRET_KEY: ci-synthetic-browser-fixture-secret
+      LLM_ENABLED: '0'
+      DEMO_CONTACT_OUTCOMES: no_answer,confirmed_available
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install backend and browser test dependencies
+        run: |
+          python -m pip install -r backend/requirements-dev.txt playwright==1.55.0
+          python -m playwright install --with-deps chromium
+      - name: Install frontend
+        run: npm ci --prefix frontend
+      - name: Prepare synthetic catalog and run local services
+        run: |
+          python backend/manage.py migrate --noinput
+          python scripts/seed_browser_fixture.py
+          (cd backend; nohup python manage.py runserver 127.0.0.1:8000 > /tmp/bazaar-browser-backend.log 2>&1 &)
+          (cd frontend; nohup npm run dev -- --host 127.0.0.1 > /tmp/bazaar-browser-frontend.log 2>&1 &)
+      - name: Execute browser purchase and RTL regression
+        run: python scripts/browser_journey.py
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rtl-browser-journey
+          path: browser-artifacts/
+          if-no-files-found: ignore
+      - name: Service logs if unsuccessful
+        if: failure()
+        run: |
+          tail -n 120 /tmp/bazaar-browser-backend.log || true
+          tail -n 120 /tmp/bazaar-browser-frontend.log || true
