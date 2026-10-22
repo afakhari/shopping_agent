@@ -35,3 +35,12 @@ React + TypeScript + Vite، Django + DRF، PostgreSQL، LangGraph، controlled g
 
 ## Competition
 Scoring: Product 75, UX 75, Intelligence 50, Deployment 40, Engineering 40, Dataset 20 = **300**. Five-minute demo video is mandatory. The public data is a partial, selectively sampled Tehran catalog. All simulated merchant interactions must be clearly represented as simulated evidence.
+
+
+## Current GitHub delivery status
+
+- [Delivery status and outstanding steps](docs/DELIVERY-STATUS.fa.md)
+- [Implementation issues and acceptance criteria](https://github.com/afakhari/shopping_agent/issues)
+- [Workflow verification](https://github.com/afakhari/shopping_agent/actions/workflows/blueprint.yml)
+
+**Important:** GitHub Actions currently verifies the published blueprint and schemas, **not** the Django/React application. Import the sanitized source package and run full application CI before declaring the project deployable.
