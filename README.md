@@ -2,7 +2,7 @@
 
 **دستیار هوشمند خرید حضوری تهران** | Tehran in-person shopping copilot.
 
-> **وضعیت مخزن در این commit:** این مخزن شامل نقشه توسعه، قراردادها و برنامه اجرایی است. کد نسخه قبلی در بسته محلی پاک‌سازی‌شده آماده شده، اما **هنوز از طریق اتصال GitHub به این مخزن منتقل نشده است**. تا انتقال و اجرای CI، این مخزن را نسخه اجرایی محصول تلقی نکنید.
+> **وضعیت فعلی:** کد نسخه اولیه React و Django با [PR #9](https://github.com/afakhari/shopping_agent/pull/9) به `main` منتقل و CI شاخه وارداتی موفق شد. این فقط baseline قابل توسعه است؛ قابلیت‌های نسخه نهایی، واردکردن داده واقعی روی محیط عملیاتی، آزمون مرورگر و دیپلوی همچنان نیازمند اجرا و ارزیابی‌اند.
 
 ## مسئله
 کاربر می‌خواهد از «نمی‌دانم چه بخرم» به «کدام کالا، از کدام فروشنده، با چه شرایطی و چه زمانی مراجعه کنم» برسد. پنج تجربه متصل: کشف محصول، مقایسه محصول، کشف و مقایسه فروشگاه، استعلام کنترل‌شده فروشنده، برنامه مراجعه و بازیابی شکست.
@@ -30,8 +30,8 @@
 ## انتخاب فنی
 React + TypeScript + Vite، Django + DRF، PostgreSQL، LangGraph، controlled generative UI، MapLibre/سرویس نقشه سازگار با ایران. این‌ها **تصمیم معماری پیشنهادی** هستند؛ وضعیت اجرا در کد و خروجی تست تعیین می‌شود.
 
-## ارسال کد نسخه پایه به همین مخزن
-بسته **BazaarCompass-GitHub-Ready.zip** از گفتگو را روی سیستم دارای Git و احراز هویت GitHub استخراج کنید. سپس فایل‌ها را (به‌جز .git، .env، node_modules، محیط مجازی، CSV/ZIP دیتاست) روی نسخه clone شده همین مخزن کپی کنید و در یک شاخه جدید Pull Request بسازید. جزئیات در [راهنمای انتشار](docs/IMPORT-BASELINE.fa.md) آمده است. **روی main force-push نکنید.**
+## کد نسخه پایه
+پروژه شامل پوشه‌های `backend/`، `frontend/`، تنظیمات Docker و تست‌های اولیه است. [PR #9](https://github.com/afakhari/shopping_agent/pull/9) پس از اجرای موفق quality-gates روی شاخه وارداتی ادغام شد. برای وضعیت دقیق پیاده‌سازی و گام‌های بعدی، [گزارش تحویل](docs/DELIVERY-STATUS.fa.md) را ببینید.
 
 ## Competition
 Scoring: Product 75, UX 75, Intelligence 50, Deployment 40, Engineering 40, Dataset 20 = **300**. Five-minute demo video is mandatory. The public data is a partial, selectively sampled Tehran catalog. All simulated merchant interactions must be clearly represented as simulated evidence.
@@ -43,4 +43,4 @@ Scoring: Product 75, UX 75, Intelligence 50, Deployment 40, Engineering 40, Data
 - [Implementation issues and acceptance criteria](https://github.com/afakhari/shopping_agent/issues)
 - [Workflow verification](https://github.com/afakhari/shopping_agent/actions/workflows/blueprint.yml)
 
-**Important:** GitHub Actions currently verifies the published blueprint and schemas, **not** the Django/React application. Import the sanitized source package and run full application CI before declaring the project deployable.
+**Important:** CI now checks the React application build/tests and Django unit tests against PostgreSQL, but does not prove real dataset import, UX quality, end-to-end browser journeys or production deployment.

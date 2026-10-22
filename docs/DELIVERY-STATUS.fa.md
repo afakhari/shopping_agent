@@ -1,23 +1,25 @@
 # وضعیت تحویل و محدودیت‌های تأییدشده | 2026-10-22
 
-## انجام‌شده روی GitHub
-- مخزن موجود و مجوز نوشتن تأیید شد؛ LICENSE اولیه حفظ شده است.
-- سند نیازمندی، UX، معماری، مدل داده و جست‌وجو، ایجنت، API، کیفیت و نقشه راه روی شاخه main commit شده‌اند.
-- قراردادهای JSON Schema نسخه ۱ برای رویداد مأموریت، پاسخ استعلام و برنامه مراجعه اضافه شده‌اند.
-- هشت Issue با معیار پذیرش قابل‌ارزیابی ثبت شده است: https://github.com/afakhari/shopping_agent/issues
-- Workflow با عنوان blueprint-sanity روی commit 26077508438c848f065790a3ffa15346a88552ab با success پایان یافت. این بررسی فقط وجود اسناد و صحت نحوی JSON Schema و تست‌های ساختاری را پوشش می‌دهد.
+## منتشر و ادغام شد
+- مخزن [shopping_agent](https://github.com/afakhari/shopping_agent) روی شاخه main دارای کد واقعی React/TypeScript/Vite و Django/DRF، Docker، تست‌های پایه و اسناد فنی است.
+- [PR #9](https://github.com/afakhari/shopping_agent/pull/9) با روش squash در commit `4ba284eff35963fc1106dfe1e32151f0562c6863` ادغام شد.
+- پس از اصلاح آدرس اسناد منتقل‌شده و تست SSE، کیفیت CI شاخه ورودی موفق شد: [quality-gates](https://github.com/afakhari/shopping_agent/actions/runs/39785054519).
+- مراحل موفق: npm ci، typecheck، lint، frontend tests، build، کامپایل Python، بررسی scaffold، Django pytest و Ruff روی PostgreSQL مخصوص CI.
+- قراردادهای JSON Schema نسخه ۱، README، UX، PRD، ایجنت، API و نقشه راه به همراه [۸ Issue اجرایی](https://github.com/afakhari/shopping_agent/issues) ثبت شده‌اند.
+- بررسی مقدماتی بسته انتقال برای وجود فایل .env و الگوهای متداول کلیدهای خصوصی/توکن، مورد قطعی پیدا نکرد. این بررسی جایگزین اسکن امنیتی تخصصی نیست.
 
-## هنوز انجام‌نشده
-- انتقال تمام source code موجود در بسته محلی به GitHub. دلیل: اتصال GitHub تنها محتوای متنی را برای نوشتن مستقیم می‌پذیرد و شبکه container برای git push به github.com قابل دسترس نیست.
-- اجرای واقعی برنامه Django/React، import دیتاست، frontend build، backend pytest، test مرورگر، تماس با provider خارجی و دیپلوی.
-- ادغام شاخه import از طریق Pull Request.
+## هنوز تأیید نشده
+- استقرار برنامه روی سرور عمومی و health/readiness با دیتاست واقعی.
+- عملکرد مدل زبانی و SDK نقشه با کلید واقعی و سهمیه مناسب.
+- E2E مرورگر روی موبایل فارسی و معیارهای UX/دسترس‌پذیری.
+- مأموریت LangGraph ماندگار با checkpoint تولیدی، استعلام چندمنظوره و بازیابی کامل شکست.
+- دقیق‌بودن موتور جست‌وجو روی مجموعه golden query برچسب‌خورده.
+- صدور ویدئوی دموی مسابقه.
 
-## راه اقدام
-۱. بسته BazaarCompass-Shopping-Agent-Import-Ready.zip موجود در گفتگو را دانلود و استخراج کنید.
-۲. با Git احراز هویت کنید.
-۳. در ریشه بسته، python scripts/import_to_shopping_agent.py --push اجرا کنید.
-۴. از https://github.com/afakhari/shopping_agent/compare/main...bootstrap/import-existing-code?expand=1 یک Pull Request بسازید.
-۵. پس از بررسی اسرار، CI و تست‌ها، merge کنید.
+## گام‌های بعدی
+۱. [Issue #2](https://github.com/afakhari/shopping_agent/issues/2): dataset import با داده اصلی، readiness و build/deploy verification.
+۲. [Issue #3](https://github.com/afakhari/shopping_agent/issues/3) و [#4](https://github.com/afakhari/shopping_agent/issues/4): UX و بازیابی جست‌وجوی فارسی.
+۳. [Issue #5](https://github.com/afakhari/shopping_agent/issues/5) و [#6](https://github.com/afakhari/shopping_agent/issues/6): نقشه تهران و مأموریت ایجنت.
+۴. [Issue #7](https://github.com/afakhari/shopping_agent/issues/7) و [#8](https://github.com/afakhari/shopping_agent/issues/8): برنامه مراجعه، تست واقعی، دیپلوی و ویدئوی دمو.
 
-## معیار گزارش‌دهی
-تا زمانی که CI برنامه و deployment smoke tests واقعاً اجرا نشده‌اند از عبارت «نسخه عملیاتی آماده مسابقه» استفاده نشود. تغییر در UI و بک‌اند باید evidence قابل‌مشاهده داشته باشد.
+**معیار گزارش‌دهی:** سبزبودن CI پایه نشان می‌دهد کد موجود build و test می‌شود؛ به معنی اتمام محصول مسابقه یا readiness عملیاتی نیست.
