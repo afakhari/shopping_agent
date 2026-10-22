@@ -235,11 +235,11 @@ function ProductResults({
               </div>
               <div className="mission-product-meta">
                 <span className={`mission-price-quality ${offer.price_quality}`}><i />{getPriceQualityLabel(offer.price_quality)}</span>
-                <span className="mission-offer-count"><Store size={14} />{money.format(result.eligible_offers_count)} فروشگاه واجد شرایط</span>
+                <span className="mission-offer-count"><Store size={13} />{money.format(result.eligible_offers_count)} فروشگاه</span>
+                {offer.shop.accepts_in_person_credit && (
+                  <span className="mission-credit-confirmed"><CreditCard size={12} /> اعتباری</span>
+                )}
               </div>
-              {offer.shop.accepts_in_person_credit && (
-                <span className="mission-credit-confirmed"><CreditCard size={12} /> اعتباری</span>
-              )}
               <details className="mission-product-details">
                 <summary>
                   جزئیات
