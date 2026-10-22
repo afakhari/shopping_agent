@@ -228,6 +228,7 @@ function ProductResults({
         const offer = result.best_offer
         const contact = contactByOffer[offer.id]
         const offerView = offerViews[result.product.id]
+        const relativeTags = sellerHighlights(offerView?.offers ?? [])
         const offersPanelId = `seller-offers-${result.product.id.replace(/[^a-zA-Z0-9_-]/g, '-')}`
         const imageUrl = result.product.images.find((value) => /^https?:\/\//i.test(value))
         const address = offer.shop.address ?? offer.shop.location_label ?? 'نشانی ثبت نشده'
@@ -342,7 +343,6 @@ function ProductResults({
                     const sellerUpdatedAt = formatPersianDateTime(sellerOffer.last_price_changed_at)
                     const sellerMapUrl = openStreetMapUrl(sellerOffer.shop.lat, sellerOffer.shop.lon)
                     const inlineMapUrl = osmEmbedUrl(sellerOffer.shop.lat, sellerOffer.shop.lon)
-                    const relativeTags = sellerHighlights(offerView.offers)
                     return (
                       <article className="mission-offer-row" key={sellerOffer.id}>
                         <div className="mission-offer-copy">

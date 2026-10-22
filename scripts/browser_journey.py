@@ -79,6 +79,7 @@ def main() -> None:
                 )
                 page.get_by_role("button", name="ارسال پیام").click()
                 page.locator(".mission-product-card").first.wait_for()
+                assert page.locator(".mission-product-highlights").first.is_visible()
                 assert_no_horizontal_overflow(page, width)
                 page.screenshot(path=str(OUTPUT / f"products-{width}.png"), full_page=True)
 
@@ -86,6 +87,7 @@ def main() -> None:
                     page.locator(".mission-offers-toggle").first.click()
                     page.locator(".mission-offer-row").nth(1).wait_for()
                     assert page.locator(".mission-offer-row").count() == 2
+                    page.locator(".mission-seller-details summary").first.click()
                     page.locator(".mission-inline-map-toggle").first.click()
                     page.locator(".mission-inline-map iframe").first.wait_for()
                     # External tiles are optional; only the iframe's safe URL matters.
