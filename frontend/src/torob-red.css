@@ -1,0 +1,420 @@
+/* Bazaar Compass / Torob-inspired Red · Persian-first competition theme
+ * Last stylesheet. Uses the existing accessible UI without copying Torob branding.
+ * Semantics: red = action, green = confirmed state, amber = stale/uncertain data.
+ */
+:root {
+  color-scheme: light;
+  --bc-canvas: #fffbfa;
+  --bc-chat-canvas: #fffbfa;
+  --bc-surface: #fff;
+  --bc-surface-soft: #fff6f6;
+  --bc-surface-hover: #fff0f2;
+  --bc-ink: #263238;
+  --bc-chat-ink: #263238;
+  --bc-text: #3e464c;
+  --bc-muted: #626c73;
+  --bc-chat-muted: #626c73;
+  --bc-subtle: #788187;
+  --bc-border: #eae4e3;
+  --bc-border-strong: #dacdd0;
+  --bc-chat-border: #ebe4e3;
+  --bc-primary: #df2638;
+  --bc-primary-hover: #b91f30;
+  --bc-primary-pressed: #991b2b;
+  --bc-primary-soft: #fff0f2;
+  --bc-chat-accent: #df2638;
+  --bc-focus: #c22237;
+  --bc-success: #16815c;
+  --bc-success-soft: #e8f6ed;
+  --bc-warning: #986021;
+  --bc-warning-soft: #fff6e7;
+  --bc-chat-composer-shadow: 0 16px 36px rgba(61, 30, 34, .09), 0 2px 8px rgba(61, 30, 34, .04);
+}
+
+.redesign-v2 {
+  background: #fffbfa;
+  background-image: radial-gradient(ellipse at 0 5%, rgba(255, 230, 233, .65), transparent 35%),
+    radial-gradient(ellipse at 98% 95%, rgba(255, 244, 241, .55), transparent 35%);
+  color: #263238;
+}
+.redesign-v2 :is(button, a, summary, textarea, input, select):focus-visible {
+  outline-color: #e04858;
+  outline-offset: 3px;
+}
+.redesign-v2 .chat-topbar {
+  background: rgba(255,255,255,.96);
+  border-block-end-color: #f0e3e3;
+  box-shadow: 0 1px 12px rgba(56, 23, 30, .045);
+}
+.redesign-v2 .chat-brand-mark {
+  border-color: #ca2133;
+  background: linear-gradient(145deg, #f04350 0%, #df2638 52%, #b91f30 100%);
+  box-shadow: 0 8px 18px rgba(210, 35, 53, .18);
+}
+.redesign-v2 .chat-brand-copy strong { color: #242b31; }
+.redesign-v2 .chat-brand-copy small { color: #7a7e83; }
+.redesign-v2 .chat-location {
+  color: #58656c;
+  background: #faf9f8;
+  border-color: #e9e4e3;
+}
+.redesign-v2 .chat-service-status.online {
+  color: #166b50;
+  background: #edf8f1;
+  border-color: #c9e9d4;
+}
+
+/* Four honest informational stages above the purchasing workspace.
+   No permanently scrolling, mostly-empty sidebar. */
+.redesign-v2 .chat-main.journey-layout {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  width: min(1570px, 100%);
+  max-width: 1570px;
+  padding: clamp(10px, 1.4vw, 18px) clamp(10px, 1.8vw, 28px);
+}
+.redesign-v2 .journey-sidebar {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: clamp(14px, 2vw, 32px);
+  flex: 0 0 auto;
+  min-height: 104px;
+  overflow: visible;
+  padding: 14px clamp(13px, 1.8vw, 23px);
+  background: #fff;
+  border: 1px solid #f0e4e3;
+  border-radius: 17px;
+  box-shadow: 0 3px 15px rgba(61, 30, 34, .035);
+}
+.redesign-v2 .journey-sidebar-top {
+  width: clamp(190px, 21vw, 290px);
+  flex: 0 0 auto;
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  border-radius: 0;
+}
+.redesign-v2 .journey-sidebar-top::before { display: none; }
+.redesign-v2 .journey-sidebar-eyebrow {
+  color: #b91f30;
+  font-size: 11px;
+}
+.redesign-v2 .journey-sidebar-top h2 {
+  margin: 4px 0 0;
+  max-width: none;
+  color: #302d32;
+  font-size: clamp(14px, 1.2vw, 17px);
+  font-weight: 850;
+  line-height: 1.7;
+}
+.redesign-v2 .journey-sidebar-top p { display: none; }
+.redesign-v2 .journey-steps { flex: 1 1 auto; min-width: 0; }
+.redesign-v2 .journey-section-label {
+  color: #9b7479;
+  font-size: 10px;
+  margin: 0 0 6px;
+}
+.redesign-v2 .journey-steps ol {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(5px, .7vw, 12px);
+}
+.redesign-v2 .journey-steps ol::before { display: none; }
+.redesign-v2 .journey-steps li,
+.redesign-v2 .journey-steps li:first-child {
+  min-width: 0;
+  padding: 7px 6px;
+  background: #fffafa;
+  border: 1px solid #f3e9e8;
+  border-radius: 12px;
+}
+.redesign-v2 .journey-step-icon,
+.redesign-v2 .journey-steps li:first-child .journey-step-icon {
+  flex: 0 0 37px;
+  width: 37px;
+  height: 37px;
+  border-color: #f2dadd;
+  background: #fff0f2;
+  color: #c72437;
+  border-radius: 11px;
+}
+.redesign-v2 .journey-steps strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #3e3a3d;
+  font-size: 11px;
+}
+.redesign-v2 .journey-steps small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #898185;
+  font-size: 10px;
+}
+.redesign-v2 .journey-steps li b { display: none; }
+.redesign-v2 .journey-side-note,
+.redesign-v2 .journey-sidebar-footer { display: none; }
+.redesign-v2 .journey-workspace {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+}
+.redesign-v2 .conversation-panel {
+  min-height: 0;
+  border-color: #ede3e2;
+  border-radius: 19px;
+  box-shadow: 0 10px 36px rgba(57, 27, 32, .045);
+}
+.redesign-v2 .conversation-panel-header {
+  min-height: 60px;
+  background: #fff;
+  border-color: #f2e9e8;
+}
+.redesign-v2 .conversation-header-copy h2 { color: #352e32; }
+.redesign-v2 .conversation-header-copy p { color: #7c767a; }
+.redesign-v2 .conversation-reset {
+  color: #aa2636;
+  background: #fff8f8;
+  border-color: #f1dfe1;
+}
+.redesign-v2 .conversation-reset:hover:not(:disabled) {
+  background: #fff0f1;
+  border-color: #e7b4bd;
+}
+.redesign-v2 .conversation-transcript { scrollbar-color: #e1c7cb transparent; }
+.redesign-v2 .conversation-welcome .welcome-orb {
+  color: #fff;
+  background: linear-gradient(145deg, #f14f5a, #dc2538);
+  box-shadow: 0 13px 28px rgba(220, 37, 56, .15);
+}
+.redesign-v2 .conversation-welcome .welcome-kicker {
+  color: #ae2434;
+  background: #fff1f2;
+  border-color: #f5dce0;
+}
+.redesign-v2 .welcome-kicker-dot {
+  background: #e33a4b;
+  box-shadow: 0 0 0 3px rgba(224, 38, 56, .13);
+}
+.redesign-v2 .conversation-welcome h3 { color: #2c3034; }
+.redesign-v2 .conversation-welcome h3 span { color: #cc2739; }
+.redesign-v2 .conversation-welcome > p { color: #646a6e; }
+.redesign-v2 .welcome-prompt-heading strong { color: #333337; }
+.redesign-v2 .quick-prompt {
+  border-color: #f0e7e6;
+  background: #fff;
+}
+.redesign-v2 .quick-prompt:hover:not(:disabled) {
+  border-color: #e9a9b1;
+  background: #fff8f8;
+  box-shadow: 0 9px 24px rgba(164, 43, 59, .085);
+}
+.redesign-v2 .quick-prompt-icon,
+.redesign-v2 .quick-prompt:nth-child(2) .quick-prompt-icon,
+.redesign-v2 .quick-prompt:nth-child(3) .quick-prompt-icon,
+.redesign-v2 .quick-prompt:nth-child(4) .quick-prompt-icon {
+  background: #fff1f2;
+  border-color: #f5d9dd;
+  color: #c72537;
+}
+.redesign-v2 .quick-prompt-copy strong { color: #383136; }
+.redesign-v2 .quick-prompt-arrow,
+.redesign-v2 .welcome-trust-row svg { color: #c83444; }
+.redesign-v2 .user-bubble {
+  color: #77313d;
+  background: #fff0f2;
+  border-color: #f7dfe3;
+}
+.redesign-v2 .assistant-mini-avatar {
+  color: #c92d41;
+  background: #fff0f2;
+  border-color: #f3dade;
+}
+.redesign-v2 .assistant-message-heading strong { color: #b62537; }
+.redesign-v2 .assistant-message-copy { color: #4c5559; }
+.redesign-v2 .mission-results-header { border-color: #eee7e6; }
+.redesign-v2 .mission-results-kicker { color: #c02b3c; }
+.redesign-v2 .mission-results-header h3 { color: #303438; }
+.redesign-v2 .mission-results-header-actions > span {
+  color: #a92738;
+  background: #fff0f2;
+  border-color: #f5dade;
+}
+.redesign-v2 .mission-edit-filters {
+  color: #a12839;
+  background: #fff;
+  border-color: #e9dce0;
+}
+.redesign-v2 .mission-edit-filters:hover { background: #fff1f3; }
+.redesign-v2 .conversation-results-block .mission-product-results { gap: 16px; }
+.redesign-v2 .conversation-results-block .mission-product-card {
+  border-color: #eee6e5;
+  border-radius: 16px;
+  box-shadow: 0 4px 18px rgba(56, 28, 34, .035);
+}
+.redesign-v2 .conversation-results-block .mission-product-card:hover {
+  border-color: #e7b2ba;
+  box-shadow: 0 10px 25px rgba(129, 34, 50, .065);
+}
+.redesign-v2 .conversation-results-block .mission-product-card.is-compared {
+  border-color: #e3394c;
+  box-shadow: 0 0 0 2px rgba(223, 38, 56, .12);
+}
+.redesign-v2 .conversation-results-block .mission-product-image {
+  border-color: #f0ebeb;
+  background: #fffafa;
+}
+.redesign-v2 .mission-product-heading-row > strong { color: #303338; }
+.redesign-v2 .mission-product-price-wrap small { color: #848185; }
+.redesign-v2 .mission-product-price {
+  color: #ce2337;
+  font-size: clamp(18px, 1.5vw, 22px);
+  font-weight: 850;
+  font-variant-numeric: tabular-nums;
+}
+.redesign-v2 .mission-product-seller { color: #71797d; }
+.redesign-v2 .mission-product-seller svg { color: #a1a7a7; }
+.redesign-v2 .mission-offer-count,
+.redesign-v2 .mission-product-address-preview { color: #747d7e; }
+.redesign-v2 .mission-credit-confirmed,
+.redesign-v2 .mission-shop-credit.registered {
+  color: #18754e;
+  background: #ebf7ee;
+  border-color: #cce7d4;
+}
+.redesign-v2 .mission-product-details {
+  border-color: #f1e9e8;
+}
+.redesign-v2 .mission-product-details summary { color: #784e55; }
+.redesign-v2 .mission-offers-toggle,
+.redesign-v2 .genui-primary-action {
+  background: #df2638;
+  color: #fff;
+  border-color: #df2638;
+}
+.redesign-v2 .mission-offers-toggle:hover:not(:disabled),
+.redesign-v2 .genui-primary-action:hover:not(:disabled) {
+  background: #b91f30;
+  border-color: #b91f30;
+}
+.redesign-v2 .mission-compare-button {
+  color: #a82b39;
+  background: #fff;
+  border-color: #efd9dd;
+}
+.redesign-v2 .mission-compare-button:hover:not(:disabled) { background: #fff1f3; }
+.redesign-v2 .mission-more-results {
+  color: #9d2836;
+  border-color: #efdde0;
+  background: #fffafa;
+}
+.redesign-v2 .mission-more-results:hover { background: #fff1f2; }
+.redesign-v2 .conversation-results-block .mission-product-card.is-offers-expanded {
+  border-color: #df9ba5;
+  background: #fffdfd;
+}
+.redesign-v2 .conversation-results-block .mission-offer-list {
+  border-color: #f1dcdf;
+  background: #fff8f9;
+}
+.redesign-v2 .conversation-results-block .mission-offer-row {
+  border-color: #eee3e4;
+  background: #fff;
+}
+.redesign-v2 .mission-offer-price { color: #cf2639; }
+.redesign-v2 .genui-form,
+.redesign-v2 .genui-structured-card,
+.redesign-v2 .genui-visit-plan,
+.redesign-v2 .genui-empty-state { border-color: #ede2e3; }
+.redesign-v2 .genui-table-wrap { border-color: #efe3e5; }
+.redesign-v2 .genui-table th { background: #fff1f3; color: #8f2534; }
+.redesign-v2 .genui-table tbody tr:nth-child(even) { background: #fffaf9; }
+.redesign-v2 .genui-visit-backup {
+  background: #f3faf5;
+  border-color: #d9eddd;
+}
+.redesign-v2 .conversation-composer {
+  border-color: #ead2d5;
+  background: #fff;
+  box-shadow: var(--bc-chat-composer-shadow);
+}
+.redesign-v2 .conversation-composer:focus-within {
+  border-color: #db5260;
+  box-shadow: 0 0 0 3px rgba(223, 38, 56, .1), var(--bc-chat-composer-shadow);
+}
+.redesign-v2 .composer-tool {
+  color: #a13f4c;
+  background: #fff2f3;
+}
+.redesign-v2 .composer-tool:hover:not(:disabled) { background: #fbe3e7; }
+.redesign-v2 .composer-send {
+  background: #df2638;
+  color: #fff;
+}
+.redesign-v2 .composer-send:hover:not(:disabled) { background: #b91f30; }
+.redesign-v2 .composer-send:disabled {
+  background: #f6ecee;
+  color: #bcaab0;
+}
+.redesign-v2 .conversation-composer textarea::placeholder { color: #8b8c8f; }
+.redesign-v2 .conversation-disclaimer {
+  color: #74777c;
+  font-size: 11px;
+  line-height: 1.85;
+}
+
+/* Three genuine alternatives display as a balanced row, not two plus one orphan. */
+@media (min-width: 1350px) {
+  .redesign-v2 .conversation-results-block .mission-product-results:has(> .mission-product-card:nth-child(3):last-child) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+/* Without the extra rail, the screen is usable on small notebooks. */
+@media (max-width: 1200px) {
+  .redesign-v2 .chat-main.journey-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px;
+  }
+  .redesign-v2 .journey-sidebar { padding: 10px 12px; }
+  .redesign-v2 .journey-sidebar-top { width: 190px; }
+  .redesign-v2 .journey-steps small { display: none; }
+}
+/* Tablet/mobile keeps the existing compact journey ribbon, not two scrollers. */
+@media (max-width: 990px) {
+  .redesign-v2 .chat-main.journey-layout { display: block; }
+  .redesign-v2 .journey-sidebar { display: none; }
+  .redesign-v2 .journey-mobile-ribbon {
+    color: #ab2a3b;
+    background: #fff0f2;
+    border-color: #f0d7db;
+  }
+  .redesign-v2 .journey-ribbon-divider { background: #efc0c7; }
+}
+@media (max-width: 720px) {
+  .redesign-v2 .chat-main.journey-layout { padding: 0; }
+  .redesign-v2 .conversation-panel { border-radius: 0; }
+  .redesign-v2 .mission-product-heading-row > strong { font-size: 14px; }
+  .redesign-v2 .conversation-composer {
+    border-radius: 14px;
+    margin-bottom: 2px;
+  }
+}
+@media (max-width: 550px) {
+  .redesign-v2 .conversation-results-block .mission-product-results { grid-template-columns: minmax(0,1fr); }
+  .redesign-v2 .mission-product-actions button { min-height: 44px; }
+  .redesign-v2 .quick-prompt { min-height: 76px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .redesign-v2 :is(.mission-product-card, .quick-prompt, .mission-product-details summary svg) {
+    transition: none;
+  }
+}
+@media (forced-colors: active) {
+  .redesign-v2 .mission-offers-toggle,
+  .redesign-v2 .composer-send,
+  .redesign-v2 .chat-brand-mark { border: 1px solid ButtonText; }
+}
