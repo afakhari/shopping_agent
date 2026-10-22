@@ -1,0 +1,26 @@
+{
+  "report_version": 1,
+  "source": "starcoach-dataset-v16-cap300-csv.zip",
+  "started_at": "2026-10-21T21:15:24.014465+00:00",
+  "completed_at": "2026-10-21T21:19:02.110287+00:00",
+  "status": "import_complete",
+  "elapsed_seconds": 218.118,
+  "preflight": {
+    "rows:products.csv": 225903,
+    "rows:shops.csv": 6476,
+    "outlier_price_values": 144,
+    "rows:offers.csv": 331506,
+    "unique_product_ids": 225903,
+    "unique_shop_ids": 6476,
+    "unique_offer_ids": 331506
+  },
+  "import": {
+    "products_inserted": 225903,
+    "products_updated": 0,
+    "shops_inserted": 6476,
+    "shops_updated": 0,
+    "offers_inserted": 331506,
+    "offers_updated": 0,
+    "offers_skipped_orphan": 0
+  }
+}
