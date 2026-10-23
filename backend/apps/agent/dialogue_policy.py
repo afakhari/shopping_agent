@@ -107,6 +107,17 @@ def resolve_dialogue_policy(
         }
 
     if pending and pending["slot"] == "product_kind":
+        # The clarification itself may contain a genuine technical question.
+        # Answer it first, but carry the unresolved usage slot forward so the
+        # next turn can continue without redoing the original product guess.
+        if _LAPTOP.search(normalized) and _GPU.search(normalized) and asking:
+            return {
+                "kind": "advice", "reply": _laptop_advice(),
+                "pending_dialogue": {
+                    "slot": "laptop_usage",
+                    **({"budget": pending["budget"]} if pending.get("budget") else {}),
+                },
+            }
         if _LAPTOP.search(normalized):
             return {
                 "kind": "clarify",
