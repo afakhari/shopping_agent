@@ -77,6 +77,11 @@ def eligible_offers(filters: dict[str, Any], *, include_distance: bool | None = 
     if budget is not None:
         qs = qs.filter(price_toman__gt=0, price_toman__lte=budget)
 
+    if filters.get("brand_name"):
+        qs = qs.filter(product__brand_name__iexact=filters["brand_name"])
+    if filters.get("model_exact"):
+        qs = qs.filter(product__model__iexact=filters["model_exact"])
+
     if filters.get("must_have_in_person_credit"):
         # An in-person provider must cover this *offer*, not merely the shop.
         qs = qs.filter(eligible_credit_offer_query())
