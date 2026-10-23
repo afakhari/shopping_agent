@@ -44,6 +44,7 @@ export function SellerLocationBoard({
   const [openMapOfferId, setOpenMapOfferId] = useState<string | null>(null)
   const [routingCapability, setRoutingCapability] = useState<{missionId: string; data: RoutingCapability} | null>(null)
   const [routingCheckedMission, setRoutingCheckedMission] = useState<string | null>(null)
+  const [capabilityError, setCapabilityError] = useState<{missionId: string; text: string} | null>(null)
   const [routeMode, setRouteMode] = useState<'car' | 'motorcycle'>('car')
   const [routeBusy, setRouteBusy] = useState(false)
   const [routeResult, setRouteResult] = useState<{scope: string; data: RouteEstimateResponse} | null>(null)
@@ -61,6 +62,7 @@ export function SellerLocationBoard({
   ).slice(0, 5)
   const routingChecked = routingCheckedMission === missionId
   const activeCapability = routingCapability?.missionId === missionId ? routingCapability.data : null
+  const visibleCapabilityError = capabilityError?.missionId === missionId ? capabilityError.text : null
   // A late answer for an old mission, result set, origin, mode or seller list
   // is kept out of sight, even if the provider response arrives successfully.
   const routeScope = routeEvidenceScope({
@@ -69,13 +71,14 @@ export function SellerLocationBoard({
   const visibleRouteResult = currentRouteEvidence(routeResult, routeScope, disabled)?.data ?? null
   const visibleRouteError = currentRouteEvidence(routeError, routeScope, disabled)?.message ?? null
 
-  const checkRouting = (opened: boolean) => {
-    if (!opened || disabled || !resultSetId || routingChecked || !missionId) return
+  const checkRouting = (opened: boolean, force = false) => {
+    if (!opened || disabled || !resultSetId || (!force && routingChecked) || !missionId) return
     setRoutingCheckedMission(missionId)
+    setCapabilityError(null)
     void getRoutingCapability(missionId)
       .then(data => setRoutingCapability({missionId, data}))
-      .catch(() => setRouteError({scope: routeScope,
-        message: 'وضعیت سرویس مسیریابی در دسترس نیست؛ فهرست و مکان ثبت‌شده برقرار است.'}))
+      .catch(() => setCapabilityError({missionId,
+        text: 'وضعیت سرویس مسیریابی در دسترس نیست؛ فهرست و مکان ثبت‌شده برقرار است.'}))
   }
 
   const calculateRoutes = async () => {
@@ -164,7 +167,12 @@ export function SellerLocationBoard({
           <p>این بخش فقط در صورت فعال‌بودن سرویس، بعد از انتخاب مبدأ و درخواست مستقیم تو محاسبه می‌شود.
             زمان‌های نشان تخمینی‌اند؛ نام فروشگاه‌ها و موجودی آن‌ها تأیید نشده‌اند.</p>
           {!routingChecked && <small>وضعیت سرویس پس از بازکردن این بخش بررسی می‌شود.</small>}
-          {routingChecked && !activeCapability && !visibleRouteError && <small>در حال بررسی قابلیت مسیریابی…</small>}
+          {routingChecked && !activeCapability && !visibleCapabilityError && <small>در حال بررسی قابلیت مسیریابی…</small>}
+          {visibleCapabilityError && <div role="status">
+            <p>{visibleCapabilityError}</p>
+            <button type="button" disabled={disabled}
+              onClick={() => checkRouting(true, true)}>تلاش دوباره برای بررسی سرویس</button>
+          </div>}
           {activeCapability && !activeCapability.enabled && <p role="status">
             اتصال مسیریابی نشان هنوز فعال نشده است. فهرست و نشانی‌های ثبت‌شده همچنان قابل استفاده‌اند.
           </p>}
