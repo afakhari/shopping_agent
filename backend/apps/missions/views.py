@@ -569,6 +569,11 @@ def mission_focus(request, mission_id: str):
                 raise ValidationError({"offer_id": "این آفر دیگر با شروط مأموریت مطابقت ندارد."})
             state.update(active_surface="sellers", selected_offer_id=offer_id,
                          selected_shop_id=offer.shop_id)
+        if state == (mission.state or {}):
+            return Response({
+                "state": mission.state, "last_event_seq": mission.last_event_seq,
+                "events": [],
+            })
         mission.state = state
         mission.save(update_fields=["state", "updated_at"])
         events = append_events_locked(mission, [("focus.updated", {
