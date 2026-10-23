@@ -103,6 +103,26 @@ class ContextualMissionApiTests(TestCase):
         self.mission_id = created.json()["mission_id"]
         self.turn("هدفون")
 
+    def test_explicit_brand_model_are_true_hard_offer_filters(self):
+        self.first.brand_name = "برند الف"
+        self.first.model = "A1"
+        self.first.save(update_fields=["brand_name", "model"])
+        self.second.brand_name = "برند ب"
+        self.second.model = "B2"
+        self.second.save(update_fields=["brand_name", "model"])
+        created = self.client.post("/api/v1/missions/", {
+            "initial_message": "هدفون",
+            "constraints": {"brand_name": "برند الف", "model_exact": "A1"},
+        }, format="json")
+        self.assertEqual(created.status_code, 201)
+        self.mission_id = created.json()["mission_id"]
+        self.turn("هدفون")
+        mission = PurchaseMission.objects.get(pk=self.mission_id)
+        self.assertEqual(mission.state["candidate_product_ids"], [self.first.source_id])
+        filters = mission.constraints
+        self.assertEqual(filters["brand_name"], "برند الف")
+        self.assertEqual(filters["model_exact"], "A1")
+
     def turn(self, message):
         response = self.client.post(
             f"/api/v1/missions/{self.mission_id}/turns/",
