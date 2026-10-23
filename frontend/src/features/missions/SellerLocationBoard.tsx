@@ -171,7 +171,7 @@ export function SellerLocationBoard({
                   {!origin && <small>برای لینک مسیریابی از محدوده انتخابی، ابتدا مبدأ تهران را در فیلترها تعیین کن.</small>}
                   {(neshanPoint || neshanDrive) && <small>
                     با بازکردن این لینک، مختصات مربوطه به نشان ارسال می‌شود. ممکن است نشان مسیر را در سایت یا اپ خودش نمایش دهد؛
-                    این کار به معنی وجود فروشگاه در آن نقطه، بازبودن یا موجودی واقعی نیست. هزینه API پروژه ایجاد نمی‌شود.
+                    این کار به معنی وجود فروشگاه در آن نقطه، بازبودن یا موجودی واقعی نیست. این لینک از سهمیه API مسیریابی پروژه استفاده نمی‌کند.
                   </small>}
                   {externalUrl && !disabled && <a href={externalUrl} target="_blank" rel="noopener noreferrer">
                     <ExternalLink size={13} aria-hidden="true" /> بازکردن نقطه در OpenStreetMap
