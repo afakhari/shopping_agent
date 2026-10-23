@@ -210,6 +210,7 @@ export async function sendMissionTurn(
 export interface RoutingCapability {
   provider: 'neshan'
   enabled: boolean
+  direction_enabled?: boolean
   modes: Array<'car' | 'motorcycle'>
 }
 
@@ -217,6 +218,14 @@ export interface RouteEstimateResponse {
   provider: 'neshan'
   mode: 'car' | 'motorcycle'
   status: 'ok' | 'unavailable'
+  service?: 'matrix' | 'direction'
+  route?: {
+    offer_id: string
+    status: 'ok'
+    duration_seconds: number
+    route_distance_meters: number
+    encoded_polyline?: string
+  }
   reason?: string
   measured_at?: string
   estimates: Array<{
@@ -243,6 +252,7 @@ export async function requestRouteEstimates(
     origin: { lat: number; lon: number; source: 'manual_region' }
     offer_ids: string[]
     mode: 'car' | 'motorcycle'
+    service?: 'matrix' | 'direction'
   },
   signal?: AbortSignal,
 ): Promise<RouteEstimateResponse> {
