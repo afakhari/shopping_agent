@@ -84,6 +84,15 @@ describe('controlled Generative UI protocol', () => {
     }))).toEqual([])
   })
 
+  it('requires explicit approximate-Tehran provenance for location UI', () => {
+    expect(getUIComponents(event('location_choice', {
+      city: 'tehran', source_type: 'approximate_region',
+    }))).toHaveLength(1)
+    expect(getUIComponents(event('location_choice', {
+      city: 'berlin', source_type: 'precise_live_gps',
+    }))).toEqual([])
+  })
+
   it('limits one incoming component stack to twelve entries', () => {
     const components = getUIComponents(event('component_stack', {
       components: Array.from({ length: 30 }, () => ({ type: 'notice', data: { message: 'notice' } })),
