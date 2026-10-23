@@ -992,3 +992,7 @@
   .redesign-v2 .genui-visit-key-facts { grid-template-columns: minmax(0,1fr); }
   .redesign-v2 .genui-visit-key-facts > div:has(dt:first-child):nth-child(4) { grid-column: auto; }
 }
+
+
+/* Adaptive shopping: numbered, referencable product choices. */
+.mission-product-rank { display:inline-flex; align-items:center; justify-content:center; flex:0 0 1.75rem; min-width:1.75rem; height:1.75rem; border-radius:.5rem; background:#fff0f1; color:#9f1c30; font-weight:800; font-variant-numeric:tabular-nums; }
