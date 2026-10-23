@@ -362,6 +362,60 @@ class ContextualMissionApiTests(TestCase):
         self.assertNotIn("ui.component", [e["type"] for e in events])
         self.assertIn("کاربرد", events[1]["payload"]["text"])
 
+    def test_video_editing_budget_followup_returns_only_laptops_ranked_by_evidence(self):
+        shop = Shop.objects.get(source_id="context_shop")
+        records = (
+            ("edit_laptop", "لپ تاپ تدوین نمونه", "لپ تاپ و نوت بوک", "تدوین", 155000000),
+            ("basic_laptop", "لپ تاپ اداری نمونه", "لپ تاپ و نوت بوک", "اداری", 90000000),
+            ("overbudget_laptop", "لپ تاپ حرفه ای تدوین", "لپ تاپ و نوت بوک", "تدوین", 210000000),
+            ("video_bag", "کیف ویدیو پروژکتور ارزان", "کیف و کاور ویدیو پروژکتور", "تدوین", 1000000),
+        )
+        for pid, title, category, usage, price in records:
+            product = Product.objects.create(
+                source_id=pid, persian_title=title,
+                normalized_title=normalize_persian_text(title),
+                category_name=category,
+                specs=[{"key": "کاربری", "value": usage, "section": "مشخصات"}],
+            )
+            Offer.objects.create(
+                source_id=f"video_offer_{pid}", product=product,
+                shop=shop, price_toman=Decimal(price),
+            )
+        mission = PurchaseMission.objects.get(pk=self.mission_id)
+        previous_results = list(mission.state["candidate_product_ids"])
+        with patch("apps.missions.views.extract_intent") as paid_model:
+            first = self.turn("چه لپ تاپی برای تدوین ویدیو مناسب من هست؟")
+            paid_model.assert_not_called()
+            self.assertNotIn("ui.component", [event["type"] for event in first])
+            mission.refresh_from_db()
+            self.assertEqual(
+                mission.state["pending_dialogue"],
+                {"slot": "laptop_budget", "usage": "editing"},
+            )
+            self.assertEqual(mission.state["candidate_product_ids"], previous_results)
+            completed = self.turn("تدوین ویدیوی سبک و قیمت تا سقف 200 میلیون")
+            paid_model.assert_not_called()
+        mission.refresh_from_db()
+        self.assertEqual(mission.constraints["max_price_toman"], "200000000")
+        self.assertEqual(mission.state["search_query"], "لپ تاپ")
+        self.assertEqual(mission.state["usage_profile"], "video_editing")
+        self.assertNotIn("pending_dialogue", mission.state)
+        self.assertEqual(
+            mission.state["candidate_product_ids"],
+            ["edit_laptop", "basic_laptop"],
+        )
+        ui_events = [event for event in completed if event["type"] == "ui.component"]
+        self.assertTrue(ui_events)
+        self.assertEqual(completed[-1]["payload"]["intent_parser"], "contextual")
+        self.assertEqual(completed[-1]["payload"]["search_query"], "لپ تاپ")
+
+        # Later budget edits may not drop the confirmed use case.
+        self.turn("بودجه شد ۱۰۰ میلیون")
+        mission.refresh_from_db()
+        self.assertEqual(mission.state["usage_profile"], "video_editing")
+        self.assertEqual(mission.constraints["max_price_toman"], "100000000")
+        self.assertEqual(mission.state["candidate_product_ids"], ["basic_laptop"])
+
     def test_product_reference_keeps_previous_results_and_does_not_search(self):
         mission = PurchaseMission.objects.get(pk=self.mission_id)
         visible = mission.state["visible_product_ids"]
