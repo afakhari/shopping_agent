@@ -1019,3 +1019,29 @@
 .redesign-v2 .conversation-queue button { cursor:pointer; min-height:40px; padding:7px 10px; border:1px solid #d9c5bd; border-radius:8px; background:#fff; color:#763426; font:inherit; }
 .redesign-v2 .conversation-queue button:disabled { opacity:.5; cursor:not-allowed; }
 .redesign-v2 .mission-stale-warning { border:1px solid #d59b6d; background:#fff9f3; padding:12px; border-radius:10px; line-height:1.7; }
+
+
+/* Evidence-first conversational demo contact approval. */
+.redesign-v2 .genui-contact-consent {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid #dfbec3;
+  border-radius: 12px;
+  background: #fffafa;
+  max-inline-size: 100%;
+  min-inline-size: 0;
+}
+.redesign-v2 .genui-contact-consent p { margin: 0; line-height: 1.8; overflow-wrap: anywhere; }
+.redesign-v2 .genui-contact-consent .genui-primary-action {
+  display: inline-flex; gap: 8px; align-items: center; justify-content: center;
+  min-height: 44px; max-inline-size: 100%; width: fit-content;
+  padding: 9px 14px; border-radius: 9px;
+  cursor: pointer;
+}
+.redesign-v2 .genui-contact-consent .genui-primary-action:disabled {
+  opacity: .55; cursor: not-allowed;
+}
+@media (max-width: 480px) {
+  .redesign-v2 .genui-contact-consent .genui-primary-action { width: 100%; }
+}
