@@ -197,6 +197,7 @@ def resolve_dialogue_policy(
                 return {
                     "kind": "search", "query_override": "لپ تاپ",
                     "constraint_updates": {"max_price_toman": amount},
+                    "usage_profile": "video_editing" if usage == "editing" else "",
                     "pending_dialogue": None,
                 }
             return {
