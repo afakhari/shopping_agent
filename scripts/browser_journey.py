@@ -119,6 +119,13 @@ def main() -> None:
                 page.screenshot(path=str(OUTPUT / f"products-{width}.png"), full_page=True)
 
                 if width == 390:
+                    # A model-card choice must not invent a chat message.
+                    previous_user_turns = page.locator(".chat-message-user").count()
+                    page.locator(".mission-product-card .mission-select-button").first.click()
+                    page.locator(".mission-product-card .mission-select-button").first.wait_for()
+                    assert page.locator(".mission-product-card .mission-select-button").first.get_attribute("aria-pressed") == "true"
+                    assert page.locator(".chat-message-user").count() == previous_user_turns
+
                     # Comparison remains a user-controlled, difference-first tool.
                     page.locator(".mission-compare-button").first.click()
                     page.locator(".mission-compare-button").nth(1).click()
@@ -132,6 +139,16 @@ def main() -> None:
                     page.locator(".mission-offers-toggle").first.click()
                     page.locator(".mission-offer-row").nth(1).wait_for()
                     assert page.locator(".mission-offer-row").count() == 2
+                    page.locator(".mission-offer-row .mission-select-button").nth(1).click()
+                    assert page.locator(".mission-offer-row .mission-select-button").nth(1).get_attribute("aria-pressed") == "true"
+                    # Bare "دومی" now means the second seller, not the second product.
+                    composer.fill("دومی")
+                    page.get_by_role("button", name="ارسال پیام").click()
+                    page.get_by_text("فروشگاه", exact=False).last.wait_for()
+                    composer.fill("آدرسش")
+                    page.get_by_role("button", name="ارسال پیام").click()
+                    page.locator(".genui-sellers").last.wait_for()
+                    assert "ثبت‌شده" in page.locator(".genui-sellers").last.inner_text()
                     page.locator(".mission-seller-details summary").first.click()
                     page.locator(".mission-inline-map-toggle").first.click()
                     page.locator(".mission-inline-map iframe").first.wait_for()
