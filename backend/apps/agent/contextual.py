@@ -117,6 +117,15 @@ def classify_contextual_turn(message: str, state: dict[str, Any] | None) -> dict
             return {"kind": "seller_recovery", "offer_id": state["selected_offer_id"]}
         return {"kind": "clarify", "reply": "کدام فروشگاه پاسخ نداد یا محصول را نداشت؟ از فهرست فروشندگان انتخابش کن تا گزینهٔ جایگزین بیابم."}
 
+    if re.search(r"(?:مقایسه|چه فرقی|فرق(?:ش|شان|شون)?|تفاوت)", normalized):
+        compared = state.get("compared_product_ids")
+        if isinstance(compared, list) and 2 <= len(compared) <= 3:
+            return {"kind": "compare"}
+        return {
+            "kind": "clarify",
+            "reply": "برای مقایسه، دو یا سه محصول از کارت‌ها انتخاب کن؛ سپس تفاوت قیمت و مشخصات ثبت‌شده را نشان می‌دهم.",
+        }
+
     if _WHY.match(normalized):
         return {"kind": "explain"} if previous_query else {
             "kind": "clarify", "reply": "هنوز محصولی پیشنهاد نشده که دلیل انتخابش را بررسی کنم."
