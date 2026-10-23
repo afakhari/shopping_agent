@@ -15,6 +15,7 @@ from urllib.request import HTTPRedirectHandler, HTTPSHandler, Request, build_ope
 from django.conf import settings
 
 _MATRIX_URL = "https://api.neshan.org/v1/distance-matrix"
+_DIRECTION_URL = "https://api.neshan.org/v4/direction"
 _MAX_BODY = 48_000
 
 
@@ -38,6 +39,87 @@ def neshan_enabled() -> bool:
         and getattr(settings, "NESHAN_ROUTING_MAX_CALLS_PER_MISSION", 0) > 0
         and getattr(settings, "NESHAN_ROUTING_DAILY_MAX_CALLS", 0) > 0
     )
+
+
+def neshan_direction_enabled() -> bool:
+    """Direction has its own feature flag; Matrix eligibility is not enough."""
+    return neshan_enabled() and bool(getattr(settings, "NESHAN_DIRECTION_ENABLED", False))
+
+
+def _normalize_metrics(leg: dict) -> tuple[int, int] | None:
+    duration = leg.get("duration")
+    distance = leg.get("distance")
+    seconds = duration.get("value") if isinstance(duration, dict) else None
+    meters = distance.get("value") if isinstance(distance, dict) else None
+    if (
+        isinstance(seconds, (int, float)) and not isinstance(seconds, bool)
+        and isinstance(meters, (int, float)) and not isinstance(meters, bool)
+        and math.isfinite(seconds) and math.isfinite(meters)
+        and 0 < seconds < 86_400 and 0 <= meters < 1_000_000
+    ):
+        return int(round(seconds)), int(round(meters))
+    return None
+
+
+def read_direction(
+    origin: tuple[float, float],
+    destination: tuple[float, float],
+    mode: str,
+) -> dict:
+    """Get one *provider-confirmed* route, never a fabricated polyline or ETA."""
+    if not neshan_direction_enabled():
+        raise RoutingUnavailable("not_configured")
+    if mode not in {"car", "motorcycle"}:
+        raise RoutingUnavailable("invalid_request")
+    params = urlencode({
+        "type": mode,
+        "origin": _point(*origin),
+        "destination": _point(*destination),
+        "alternative": "false",
+    })
+    request = Request(
+        f"{_DIRECTION_URL}?{params}",
+        headers={"Api-Key": settings.NESHAN_ROUTING_API_KEY, "Accept": "application/json"},
+        method="GET",
+    )
+    try:
+        with build_opener(HTTPSHandler(), _NoRedirects()).open(request, timeout=3.5) as response:
+            if response.status != 200:
+                raise RoutingUnavailable("provider_unavailable")
+            raw = response.read(96_001)
+        if len(raw) > 96_000:
+            raise RoutingUnavailable("invalid_response")
+        payload = json.loads(raw)
+    except HTTPError as exc:
+        if exc.code in {480, 481, 482, 483, 484, 485}:
+            raise RoutingUnavailable("quota_or_key_unavailable") from None
+        raise RoutingUnavailable("provider_unavailable") from None
+    except (OSError, ValueError):
+        raise RoutingUnavailable("provider_unavailable") from None
+    if not isinstance(payload, dict):
+        raise RoutingUnavailable("invalid_response")
+    routes = payload.get("routes")
+    if not isinstance(routes, list) or not routes:
+        raise RoutingUnavailable("no_route")
+    route = routes[0]
+    if not isinstance(route, dict):
+        raise RoutingUnavailable("invalid_response")
+    legs = route.get("legs")
+    if not isinstance(legs, list) or len(legs) != 1 or not isinstance(legs[0], dict):
+        raise RoutingUnavailable("invalid_response")
+    metrics = _normalize_metrics(legs[0])
+    if metrics is None:
+        raise RoutingUnavailable("invalid_response")
+    result = {
+        "status": "ok",
+        "duration_seconds": metrics[0],
+        "route_distance_meters": metrics[1],
+    }
+    overview = route.get("overview_polyline")
+    encoded = overview.get("points") if isinstance(overview, dict) else None
+    if isinstance(encoded, str) and 0 < len(encoded) <= 16_000 and encoded.isascii():
+        result["encoded_polyline"] = encoded
+    return result
 
 
 def _point(lat: float, lon: float) -> str:
