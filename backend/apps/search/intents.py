@@ -78,6 +78,46 @@ def _resolve_laptop_scope(query: str) -> CategoryScope | None:
     )
 
 
+# Extend category-first retrieval to the most frequent consumer families.
+# A category is a ground-truth catalogue facet; a matching token in a charger
+# or phone cover is not evidence that the item is a phone.
+_PRODUCT_FAMILIES = (
+    ("گوشی", "گوشی موبایل", ("گوشی موبایل",)),
+    ("هدفون", "هدفون و هندزفری", ("هدفون، هدست و هندزفری", "هدفون")),
+    ("تلویزیون", "تلویزیون", ("تلویزیون",)),
+    ("تبلت", "تبلت", ("تبلت",)),
+)
+_ACCESSORY_HEADS = frozenset({
+    "کیف", "کاور", "شارژر", "باتری", "محافظ", "پایه", "گلس", "برچسب",
+})
+
+
+def _resolve_consumer_scope(query: str) -> CategoryScope | None:
+    for word, label, categories in _PRODUCT_FAMILIES:
+        if re.search(rf"(?<!\w){re.escape(word)}(?!\w)", query) is None:
+            continue
+        # Distinguish an explicit accessory request by its initial noun.
+        head = query.split(maxsplit=1)[0]
+        if head in _ACCESSORY_HEADS:
+            return CategoryScope(
+                key=f"{word}_accessory",
+                label=f"{head} {word}",
+                query=Q(category_name__icontains=head) & Q(category_name__icontains=word),
+            )
+        if word == "گوشی" and "پزشکی" in query:
+            return CategoryScope(
+                key="medical_stethoscope", label="گوشی پزشکی",
+                query=Q(category_name__iexact="گوشی پزشکی"),
+            )
+        category_query = Q()
+        for category in categories:
+            category_query |= Q(category_name__iexact=category)
+        return CategoryScope(
+            key=f"{word}_product", label=label, query=category_query,
+        )
+    return None
+
+
 _PRESSURE_TRIGGERS = ("فشارسنج", "فشار سنج", "بارومتر", "مانومتر")
 _INDUSTRIAL_CUES = (
     "صنعتی", "محیطی", "بارومتر", "مانومتر", "گیج فشار", "درجه باد",
@@ -107,6 +147,9 @@ def resolve_category_scope(normalized_query: str) -> CategoryScope | None:
     laptop_scope = _resolve_laptop_scope(query)
     if laptop_scope is not None:
         return laptop_scope
+    consumer_scope = _resolve_consumer_scope(query)
+    if consumer_scope is not None:
+        return consumer_scope
     if not any(trigger in query for trigger in _PRESSURE_TRIGGERS):
         return None
 
