@@ -515,7 +515,7 @@ export function rebuildChatFromEvents(events: MissionEvent[]): MissionChatMessag
     if (event.type === 'user.message') {
       const value = readText(event.payload, 'message')
       if (value) messages.push({ id: `user-${event.seq}`, role: 'user', text: value, components: [] })
-      currentSocialIntent = classifyLocalConversation(value)
+      currentSocialIntent = classifyLocalConversation(value ?? '')
       awaitingAssistant = true
       continue
     }
