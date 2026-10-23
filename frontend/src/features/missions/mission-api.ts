@@ -129,12 +129,13 @@ export async function sendMissionTurn(
   constraints: MissionConstraints,
   onEvent: (event: MissionEvent) => void,
   signal?: AbortSignal,
+  clientRequestId?: string,
 ): Promise<void> {
   const response = await fetch(`/api/v1/missions/${encodeURIComponent(missionId)}/turns/`, {
     method: 'POST',
     signal,
     headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
-    body: JSON.stringify({ message, constraints }),
+    body: JSON.stringify({ message, constraints, client_request_id: clientRequestId }),
   })
   if (!response.ok) {
     let messageText = friendlyHttpError(response.status)

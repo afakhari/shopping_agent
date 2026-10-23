@@ -132,6 +132,22 @@ class ContextualMissionApiTests(TestCase):
         self.mission_id = created.json()["mission_id"]
         self.turn("هدفون")
 
+    def test_turn_request_id_replays_without_duplicate_events(self):
+        payload = {"message": "هدفون", "client_request_id": "turn-idempotent-001"}
+        url = f"/api/v1/missions/{self.mission_id}/turns/"
+        first = self.client.post(url, payload, format="json", HTTP_ACCEPT="text/event-stream")
+        self.assertEqual(first.status_code, 200)
+        saved_payload = b"".join(first.streaming_content)
+        count = PurchaseMission.objects.get(pk=self.mission_id).events.count()
+        repeated = self.client.post(url, payload, format="json", HTTP_ACCEPT="text/event-stream")
+        self.assertEqual(repeated.status_code, 200)
+        self.assertEqual(b"".join(repeated.streaming_content), saved_payload)
+        self.assertEqual(PurchaseMission.objects.get(pk=self.mission_id).events.count(), count)
+        changed = self.client.post(url, {
+            "message": "دوربین", "client_request_id": "turn-idempotent-001",
+        }, format="json", HTTP_ACCEPT="text/event-stream")
+        self.assertEqual(changed.status_code, 400)
+
     def test_paired_null_coordinates_clear_existing_geofence(self):
         created = self.client.post("/api/v1/missions/", {
             "initial_message": "هدفون",

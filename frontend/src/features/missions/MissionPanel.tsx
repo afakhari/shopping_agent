@@ -642,6 +642,7 @@ export function MissionPanel({
   // Retain a request ID after a network failure, so a user-triggered retry
   // receives the original server simulation instead of creating a duplicate.
   const pendingContactIdsRef = useRef(new Map<string, string>())
+  const pendingTurnRef = useRef<{ message: string; id: string } | null>(null)
 
   const constraints: MissionConstraints = {
     city: 'tehran',
@@ -929,6 +930,9 @@ export function MissionPanel({
     turnCounter.current += 1
     const turnId = `${Date.now()}-${turnCounter.current}`
     const lastSavedSequence = latestEventSeqRef.current
+    const requestId = pendingTurnRef.current?.message === trimmed
+      ? pendingTurnRef.current.id : globalThis.crypto.randomUUID()
+    pendingTurnRef.current = { message: trimmed, id: requestId }
     let activeMissionId: string | null = missionIdRef.current
     let startedServerTurn = false
     let confirmed = false
@@ -950,8 +954,9 @@ export function MissionPanel({
         storeMissionId(activeMissionId)
       }
       startedServerTurn = true
-      await sendMissionTurn(activeMissionId, trimmed, turnConstraints, handleEvent)
+      await sendMissionTurn(activeMissionId, trimmed, turnConstraints, handleEvent, undefined, requestId)
       confirmed = true
+      pendingTurnRef.current = null
     } catch (reason) {
       // A response stream can disconnect AFTER Django commits the turn.
       // Restore that saved turn instead of suggesting a duplicate submission.
@@ -982,6 +987,7 @@ export function MissionPanel({
             setStageLabel('نتیجه ثبت‌شده مأموریت از سرور بازیابی شد.')
             recovered = true
             confirmed = true
+            pendingTurnRef.current = null
           }
         } catch {
           // Do not mask the original error; an offline network may block GET too.
@@ -1476,6 +1482,7 @@ export function MissionPanel({
     setComparisonOpen(false)
     setContactByOffer({})
     pendingContactIdsRef.current.clear()
+    pendingTurnRef.current = null
     setActiveFilterForm(null)
     shouldAutoScrollRef.current = true
     setError(null)

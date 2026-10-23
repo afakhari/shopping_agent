@@ -24,7 +24,7 @@ from apps.agent.comparison import build_evidence_comparison
 from apps.agent.simulator import serialize_contact_attempt, simulate_contact
 from apps.agent.contact_evidence import build_contact_evidence
 from apps.catalog.models import Offer, Product
-from apps.missions.models import ContactAttempt, PurchaseMission, RoutingDailyUsage
+from apps.missions.models import ContactAttempt, MissionEvent, PurchaseMission, RoutingDailyUsage
 from apps.missions.renderers import ServerSentEventRenderer
 from apps.missions.serializers import (
     ContactAttemptCreateSerializer,
@@ -85,6 +85,39 @@ def _sse_stream(events: list[dict[str, Any]]) -> Iterator[str]:
     for event in events:
         encoded = json.dumps(event, ensure_ascii=False, separators=(",", ":"))
         yield f"id: {event['seq']}\ndata: {encoded}\n\n"
+
+
+def _replay_turn_if_completed(mission: PurchaseMission, data: dict[str, Any]):
+    """Replay an earlier completed turn by request key without repeating server-side effects."""
+    request_id = data.get("client_request_id")
+    if not request_id:
+        return None
+    completed = MissionEvent.objects.filter(
+        mission=mission, event_type="turn.completed",
+        payload__client_request_id=request_id,
+    ).order_by("-seq").first()
+    if completed is None:
+        return None
+    started = MissionEvent.objects.filter(
+        mission=mission, event_type="user.message", seq__lt=completed.seq,
+    ).order_by("-seq").first()
+    if started is None or started.payload.get("message") != data["message"]:
+        raise ValidationError({"client_request_id": "این شناسه قبلاً برای پیام دیگری استفاده شده است."})
+    saved = MissionEvent.objects.filter(
+        mission=mission, seq__gte=started.seq, seq__lte=completed.seq,
+    ).order_by("seq")
+    events = [
+        {"schema_version": 1, "mission_id": str(mission.pk), "seq": event.seq,
+         "type": event.event_type, "payload": event.payload}
+        for event in saved
+    ]
+    response = StreamingHttpResponse(
+        _sse_stream(events), content_type="text/event-stream; charset=utf-8"
+    )
+    response["Cache-Control"] = "no-cache, no-transform"
+    response["X-Accel-Buffering"] = "no"
+    response["X-Mission-ID"] = str(mission.pk)
+    return response
 
 
 def _search_filterset(constraints: dict[str, Any]) -> dict[str, Any]:
@@ -175,6 +208,10 @@ def mission_turn(request, mission_id: str):
     serializer = MissionTurnSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     data = serializer.validated_data
+    # Repeat response is read before any optional model call or catalog search.
+    previous = _replay_turn_if_completed(_owned_mission(request, mission_id), data)
+    if previous is not None:
+        return previous
     created_events: list[dict[str, Any]] = []
     local_intent = classify_conversation_intent(data["message"])
     if local_intent is not None:
@@ -183,6 +220,9 @@ def mission_turn(request, mission_id: str):
         # hard constraints intact, and do not call BoxAPI or the catalogue.
         with transaction.atomic():
             mission = _owned_mission(request, mission_id, lock=True)
+            previous = _replay_turn_if_completed(mission, data)
+            if previous is not None:
+                return previous
             _validate_full_constraints(mission.constraints, data.get("constraints", {}))
             message = conversation_reply(local_intent)
             created_events = append_events_locked(mission, [
@@ -192,6 +232,7 @@ def mission_turn(request, mission_id: str):
                     "status": mission.status,
                     "current_stage": mission.current_stage,
                     "intent_parser": "local_conversation",
+                    "client_request_id": data.get("client_request_id"),
                     "agent_runtime": "deterministic_guard",
                     "search_query": (mission.state or {}).get("search_query", ""),
                     "constraints": mission.constraints,
@@ -226,6 +267,9 @@ def mission_turn(request, mission_id: str):
         # selection with the *effective* constraints inside the row lock.
         with transaction.atomic():
             mission = _owned_mission(request, mission_id, lock=True)
+            previous = _replay_turn_if_completed(mission, data)
+            if previous is not None:
+                return previous
             decision = classify_contextual_turn(data["message"], mission.state)
             if decision["kind"] == "refine" and decision["constraint_updates"].get("sort") == "distance_asc" and preflight_constraints.get("lat") is None:
                 decision = {"kind": "location_clarify", "reply": "برای نزدیکی، ابتدا محدوده تهران را انتخاب کن."}
@@ -441,6 +485,7 @@ def mission_turn(request, mission_id: str):
                 "status": mission.status,
                 "current_stage": mission.current_stage,
                 "intent_parser": "contextual",
+                "client_request_id": data.get("client_request_id"),
                 "agent_runtime": "deterministic_guard",
                 "search_query": (mission.state or {}).get("search_query", ""),
                 "selected_product_id": (mission.state or {}).get("selected_product_id"),
@@ -480,6 +525,9 @@ def mission_turn(request, mission_id: str):
 
     with transaction.atomic():
         mission = _owned_mission(request, mission_id, lock=True)
+        previous = _replay_turn_if_completed(mission, data)
+        if previous is not None:
+            return previous
         constraints = _validate_full_constraints(mission.constraints, data.get("constraints", {}))
         if decision["kind"] == "refine":
             # Server-owned context is checked again inside the lock.
@@ -565,6 +613,7 @@ def mission_turn(request, mission_id: str):
                     "total": response.get("total", 0),
                     "agent_runtime": graph_state.get("graph_runtime", "langgraph"),
                     "intent_parser": graph_state.get("intent_parser", "heuristic"),
+                    "client_request_id": data.get("client_request_id"),
                     "search_query": graph_state.get("search_query", ""),
                     "selected_product_id": selected_product,
                     "result_set_id": result_set_id,
