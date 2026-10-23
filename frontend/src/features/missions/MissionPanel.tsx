@@ -1567,7 +1567,7 @@ export function MissionPanel({
                     offerViews={offerViews}
                     onToggleOffers={toggleProductOffers}
                     onLoadMoreOffers={loadMoreProductOffers}
-                    allowActions={isCurrentResult && !resultsStale}
+                    allowActions={isCurrentResult && !resultsStale && !isRunning && !isRestoring}
                   />
                 </div>
               )}
