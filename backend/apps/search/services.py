@@ -28,6 +28,7 @@ from apps.catalog.models import Offer, Product, Shop
 from apps.catalog.services.visit_context import opening_status, indoor_address_hints
 from apps.search.credit import eligible_credit_offer_query, offer_supports_in_person_credit
 from apps.search.intents import CategoryScope, resolve_category_scope
+from apps.search.evidence import editing_laptop_evidence
 
 DEFAULT_MAX_REASONABLE_PRICE_TOMAN = 100_000_000_000
 
@@ -285,6 +286,11 @@ def product_search_page(filters: dict[str, Any]) -> dict[str, Any]:
         if offer is None:  # Fail closed if an inconsistent row appears during an import.
             continue
         shop_distance = getattr(product, "best_offer_distance_m", None)
+        editing_evidence = (
+            editing_laptop_evidence(
+                product, intensity=filters.get("usage_intensity"),
+            ) if is_editing else None
+        )
         results.append(
             {
                 "product": serialize_product(product),
@@ -292,15 +298,9 @@ def product_search_page(filters: dict[str, Any]) -> dict[str, Any]:
                 "eligible_offers_count": counts.get(product.source_id, 0),
                 "reasons": (
                     _reasons(filters, category_scope)
-                    + (
-                        ["در مشخصات ثبت‌شده، کاربری تدوین ذکر شده است؛ عملکرد واقعی تضمین نشده"]
-                        if product.usecase_score >= 100 else
-                        ["در مشخصات ثبت‌شده، کاربری چندرسانه‌ای ذکر شده؛ تناسب تدوین نیاز به بررسی دارد"]
-                        if product.usecase_score > 0 else
-                        ["مناسب‌بودن برای تدوین از مشخصات موجود تأیید نشده است"]
-                    )
-                    if is_editing else _reasons(filters, category_scope)
+                    + (editing_evidence["notes"] if editing_evidence else [])
                 ),
+                "recommendation_evidence": editing_evidence,
             }
         )
     return {
