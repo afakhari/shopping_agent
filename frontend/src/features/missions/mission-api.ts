@@ -6,9 +6,9 @@ export interface MissionConstraints {
   must_have_in_person_credit?: boolean
   brand_name?: string | null
   model_exact?: string | null
-  lat?: number
-  lon?: number
-  radius_m?: number
+  lat?: number | null
+  lon?: number | null
+  radius_m?: number | null
   sort?: 'relevance' | 'price_asc' | 'distance_asc' | 'recent_price_change'
 }
 

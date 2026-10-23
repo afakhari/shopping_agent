@@ -1102,6 +1102,7 @@ export function MissionPanel({
         ...(budget.trim() ? { max_price_toman: budget.trim() } : {}),
         must_have_in_person_credit: mustHaveCredit,
         sort: sort === 'distance_asc' ? 'relevance' : sort,
+        lat: null, lon: null, radius_m: null,
       }
       setSelectedRegionId('')
       onLocationChange(null)

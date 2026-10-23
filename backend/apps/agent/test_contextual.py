@@ -19,6 +19,11 @@ class ContextualRouterTests(TestCase):
         self.assertEqual(decision["query"], "هدفون")
         self.assertEqual(decision["constraint_updates"]["max_price_toman"], "2000000")
 
+    def test_budget_grouped_thousands_refines_to_actual_toman(self):
+        decision = classify_contextual_turn("بودجه م شد ۳٬۰۰۰٬۰۰۰ تومان", {"search_query": "هدفون"})
+        self.assertEqual(decision["kind"], "refine")
+        self.assertEqual(decision["constraint_updates"]["max_price_toman"], "3000000")
+
     def test_credit_is_an_offer_filter_not_a_new_product(self):
         decision = classify_contextual_turn("فقط قسطی", {"search_query": "هدفون"})
         self.assertEqual(decision["kind"], "refine")
@@ -126,6 +131,41 @@ class ContextualMissionApiTests(TestCase):
         self.assertEqual(created.status_code, 201)
         self.mission_id = created.json()["mission_id"]
         self.turn("هدفون")
+
+    def test_paired_null_coordinates_clear_existing_geofence(self):
+        created = self.client.post("/api/v1/missions/", {
+            "initial_message": "هدفون",
+            "constraints": {"lat": 35.7, "lon": 51.4, "radius_m": 3000,
+                            "sort": "distance_asc"},
+        }, format="json")
+        self.assertEqual(created.status_code, 201)
+        self.mission_id = created.json()["mission_id"]
+        self.turn("هدفون")
+        response = self.client.post(
+            f"/api/v1/missions/{self.mission_id}/turns/",
+            {"message": "هدفون", "constraints": {
+                "lat": None, "lon": None, "radius_m": None, "sort": "relevance",
+            }}, format="json", HTTP_ACCEPT="text/event-stream",
+        )
+        self.assertEqual(response.status_code, 200)
+        list(response.streaming_content)
+        saved = PurchaseMission.objects.get(pk=self.mission_id).constraints
+        self.assertNotIn("lat", saved)
+        self.assertNotIn("lon", saved)
+        self.assertNotIn("radius_m", saved)
+
+    def test_focus_change_invalidates_previous_visit_plan(self):
+        mission = PurchaseMission.objects.get(pk=self.mission_id)
+        mission.state = {**mission.state, "visit_plan": {"offer_id": "old_offer"}}
+        mission.save(update_fields=["state"])
+        response = self.client.post(f"/api/v1/missions/{self.mission_id}/focus/", {
+            "action": "select_product", "result_set_id": mission.state["result_set_id"],
+            "product_id": self.first.source_id,
+        }, format="json")
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("visit_plan", response.json()["state"])
+        self.assertEqual(self.client.get(
+            f"/api/v1/missions/{self.mission_id}/visit-plan/").status_code, 404)
 
     def test_explicit_brand_model_are_true_hard_offer_filters(self):
         self.first.brand_name = "برند الف"

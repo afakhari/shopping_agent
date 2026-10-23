@@ -7,10 +7,10 @@ references fail closed instead of being converted to a broad OR search.
 from __future__ import annotations
 
 import re
-from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from apps.catalog.services.normalization import normalize_persian_text
+from apps.agent.amounts import NUMBER_TOKEN, toman_amount
 
 _ORDINALS = {"اولی": 0, "اول": 0, "دومی": 1, "دوم": 1,
              "سومی": 2, "سوم": 2, "چهارمی": 3, "چهارم": 3}
@@ -22,7 +22,7 @@ _PRODUCT_REF = re.compile(
 _BUDGET = re.compile(
     r"(?:بودجه(?: م| من)?|سقف(?: بودجه)?|حداکثر(?: بودجه)?|تا(?: سقف)?)"
     r"(?: (?:م|رو|را|شد|شده|هست|بشه|بکن|کن|رسید|می خوام))*"
-    r"\s*(?P<amount>\d+(?:[.,]\d+)?)\s*(?P<unit>میلیون|هزار|تومان)?"
+    rf"\s*(?P<amount>{NUMBER_TOKEN})\s*(?P<unit>میلیون|هزار|تومان)?"
 )
 _CREDIT_NEGATION = re.compile(r"(?:بدون|نمی ?خوام|لازم نیست|نمی ?خوامش).{0,24}(?:قسطی|اعتباری|ترب ?پی)|(?:قسطی|اعتباری).{0,12}(?:نباشه|نمی ?خوام)")
 _WHY = re.compile(r"^(?:چرا|به چه دلیل|دلیلش چیه|چرا اینو پیشنهاد دادی|چرا این مدل)(?:.*)?$")
@@ -34,18 +34,7 @@ def _budget_value(message: str) -> str | None:
     match = _BUDGET.search(message)
     if not match:
         return None
-    try:
-        amount = Decimal(match.group("amount").replace(",", "."))
-        unit = match.group("unit")
-        if unit == "میلیون":
-            amount *= 1_000_000
-        elif unit == "هزار":
-            amount *= 1_000
-        if not amount.is_finite() or amount < 0 or amount >= Decimal("1e30"):
-            return None
-        return str(amount.quantize(Decimal("1")))
-    except (InvalidOperation, ValueError):
-        return None
+    return toman_amount(match.group("amount"), match.group("unit"))
 
 
 def classify_contextual_turn(message: str, state: dict[str, Any] | None) -> dict[str, Any]:

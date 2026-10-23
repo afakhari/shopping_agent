@@ -61,6 +61,10 @@ def _validate_full_constraints(
 ) -> dict[str, Any]:
     merged: dict[str, Any] = {"city": "tehran", "sort": "relevance", **(existing or {})}
     merged.update(updates or {})
+    # A paired null is the explicit location-clear command. Omission retains the geofence.
+    if updates and "lat" in updates and "lon" in updates and updates["lat"] is None and updates["lon"] is None:
+        for key in ("lat", "lon", "radius_m"):
+            merged.pop(key, None)
     serializer = MissionConstraintsSerializer(data=merged)
     serializer.is_valid(raise_exception=True)
     data = dict(serializer.validated_data)
@@ -381,7 +385,7 @@ def mission_turn(request, mission_id: str):
                             mission.state = {
                                 **state, "visible_offer_ids": [x["id"] for x in backup],
                                 "selected_offer_id": None, "selected_shop_id": None,
-                                "active_surface": "sellers",
+                                "active_surface": "sellers", "visit_plan": None,
                             }
                             mission.save(update_fields=["state", "updated_at"])
                             reply = (
@@ -635,6 +639,9 @@ def mission_focus(request, mission_id: str):
                 raise ValidationError({"offer_id": "این آفر دیگر با شروط مأموریت مطابقت ندارد."})
             state.update(active_surface="sellers", selected_offer_id=offer_id,
                          selected_shop_id=offer.shop_id)
+        # A visit plan is evidence tied to a particular active selection.
+        if action in {"select_product", "view_sellers", "view_products", "select_offer"}:
+            state.pop("visit_plan", None)
         if state == (mission.state or {}):
             return Response({
                 "state": mission.state, "last_event_seq": mission.last_event_seq,
@@ -879,7 +886,7 @@ def create_contact_attempt(request, mission_id: str):
                 "alternative_offer_ids": [item["id"] for item in alternatives],
                 "alternative_product_ids": alternative_product_ids,
                 "candidate_product_ids": candidate_product_ids,
-                **({"visit_plan": visit_plan} if visit_plan is not None else {}),
+                "visit_plan": visit_plan,
             }
             locked_mission.current_stage = "contact_checked"
             locked_mission.status = PurchaseMission.Status.WAITING_FOR_USER
