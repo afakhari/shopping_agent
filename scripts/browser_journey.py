@@ -256,6 +256,32 @@ def main() -> None:
                     assert_no_horizontal_overflow(page, width)
                     page.screenshot(path=str(OUTPUT / "upstream-recovery-mobile.png"), full_page=True)
 
+                    # Regression from the owner's actual Persian conversation:
+                    # first message sets a canonical laptop+editing need;
+                    # the budget reply must NOT search for cheap projector bags.
+                    composer.fill("چه لپ تاپی برای تدوین ویدیو مناسب من هست؟")
+                    page.get_by_role("button", name="ارسال پیام").click()
+                    page.get_by_text("سقف بودجه‌ات چند تومان است؟", exact=False).last.wait_for()
+                    composer.fill("تدوین ویدیوی سبک و قیمت تا سقف 200 میلیون")
+                    page.get_by_role("button", name="ارسال پیام").click()
+                    active_result = page.locator(
+                        ".conversation-results-history[open] .mission-product-card"
+                    )
+                    active_result.first.wait_for()
+                    assert active_result.count() == 2, "Must show laptops, not keyword-related accessories"
+                    assert "لپ تاپ" in active_result.nth(0).inner_text()
+                    assert "کیف" not in " ".join(active_result.all_inner_texts())
+                    evidence = active_result.first.locator(".mission-product-evidence")
+                    evidence.wait_for()
+                    evidence.locator("summary").click()
+                    assert "تدوین" in evidence.inner_text()
+                    assert "تأیید" in evidence.inner_text()
+                    assert_no_horizontal_overflow(page, width)
+                    page.screenshot(
+                        path=str(OUTPUT / "editing-recommendation-mobile.png"),
+                        full_page=True,
+                    )
+
                 context.close()
             print("BROWSER_JOURNEY=PASS; Chromium RTL 320/390/1440; synthetic fixtures.")
         finally:
