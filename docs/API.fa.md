@@ -1,5 +1,7 @@
 # قرارداد API v1: پیاده‌شده در برابر پیشنهادی | ۲۳ اکتبر ۲۰۲۶
 
+> **افزوده پس از PRهای #26/#28:** اکشن `POST /api/v1/missions/{uuid}/focus/` همچنین `action=set_compare` با `product_ids` (صفر تا سه مدل بدون شناسه تکراری) را می‌پذیرد و نتیجه در state ذخیره می‌شود. کامپوننت‌های `contact_prompt` و `location_choice` در پاسخ‌های زمینه‌ای استفاده می‌شوند؛ تماس دمو بدون تأیید مستقیم فعال نمی‌شود. `route-estimates` در [ADR نشان](NESHAN-INTEGRATION-ADR-2026-10-23.fa.md) **پیشنهاد** است و هنوز endpoint موجود نیست.
+
 **وضعیت پیاده‌سازی از `backend/config/urls.py` و routeهای Django روی main #25 بررسی شده است.** بخش «API هدف» پایین، *طرح آتی* است، نه نشانی تضمین‌شده.
 
 ## Endpointهای موجود در کد فعلی
