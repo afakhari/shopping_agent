@@ -40,6 +40,32 @@ class ContextualRouterTests(TestCase):
         self.assertEqual(classify_contextual_turn("هدفون تا ۳ میلیون", {"search_query": "لپ تاپ"})["kind"], "search")
         self.assertEqual(classify_contextual_turn("هدفون می خوام", {})["kind"], "search")
 
+    def test_changing_product_and_budget_is_not_a_budget_only_turn(self):
+        self.assertEqual(classify_contextual_turn(
+            "تا ۴ میلیون گوشی می خوام", {"search_query": "لپ تاپ"}
+        )["kind"], "search")
+        self.assertEqual(classify_contextual_turn(
+            "فقط قسطی گوشی می خوام", {"search_query": "لپ تاپ"}
+        )["kind"], "search")
+
+    def test_seller_focus_changes_ordinal_referent(self):
+        state = {
+            "search_query": "هدفون", "active_surface": "sellers",
+            "visible_product_ids": ["p1", "p2"],
+            "visible_offer_ids": ["o1", "o2"],
+        }
+        self.assertEqual(classify_contextual_turn("دومی", state)["offer_id"], "o2")
+        self.assertEqual(classify_contextual_turn("فروشگاه دوم", state)["offer_id"], "o2")
+        self.assertEqual(classify_contextual_turn("آدرس فروشگاه دوم", state)["kind"], "seller_details")
+
+    def test_two_stage_request_preserves_product_and_seller_intent(self):
+        state = {"search_query": "هدفون", "visible_product_ids": ["p1", "p2"],
+                 "active_surface": "products"}
+        result = classify_contextual_turn("دومی خوبه ولی فروشنده نزدیک تر پیدا کن", state)
+        self.assertEqual(result["kind"], "select_product")
+        self.assertEqual(result["product_id"], "p2")
+        self.assertTrue(result["explore_sellers"])
+
     def test_why_does_not_start_unrelated_search(self):
         self.assertEqual(classify_contextual_turn("چرا اینو پیشنهاد دادی", {"search_query": "هدفون"})["kind"], "explain")
 
@@ -108,6 +134,58 @@ class ContextualMissionApiTests(TestCase):
         self.assertEqual(mission.state["search_query"], "هدفون")
         self.assertEqual(mission.state["candidate_product_ids"], [])
         self.assertEqual(events[-1]["payload"]["intent_parser"], "contextual")
+
+    def test_structured_focus_action_and_stale_result_guard(self):
+        mission = PurchaseMission.objects.get(pk=self.mission_id)
+        result_set_id = mission.state["result_set_id"]
+        first_id = mission.state["visible_product_ids"][0]
+        endpoint = f"/api/v1/missions/{self.mission_id}/focus/"
+        selected = self.client.post(endpoint, {
+            "action": "select_product", "product_id": first_id,
+            "result_set_id": result_set_id,
+        }, format="json")
+        self.assertEqual(selected.status_code, 200, selected.content)
+        self.assertEqual(selected.json()["state"]["selected_product_id"], first_id)
+        matching = Offer.objects.filter(product_id=first_id).first()
+        self.assertIsNotNone(matching)
+        focused = self.client.post(endpoint, {
+            "action": "view_sellers", "product_id": first_id,
+            "offer_ids": [matching.source_id], "result_set_id": result_set_id,
+        }, format="json")
+        self.assertEqual(focused.status_code, 200, focused.content)
+        self.assertEqual(focused.json()["state"]["active_surface"], "sellers")
+        chosen = self.client.post(endpoint, {
+            "action": "select_offer", "offer_id": matching.source_id,
+            "result_set_id": result_set_id,
+        }, format="json")
+        self.assertEqual(chosen.status_code, 200, chosen.content)
+        self.assertEqual(chosen.json()["state"]["selected_offer_id"], matching.source_id)
+        old = self.client.post(endpoint, {
+            "action": "select_product", "product_id": first_id,
+            "result_set_id": "no-longer-current",
+        }, format="json")
+        self.assertEqual(old.status_code, 400)
+
+    def test_contextual_filter_change_marks_old_surface_stale(self):
+        mission = PurchaseMission.objects.get(pk=self.mission_id)
+        before = mission.state["result_set_id"]
+        response = self.client.post(
+            f"/api/v1/missions/{self.mission_id}/turns/",
+            {"message": "مدل دوم رو انتخاب کن",
+             "constraints": {"max_price_toman": "500000"}},
+            format="json", HTTP_ACCEPT="text/event-stream",
+        )
+        self.assertEqual(response.status_code, 200)
+        mission.refresh_from_db()
+        self.assertEqual(mission.constraints["max_price_toman"], "500000")
+        self.assertTrue(mission.state["results_stale"])
+        self.assertIsNone(mission.state.get("selected_product_id"))
+        rejected = self.client.post(
+            f"/api/v1/missions/{self.mission_id}/focus/",
+            {"action": "select_product", "product_id": self.first.source_id,
+             "result_set_id": before}, format="json",
+        )
+        self.assertEqual(rejected.status_code, 400)
 
     def test_ambiguous_reference_never_runs_catalogue(self):
         with patch("apps.missions.views.run_purchase_graph") as graph:
