@@ -996,3 +996,8 @@
 
 /* Adaptive shopping: numbered, referencable product choices. */
 .mission-product-rank { display:inline-flex; align-items:center; justify-content:center; flex:0 0 1.75rem; min-width:1.75rem; height:1.75rem; border-radius:.5rem; background:#fff0f1; color:#9f1c30; font-weight:800; font-variant-numeric:tabular-nums; }
+
+/* Keep primary seller exploration and secondary product-selection actions distinct. */
+.redesign-v2 .mission-select-button { display:inline-flex; align-items:center; gap:6px; min-height:42px; border:1px solid #f0dbdd; border-radius:10px; background:#fff9fa; color:#a42b3b; padding:7px 12px; cursor:pointer; font:inherit; font-weight:650; }
+.redesign-v2 .mission-select-button:hover:not(:disabled) { background:#ffeef1; }
+.redesign-v2 .mission-select-button[aria-pressed="true"] { border-color:#a42b3b; background:#fff0f2; }
