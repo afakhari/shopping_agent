@@ -601,6 +601,8 @@ export function MissionPanel({
   const [contactingOfferId, setContactingOfferId] = useState<string | null>(null)
   const [contactByOffer, setContactByOffer] = useState<Record<string, ContactAttemptResponse>>({})
   const [offerViews, setOfferViews] = useState<Record<string, ProductOfferView>>({})
+  const [brandFilter, setBrandFilter] = useState<string | null>(null)
+  const [modelFilter, setModelFilter] = useState<string | null>(null)
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null)
   const [selectedOfferId, setSelectedOfferId] = useState<string | null>(null)
   const [resultSetId, setResultSetId] = useState<string | null>(null)
@@ -635,6 +637,8 @@ export function MissionPanel({
     city: 'tehran',
     ...(budget.trim() ? { max_price_toman: budget.trim() } : {}),
     must_have_in_person_credit: mustHaveCredit,
+    brand_name: brandFilter,
+    model_exact: modelFilter,
     sort: location || sort !== 'distance_asc' ? sort : 'relevance',
     ...(location ? { lat: location.lat, lon: location.lon, radius_m: radiusM } : {}),
   }
@@ -659,6 +663,8 @@ export function MissionPanel({
         setResultsStale(snapshot.state?.results_stale === true)
         setSelectedOfferId(typeof snapshot.state?.selected_offer_id === 'string' ? snapshot.state.selected_offer_id : null)
         serverConstraintsRef.current = snapshot.constraints
+        setBrandFilter(snapshot.constraints.brand_name ?? null)
+        setModelFilter(snapshot.constraints.model_exact ?? null)
         missionIdRef.current = restoreId
         setSelectedProductId(typeof snapshot.state?.selected_product_id === 'string' ? snapshot.state.selected_product_id : null)
         setContactByOffer(restoreContactResponses(history))
@@ -756,6 +762,8 @@ export function MissionPanel({
     }
     if (event.type === 'turn.completed' && isRecord(event.payload.constraints)) {
       serverConstraintsRef.current = event.payload.constraints as MissionConstraints
+      setBrandFilter(serverConstraintsRef.current.brand_name ?? null)
+      setModelFilter(serverConstraintsRef.current.model_exact ?? null)
       // Reconcile inferred natural-language constraints with the visible filters.
       // The server decides eligibility; the client must not silently present stale filters.
       const interpreted = readText(event.payload, 'search_query') || lastQuery
@@ -915,6 +923,8 @@ export function MissionPanel({
             setEvents(history)
             latestEventSeqRef.current = Math.max(latestEventSeqRef.current, ...history.map(item => item.seq))
             serverConstraintsRef.current = snapshot.constraints
+            setBrandFilter(snapshot.constraints.brand_name ?? null)
+            setModelFilter(snapshot.constraints.model_exact ?? null)
             resultSetIdRef.current = typeof snapshot.state?.result_set_id === 'string' ? snapshot.state.result_set_id : null
             setResultSetId(resultSetIdRef.current)
             setResultsStale(snapshot.state?.results_stale === true)
@@ -990,6 +1000,8 @@ export function MissionPanel({
       setResultsStale(snapshot.state?.results_stale === true)
       setSelectedOfferId(typeof snapshot.state?.selected_offer_id === 'string' ? snapshot.state.selected_offer_id : null)
       serverConstraintsRef.current = snapshot.constraints
+      setBrandFilter(snapshot.constraints.brand_name ?? null)
+      setModelFilter(snapshot.constraints.model_exact ?? null)
       setSelectedProductId(typeof snapshot.state?.selected_product_id === 'string' ? snapshot.state.selected_product_id : null)
       setChatMessages(rebuildChatFromEvents(history))
       setContactByOffer(restoreContactResponses(history))
@@ -1295,6 +1307,8 @@ export function MissionPanel({
           fields: [
             { id: 'product_query', label: 'محصول', type: 'text', required: true, default_value: lastQuery },
             { id: 'max_price_toman', label: 'سقف بودجه (تومان)', type: 'number', required: false, min: 1, default_value: budget, helper_text: 'اختیاری؛ ارقام فارسی یا انگلیسی را وارد کن.' },
+            { id: 'brand_name', label: 'برند دقیق ثبت‌شده (اختیاری)', type: 'text', required: false, default_value: brandFilter ?? '', helper_text: 'اگر مشخص شود، تنها برند دقیق ثبت‌شده در دیتاست پذیرفته می‌شود.' },
+            { id: 'model_exact', label: 'مدل دقیق ثبت‌شده (اختیاری)', type: 'text', required: false, default_value: modelFilter ?? '', helper_text: 'در صورت نامشخص‌بودن مدل در دیتاست، نتایج ممکن است صفر شوند.' },
             { id: 'must_have_in_person_credit', label: 'فقط خرید اعتباری حضوری', type: 'checkbox', default_value: mustHaveCredit },
             ...(location ? [{ id: 'radius_m', label: 'حداکثر فاصلهٔ مستقیم', type: 'select' as const, required: true, default_value: String(radiusM), options: [
               { label: '۱ کیلومتر', value: '1000' },
@@ -1340,8 +1354,12 @@ export function MissionPanel({
       const rawRadius = values.radius_m
       const parsedRadius = Number(normalizeDigits(String(rawRadius ?? '')))
       const nextRadius = [1000, 3000, 5000, 10000].includes(parsedRadius) ? parsedRadius : radiusM
+      const brandValue = typeof values.brand_name === 'string' ? values.brand_name.trim().slice(0, 300) : brandFilter
+      const modelValue = typeof values.model_exact === 'string' ? values.model_exact.trim().slice(0, 500) : modelFilter
       const nextConstraints: MissionConstraints = {
         ...constraints,
+        brand_name: brandValue || null,
+        model_exact: modelValue || null,
         ...(hasBudgetField ? { max_price_toman: normalizedBudget || null } : {}),
         must_have_in_person_credit: credit,
         ...(location ? { lat: location.lat, lon: location.lon, radius_m: nextRadius } : {}),
@@ -1351,6 +1369,8 @@ export function MissionPanel({
         setError('نام محصول را وارد کن تا بتوانم گزینه‌ها را پیدا کنم.')
         return
       }
+      setBrandFilter(brandValue || null)
+      setModelFilter(modelValue || null)
       onRestoreConstraints(nextConstraints, query)
       setActiveFilterForm(null)
       void runTurn(query, nextConstraints, query)
@@ -1385,6 +1405,8 @@ export function MissionPanel({
     setLastQuery('')
     setSelectedCompareProductIds([])
     setSelectedProductId(null)
+    setBrandFilter(null)
+    setModelFilter(null)
     setComparisonOpen(false)
     setContactByOffer({})
     pendingContactIdsRef.current.clear()
