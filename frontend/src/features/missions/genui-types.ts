@@ -15,6 +15,7 @@ export type GenUIAction =
   | { type: 'fill_query'; query: string }
   | { type: 'open_filter_form' }
   | { type: 'verify_offer'; offerId: string; shopId: string }
+  | { type: 'verify_selected_offer'; offerId: string; shopId: string }
 
 /** A fixed vocabulary. The server/LLM can choose components, never execute arbitrary UI. */
 const ALLOWED_COMPONENT_TYPES = new Set([
@@ -32,6 +33,7 @@ const ALLOWED_COMPONENT_TYPES = new Set([
   'alternative_options',
   'seller_options',
   'seller_details',
+  'contact_prompt',
 ])
 
 const MAX_COMPONENTS_PER_EVENT = 12
@@ -42,6 +44,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 /** Fail closed for seller cards; historical component types stay compatible. */
 function isValidData(type: string, data: Record<string, unknown>): boolean {
+  if (type === 'contact_prompt') {
+    return typeof data.offer_id === 'string' && data.offer_id.length > 0
+      && typeof data.shop_id === 'string' && data.shop_id.length > 0
+      && typeof data.product_id === 'string' && data.product_id.length > 0
+      && data.source_type === 'demo_simulation'
+  }
   if (type === 'seller_options') {
     return Array.isArray(data.offers) && data.offers.length <= 12
       && data.offers.every((offer) => isRecord(offer) && typeof offer.id === 'string'
