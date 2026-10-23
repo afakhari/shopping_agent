@@ -1640,7 +1640,7 @@ export function MissionPanel({
                     onToggleOffers={toggleProductOffers}
                     onLoadMoreOffers={loadMoreProductOffers}
                     resultSetId={isCurrentResult ? resultSetId : null}
-                    routeOrigin={constraints.lat !== undefined && constraints.lon !== undefined
+                    routeOrigin={typeof constraints.lat === 'number' && typeof constraints.lon === 'number'
                       ? { lat: constraints.lat, lon: constraints.lon } : null}
                     allowActions={isCurrentResult && !resultsStale && !queuePaused && !isRunning && !isRestoring}
                   />
