@@ -11,6 +11,7 @@ from typing import Any
 
 from apps.catalog.services.normalization import normalize_persian_text
 from apps.agent.amounts import NUMBER_TOKEN, toman_amount
+from apps.agent.dialogue_policy import resolve_dialogue_policy
 
 _ORDINALS = {"اولی": 0, "اول": 0, "دومی": 1, "دوم": 1,
              "سومی": 2, "سوم": 2, "چهارمی": 3, "چهارم": 3}
@@ -25,42 +26,12 @@ _BUDGET = re.compile(
     rf"\s*(?P<amount>{NUMBER_TOKEN})\s*(?P<unit>میلیون|هزار|تومان)?"
 )
 _CREDIT_NEGATION = re.compile(r"(?:بدون|نمی ?خوام|لازم نیست|نمی ?خوامش).{0,24}(?:قسطی|اعتباری|ترب ?پی)|(?:قسطی|اعتباری).{0,12}(?:نباشه|نمی ?خوام)")
-_WHY = re.compile(r"^(?:چرا|به چه دلیل|دلیلش چیه|چرا اینو پیشنهاد دادی|چرا این مدل)(?:.*)?$")
+_WHY = re.compile(
+    r"^(?:چرا(?: اینو پیشنهاد دادی| این مدل| این محصول| اینو| این| پیشنهاد دادی)?"
+    r"|به چه دلیل این(?:و)?|دلیلش چیه)$"
+)
 _SELLER_WORDS = re.compile(r"(?:فروشنده|فروشگاه|مغازه|پاساژ)")
 _STORE_QUESTION = re.compile(r"(?:ساعت|باز(?:ه| است)|بسته|آدرس|نشانی|کجا|موجودی|تلفن|تماس)")
-# A bare «لپ» can mean a cheek/cosmetic request or an abbreviated laptop.
-# Never let the model silently commit to a product category here.
-_BARE_LAP = re.compile(r"(?<!\w)لپ(?!\w)")
-_LAPTOP = re.compile(r"(?:لپ\s*تاپ|لپتاپ|لپ\s*تاب|نوت\s*بوک)")
-_GPU_TERM = re.compile(r"(?:کارت\s*گرافیک|گرافیک\s*مجزا|گرافیک\s*آن\s*بورد)")
-_GPU_QUESTION = re.compile(
-    r"(?:نمیدونم|نمی\s*دونم|نمی\s*دانم|ایا|آیا|"
-    r"نیاز|لازم|ضروری|باید|یا\s*نه|کافیه|فرق|تفاوت)"
-)
-
-
-def _shopping_advice(message: str) -> str | None:
-    """Answer narrow buying-advice questions without fabricating catalog facts."""
-    if (_LAPTOP.search(message) and _GPU_TERM.search(message)
-            and _GPU_QUESTION.search(message)):
-        # A specific requested GPU model is a product search, not an advice request.
-        if re.search(r"(?<!\w)(?:rtx|gtx|rx)\s*\d{3,4}(?!\w)", message):
-            return None
-        return (
-            "برای خرید لپ‌تاپ، همهٔ دستگاه‌ها پردازش گرافیکی دارند؛ "
-            "سؤال اصلی این است که آیا «کارت گرافیک مجزا» لازم داری یا نه. "
-            "برای کارهای روزمره، آفیس، وب‌گردی و پخش عکس یا اسلاید در مراسم، "
-            "گرافیک مجتمع معمولاً کافی است. "
-            "برای تدوین سنگین فیلم عروسی، افکت‌های ویدئویی، کار سه‌بعدی "
-            "یا بازی‌های سنگین، کارت گرافیک مجزا می‌تواند کمک کند. "
-            "اگر منظورت از استفاده در عروسی «پخش عکس و موسیقی» است یا «تدوین فیلم»، "
-            "بگو تا با توجه به بودجه راهنمایی دقیق‌تری بدهم. "
-            "فعلاً بدون مشخص‌شدن کاربردت مدلی را قطعی پیشنهاد نمی‌کنم."
-        )
-    return None
-
-
-
 def _budget_value(message: str) -> str | None:
     match = _BUDGET.search(message)
     if not match:
@@ -85,21 +56,6 @@ def classify_contextual_turn(message: str, state: dict[str, Any] | None) -> dict
     focus = state.get("active_surface", "products")
     if not normalized:
         return {"kind": "clarify", "reply": "چه محصولی را برای خرید حضوری بررسی کنیم؟"}
-
-    # High-cost failure: a shortened noun is NOT permission to guess laptop or
-    # makeup, even if optional LLM intent extraction would confidently choose one.
-    if _BARE_LAP.search(normalized) and not _LAPTOP.search(normalized):
-        return {
-            "kind": "clarify",
-            "reply": (
-                "منظورت از «لپ» لپ‌تاپ برای کارهای مراسم عروسی است یا "
-                "وسیلهٔ آرایش صورت؟ کاربرد دقیق را بگو تا پیشنهاد نامربوط ندهم."
-            ),
-        }
-
-    advice = _shopping_advice(normalized)
-    if advice:
-        return {"kind": "clarify", "reply": advice}
 
     # "دومی خوبه ولی فروشنده نزدیک تر..." is a structured two-step action.
     combined = re.match(
@@ -199,6 +155,12 @@ def classify_contextual_turn(message: str, state: dict[str, Any] | None) -> dict
         x in normalized for x in ("این فروشگاه", "همون فروشگاه", "آدرسش", "ساعتش", "موجودیش")
     ):
         return {"kind": "clarify", "reply": "کدام فروشگاه؟ فروشنده را از فهرست انتخاب کن تا فقط داده‌های ثبت‌شده را توضیح بدهم."}
+
+    # Resolve deterministic product/seller actions first. Only questions
+    # left unresolved by those grounded actions reach the pre-search policy.
+    policy = resolve_dialogue_policy(message, state)
+    if policy is not None:
+        return dict(policy)
 
     value = _budget_value(normalized)
     # A budget-only update has no new product tokens after the amount.

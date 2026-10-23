@@ -193,17 +193,6 @@ def product_search_page(filters: dict[str, Any]) -> dict[str, Any]:
 
     category_scope = resolve_category_scope(normalized_query)
     products = Product.objects.filter(_product_match_query(normalized_query))
-    # A regular laptop search must not recommend electronic toy laptops.
-    # Keep educational toy results available when the user explicitly asks for them.
-    if (
-        ("لپ تاپ" in normalized_query or "لپتاپ" in normalized_query)
-        and not any(cue in normalized_query for cue in ("آموزشی کودک", "اسباب بازی", "اسباب‌بازی"))
-    ):
-        products = products.exclude(
-            Q(normalized_title__icontains="آموزشی کودک")
-            | Q(normalized_title__icontains="اسباب بازی")
-            | Q(category_name__icontains="اسباب بازی")
-        )
     if category_scope is not None:
         products = products.filter(category_scope.query)
     # One Boolean semi-join per candidate product. Unlike joining Offer plus

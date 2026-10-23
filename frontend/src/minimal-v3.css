@@ -1682,3 +1682,15 @@
 /* Secondary copy remains readable against white, including small metadata. */
 .redesign-v2 .mission-offer-count { color: #626971; }
 .redesign-v2 .conversation-composer textarea::placeholder { color: #686d77; opacity: 1; }
+
+/* An advice reply must not bury the conversation beneath past catalog lists.
+   Native <details> keeps earlier evidence keyboard-accessible and reversible. */
+.redesign-v2 .conversation-results-history { min-width: 0; }
+.redesign-v2 .conversation-results-history > summary {
+  cursor: pointer; padding: 8px 12px; border-radius: 10px;
+  font-size: 12px; font-weight: 650; color: #404955;
+  background: #f4f5f8; margin: 8px 0;
+}
+.redesign-v2 .conversation-results-history > summary:focus-visible {
+  outline: 2px solid #c9233a; outline-offset: 3px;
+}

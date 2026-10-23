@@ -361,7 +361,7 @@ def mission_turn(request, mission_id: str):
             "kind": "location_clarify",
             "reply": "برای مرتب‌سازی فروشگاه‌ها بر اساس نزدیکی، ابتدا موقعیت یا محدوده تهران را انتخاب کن.",
         }
-    if decision["kind"] in {"select_product", "explore_sellers", "contact_prompt", "compare", "select_offer", "seller_details", "seller_recovery", "explain", "clarify", "location_clarify"}:
+    if decision["kind"] in {"select_product", "explore_sellers", "contact_prompt", "compare", "select_offer", "seller_details", "seller_recovery", "explain", "clarify", "advice", "location_clarify"}:
         # No extra LLM call for a grounded contextual turn. Re-evaluate every
         # selection with the *effective* constraints inside the row lock.
         with transaction.atomic():
@@ -583,6 +583,18 @@ def mission_turn(request, mission_id: str):
                         (mission.state or {}).get("candidate_product_ids")
                     )}
                     mission.save(update_fields=["constraints", "state", "updated_at"])
+                if "pending_dialogue" in decision:
+                    pending_slot = decision["pending_dialogue"]
+                    updated_state = dict(mission.state or {})
+                    if pending_slot is None:
+                        updated_state.pop("pending_dialogue", None)
+                    else:
+                        updated_state["pending_dialogue"] = pending_slot
+                    mission.state = updated_state
+                    mission.status = PurchaseMission.Status.WAITING_FOR_USER
+                    if pending_slot:
+                        mission.current_stage = "awaiting_clarification"
+                    mission.save(update_fields=["state", "status", "current_stage", "updated_at"])
                 reply = decision.get("reply", "لطفاً منظورت را دقیق‌تر مشخص کن.")
             scoped_events = [
                 ("user.message", {"message": data["message"]}),
@@ -613,7 +625,19 @@ def mission_turn(request, mission_id: str):
         response_stream["X-Mission-ID"] = str(mission.pk)
         return response_stream
 
-    if decision["kind"] == "refine":
+    if decision["kind"] == "search" and decision.get("query_override"):
+        # The preceding turns completed a persisted, typed clarification.
+        # Never ask the model to reinterpret a bare budget answer as a product.
+        preflight_constraints = _validate_full_constraints(
+            preflight_constraints, decision.get("constraint_updates", {})
+        )
+        intent_result = {
+            "search_query": decision["query_override"],
+            "max_price_toman": preflight_constraints.get("max_price_toman"),
+            "must_have_in_person_credit": preflight_constraints.get("must_have_in_person_credit", False),
+            "sort": preflight_constraints.get("sort", "relevance"),
+        }
+    elif decision["kind"] == "refine":
         # A change such as "بودجه‌م شد دو میلیون" is not a new product query.
         # Keep the last catalogue phrase and recheck all offer-level constraints.
         preflight_constraints = _validate_full_constraints(
@@ -639,6 +663,17 @@ def mission_turn(request, mission_id: str):
         if previous is not None:
             return previous
         constraints = _validate_full_constraints(mission.constraints, data.get("constraints", {}))
+        if decision["kind"] == "search" and decision.get("query_override"):
+            locked_decision = classify_contextual_turn(data["message"], mission.state)
+            if locked_decision.get("kind") != "search" or (
+                locked_decision.get("query_override") != decision.get("query_override")
+            ):
+                raise ValidationError({
+                    "message": "زمینه پاسخ روشن‌سازی تغییر کرده است؛ لطفاً دوباره درخواست بده."
+                })
+            constraints = _validate_full_constraints(
+                constraints, locked_decision.get("constraint_updates", {})
+            )
         if decision["kind"] == "refine":
             # Server-owned context is checked again inside the lock.
             locked_decision = classify_contextual_turn(data["message"], mission.state)
@@ -652,12 +687,15 @@ def mission_turn(request, mission_id: str):
 
         graph_state = run_purchase_graph(
             mission_id=str(mission.pk),
-            message=decision["query"] if decision["kind"] == "refine" else data["message"],
+            message=(
+                decision["query"] if decision["kind"] == "refine"
+                else decision.get("query_override", data["message"])
+            ),
             constraints=constraints,
             intent_result=intent_result,
             intent_resolved=True,
         )
-        if decision["kind"] == "refine":
+        if decision["kind"] == "refine" or decision.get("query_override"):
             graph_state["intent_parser"] = "contextual"
         # Persist constraints inferred from the user's natural-language message (e.g. budget or
         # in-person credit), not only the filter values supplied by the UI. The same effective
