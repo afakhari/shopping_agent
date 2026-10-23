@@ -1747,10 +1747,6 @@ export function MissionPanel({
         <button className="mission-manual-region-toggle" type="button" aria-expanded={showRegionPicker} disabled={isRunning || isRestoring} onClick={() => setShowRegionPicker(value => !value)}>
           <MapPin size={13} /> انتخاب دستی محدوده
         </button>
-        <details className="conversation-disclosure">
-          <summary>درباره داده‌ها</summary>
-          <p>قیمت‌ها تاریخی‌اند و موجودی به‌صورت نمایشی بررسی می‌شود. بیشتر نام فروشگاه‌ها و همه شماره‌های تماس دیتاست مسابقه ساختگی‌اند.</p>
-        </details>
       </div>
       {showRegionPicker && (
         <div className="mission-manual-region-panel">
