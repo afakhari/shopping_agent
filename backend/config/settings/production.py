@@ -2,6 +2,7 @@
 import os
 from django.core.exceptions import ImproperlyConfigured
 
+from . import base as base_settings
 from .base import *  # noqa: F403
 
 DEBUG = False
@@ -30,11 +31,12 @@ X_FRAME_OPTIONS = "DENY"
 
 # Defence in depth for an anonymous public API. An edge/global quota is still
 # essential: Django's default per-process cache is not a distributed rate limiter.
-REST_FRAMEWORK["DEFAULT_THROTTLE_CLASSES"] = [
-    "rest_framework.throttling.AnonRateThrottle",
-]
-REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"] = {
-    "anon": os.environ.get("DJANGO_ANON_RATE", "120/min"),
+REST_FRAMEWORK = {
+    **base_settings.REST_FRAMEWORK,
+    "DEFAULT_THROTTLE_CLASSES": ["rest_framework.throttling.AnonRateThrottle"],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": os.environ.get("DJANGO_ANON_RATE", "120/min"),
+    },
 }
 
 # A listening web process is not production-ready until the catalog is populated.
