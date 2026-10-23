@@ -15,6 +15,7 @@ from typing import Any, Literal, TypedDict
 
 from apps.agent.amounts import NUMBER_TOKEN, toman_amount
 from apps.agent.conversation import classify_conversation_intent
+from apps.agent.recommendation_frame import resolve_recommendation_frame
 from apps.catalog.services.normalization import normalize_persian_text
 
 DialogueAction = Literal["clarify", "advice", "search"]
@@ -172,22 +173,11 @@ def resolve_dialogue_policy(
             },
         }
 
-    # A recommendation question names a product family and a use case.
-    # Persist them before asking about budget; never search for "video" alone.
-    if (_LAPTOP.search(normalized) and _USAGE_EDIT.search(normalized)
-            and (asking or "مناسب" in normalized or "پیشنهاد" in normalized)):
-        amount = _budget(normalized)
-        if amount:
-            return {
-                "kind": "search", "query_override": "لپ تاپ",
-                "constraint_updates": {"max_price_toman": amount},
-                "usage_profile": "video_editing", "pending_dialogue": None,
-            }
-        return {
-            "kind": "clarify",
-            "reply": "برای تدوین ویدیو لپ‌تاپ بررسی می‌کنیم. سقف بودجه‌ات چند تومان است؟",
-            "pending_dialogue": {"slot": "laptop_budget", "usage": "editing"},
-        }
+    # Typed, reusable recommendation slot filling. The product family is
+    # canonical and never reconstructed from a budget-only or use-case reply.
+    framed = resolve_recommendation_frame(message, state)
+    if framed is not None:
+        return dict(framed)
 
     if pending and pending["slot"] == "laptop_usage":
         if _USAGE_EDIT.search(normalized) or _USAGE_PRESENT.search(normalized):
