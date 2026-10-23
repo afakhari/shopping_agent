@@ -420,6 +420,21 @@ function ContactStatus({ component }: { component: GenUIComponent }) {
   )
 }
 
+function RegionChoice({ disabled, onAction }: {
+  disabled: boolean
+  onAction: (action: GenUIAction) => void
+}) {
+  return <section className="genui-region-choice" aria-label="انتخاب محدوده تهران">
+    <strong>برای نزدیک‌ترین فروشنده، مبدأ را انتخاب کن</strong>
+    <p>فهرست فروشگاه‌های دیتاست محدود است. انتخاب منطقه، مختصات تقریبی ثبت‌شده را اعمال می‌کند؛
+      فاصله‌ها مستقیم‌اند و زمان سفر محاسبه نمی‌شود.</p>
+    <button type="button" disabled={disabled} className="genui-secondary-action"
+      onClick={() => onAction({ type: 'open_region_picker' })}>
+      <MapPin size={16} aria-hidden="true"/> انتخاب دستی محدوده تهران
+    </button>
+  </section>
+}
+
 function ContactConsent({ component, disabled, onAction }: {
   component: GenUIComponent
   disabled: boolean
@@ -507,6 +522,8 @@ function renderComponent(component: GenUIComponent, defaults: GenUIDefaults, onA
       return <ContactStatus key={component.id ?? component.type} component={component} />
     case 'notice':
       return <section className="genui-notice"><ClipboardList size={17} /><span>{text(component.data.message, text(component.data.title))}</span></section>
+    case 'location_choice':
+      return <RegionChoice disabled={disabled} onAction={onAction} />
     case 'contact_prompt':
       return <ContactConsent key={component.id ?? component.type} component={component}
         disabled={disabled} onAction={onAction} />
