@@ -69,6 +69,24 @@ def classify_contextual_turn(message: str, state: dict[str, Any] | None) -> dict
     if not normalized:
         return {"kind": "clarify", "reply": "چه محصولی را برای خرید حضوری بررسی کنیم؟"}
 
+    # "دومی خوبه ولی فروشنده نزدیک تر..." is a structured two-step action.
+    combined = re.match(
+        r"^(?:مدل |محصول )?(اولی|اول|دومی|دوم|سومی|سوم|چهارمی|چهارم)"
+        r"(?: رو| را)? (?:خوبه|می خوام|انتخاب کن|انتخاب کردم|بیشتر دوست دارم)"
+        r" (?:ولی|اما|و) (.+)$", normalized
+    )
+    if combined:
+        index = _ORDINALS[combined.group(1)]
+        second = combined.group(2)
+        if focus != "products" or index >= len(visible_ids):
+            return {"kind": "clarify", "reply": "منظورت محصول است یا فروشنده؟ لطفاً از فهرست فعال انتخاب کن."}
+        if "فروشنده" in second or "فروشگاه" in second or "نزدیک" in second:
+            return {
+                "kind": "select_product", "product_id": visible_ids[index], "index": index,
+                "explore_sellers": True, "prefer_distance": "نزدیک" in second,
+            }
+        return {"kind": "clarify", "reply": "مدل موردنظرت مشخص است؛ بخش دوم درخواست را کوتاه‌تر توضیح بده."}
+
     # Explicit seller noun takes precedence over product focus. Bare ordinals
     # refer ONLY to the currently focused surface, never the history at large.
     ordinal_match = re.search(r"(?<!\S)(اولی|اول|دومی|دوم|سومی|سوم|چهارمی|چهارم)(?!\S)", normalized)
@@ -94,24 +112,6 @@ def classify_contextual_turn(message: str, state: dict[str, Any] | None) -> dict
         if index < len(visible_ids):
             return {"kind": "select_product", "product_id": visible_ids[index], "index": index}
         return {"kind": "clarify", "reply": "این شماره در نتایج فعلی مشخص نیست. نام مدل را بگو یا از کارت همان محصول استفاده کن."}
-
-    # "دومی خوبه ولی فروشنده نزدیک تر..." is a structured two-step action.
-    combined = re.match(
-        r"^(?:مدل |محصول )?(اولی|اول|دومی|دوم|سومی|سوم|چهارمی|چهارم)"
-        r"(?: رو| را)? (?:خوبه|می خوام|انتخاب کن|انتخاب کردم|بیشتر دوست دارم)"
-        r" (?:ولی|اما|و) (.+)$", normalized
-    )
-    if combined:
-        index = _ORDINALS[combined.group(1)]
-        second = combined.group(2)
-        if focus != "products" or index >= len(visible_ids):
-            return {"kind": "clarify", "reply": "منظورت محصول است یا فروشنده؟ لطفاً از فهرست فعال انتخاب کن."}
-        if "فروشنده" in second or "فروشگاه" in second or "نزدیک" in second:
-            return {
-                "kind": "select_product", "product_id": visible_ids[index], "index": index,
-                "explore_sellers": True, "prefer_distance": "نزدیک" in second,
-            }
-        return {"kind": "clarify", "reply": "مدل موردنظرت مشخص است؛ بخش دوم درخواست را کوتاه‌تر توضیح بده."}
 
     # A reported failed physical visit/contact is a recovery request, not
     # a new catalogue product name. It is user-reported, not real verification.
