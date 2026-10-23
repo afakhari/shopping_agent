@@ -39,7 +39,7 @@ describe('seller location trust and coordinated selection', () => {
     const markup = renderToStaticMarkup(<SellerLocationBoard
       offers={shops} selectedOfferId="unknown" onSelectOffer={() => {}} disabled={false} />)
     expect(markup).toContain('فروشگاه نمایشی unknown')
-    expect(markup).toContain('مختصات این فروشنده')
+    expect(markup).toContain('مختصات معتبر در محدودهٔ پوشش تهران')
     expect(markup).toContain('نام بسیاری از فروشگاه‌ها')
     expect(markup).not.toContain('<iframe')
   })
