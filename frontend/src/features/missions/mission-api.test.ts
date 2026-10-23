@@ -85,7 +85,7 @@ describe('SSE stream terminal state', () => {
 
 describe('Neshan route boundaries', () => {
   it('checks server capability without spending a paid routing request', async () => {
-    const fetchMock = vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => new Response(JSON.stringify({
+    const fetchMock = vi.fn<typeof fetch>(async () => new Response(JSON.stringify({
       provider: 'neshan', enabled: false, modes: [],
     }), { status: 200 }))
     vi.stubGlobal('fetch', fetchMock)
@@ -96,7 +96,7 @@ describe('Neshan route boundaries', () => {
   })
 
   it('sends only scoped offer IDs and the explicitly chosen Tehran origin', async () => {
-    const fetchMock = vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => new Response(JSON.stringify({
+    const fetchMock = vi.fn<typeof fetch>(async () => new Response(JSON.stringify({
       provider: 'neshan', mode: 'car', status: 'unavailable', reason: 'not_configured',
       estimates: [], availability_verified: false, source: 'provider_route_estimate',
     }), { status: 200 }))
