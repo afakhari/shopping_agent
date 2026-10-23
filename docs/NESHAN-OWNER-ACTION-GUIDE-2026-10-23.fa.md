@@ -1,5 +1,7 @@
 # راهنمای اقدامات مالک پروژه برای اتصال واقعی نشان به بازارکامپس
 
+> **به‌روزرسانی بعد از اعلام مالک:** دو سرویس «ماتریس فاصله با ترافیک» و «مسیریابی با ترافیک + ETA» در پنل انتخاب شده‌اند و کلید REST ساخته شده است. نیازی نیست این دو را دوباره ایجاد کنی. هنوز معلوم نیست کلید وب مخصوص React/OpenLayers ساخته شده باشد. راهنمای نصب نقشه: [تصمیم React/OpenLayers](NESHAN-REACT-OPENLAYERS-PLAN-2026-10-23.fa.md).
+
 **تاریخ:** ۲۳ اکتبر ۲۰۲۶ · **اولویت:** کاربرد واقعی در تهران، هزینه قابل پیش‌بینی، عدم گمراهی کاربران، بدون افشای کلید. این سند دستورالعمل اجرای مالک است، نه مدرک فعال‌بودن حساب نشان.
 
 ## الان چه چیزهایی کار می‌کنند؟
@@ -45,7 +47,10 @@ $secret = Read-Host "Private Neshan REST Matrix key" -AsSecureString
 $ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secret)
 try {
   $env:NESHAN_ROUTING_API_KEY = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr)
-  py -3 scripts/neshan_smoke.py --live --authorize-one-call
+  py -3 scripts/neshan_smoke.py --service matrix --live --authorize-one-call
+  # این فرمان جداگانه احتمالاً هزینه یک درخواست جدید دارد؛
+  # فقط بعد از تأیید مستقل سهمیه مسیریابی:
+  # py -3 scripts/neshan_smoke.py --service direction --live --authorize-one-call
 } finally {
   Remove-Item Env:NESHAN_ROUTING_API_KEY -ErrorAction SilentlyContinue
   [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr)
@@ -63,7 +68,9 @@ try {
 
 ```dotenv
 NESHAN_ROUTING_ENABLED=1
-NESHAN_ROUTING_API_KEY=<PRIVATE_REST_MATRIX_KEY_IN_HOST_SECRETS>
+# فقط پس از موفقیت smoke جداگانه Direction و تأیید هزینه:
+NESHAN_DIRECTION_ENABLED=0
+NESHAN_ROUTING_API_KEY=<PRIVATE_REST_KEY_IN_HOST_SECRETS>
 NESHAN_ROUTING_MAX_CALLS_PER_MISSION=1
 NESHAN_ROUTING_DAILY_MAX_CALLS=2
 ```
@@ -100,3 +107,11 @@ One-call host smoke: PASS / HTTP code / not-run
 ```
 
 کلیدهای خام، شماره تماس، فایل .env و اطلاعات ورود را **هرگز** در متن گفتگو یا Issue ثبت نکن.
+
+
+## مرحله خاص بعد از فعال‌سازی دو سرویس REST توسط مالک
+
+1. با کلید کنونی، در هاست مقصد ابتدا smoke **Matrix** و سپس (فقط با اجازه پرداخت جدید) smoke **Direction** را جداگانه اجرا کن. هر فرمان دقیقاً یک درخواست به endpoint مربوطه دارد و حاوی موقعیت کاربر واقعی نیست.
+2. بعد از PASS هر دو و تأیید سهمیه واقعی، `NESHAN_DIRECTION_ENABLED=1` را در secret/config محیط سرور بگذار؛ با خاموش بودن `NESHAN_ROUTING_ENABLED` هر دو همچنان خاموش‌اند. سقف مشترک درخواست روزانه شامل Matrix و Direction می‌شود.
+3. برای نقشه React/OpenLayers نشان به **یک کلید وب جداگانه** نیاز است؛ فعال کردن سرویس‌های REST به معنی مجازبودن `mapKey` وب نیست. بدون کلید و تست بسته‌های npm و lockfile، در کد فعلی نقشه هنوز OSM اختیاری است.
+4. چون کاربر کلید REST ساخته است، **مهم‌ترین اطلاعات غیرمحرمانه باقی‌مانده** عبارت است از: `web_map_key_created=yes/no`، نام نوع هاست، وضعیت دامنه HTTPS، تعرفه و اعتبار پنل، `smoke_matrix=PASS|not-run|HTTP-code` و `smoke_direction=PASS|not-run|HTTP-code`. **خود کلید و عکس آن را ارسال نکن.**

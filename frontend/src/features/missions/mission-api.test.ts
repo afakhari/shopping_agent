@@ -95,6 +95,27 @@ describe('Neshan route boundaries', () => {
     expect(fetchMock.mock.calls[0]?.[1]?.method ?? 'GET').toBe('GET')
   })
 
+  it('requires a deliberate Direction request for exactly one selected seller', async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => new Response(JSON.stringify({
+      provider: 'neshan', service: 'direction', mode: 'car', status: 'ok',
+      route: {offer_id: 'o2', status: 'ok', duration_seconds: 420, route_distance_meters: 2000},
+      estimates: [], availability_verified: false, source: 'provider_route_estimate',
+    }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+    const value = await requestRouteEstimates('mission', {
+      service: 'direction',
+      result_set_id: 'set',
+      offer_ids: ['o2'], mode: 'car',
+      origin: {lat: 35.7, lon: 51.4, source: 'manual_region'},
+    })
+    expect(value.route?.offer_id).toBe('o2')
+    expect(value.route?.duration_seconds).toBe(420)
+    const input = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))
+    expect(input.service).toBe('direction')
+    expect(input.offer_ids).toEqual(['o2'])
+    expect(value.availability_verified).toBe(false)
+  })
+
   it('sends only scoped offer IDs and the explicitly chosen Tehran origin', async () => {
     const fetchMock = vi.fn<typeof fetch>(async () => new Response(JSON.stringify({
       provider: 'neshan', mode: 'car', status: 'unavailable', reason: 'not_configured',

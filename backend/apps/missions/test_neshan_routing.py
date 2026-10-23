@@ -130,6 +130,47 @@ class RouteEstimateTests(TestCase):
         self.assertEqual(self.client.post(self.url, self.payload, format="json").status_code, 404)
 
 
+    @override_settings(
+        NESHAN_ROUTING_ENABLED=True,
+        NESHAN_ROUTING_API_KEY="fake-unit-test-key",
+        NESHAN_ROUTING_MAX_CALLS_PER_MISSION=3,
+        NESHAN_ROUTING_DAILY_MAX_CALLS=3,
+        NESHAN_DIRECTION_ENABLED=False,
+    )
+    def test_direction_requires_separate_enable_and_one_offer(self):
+        payload = {**self.payload, "service": "direction", "offer_ids": ["a1"]}
+        with patch("apps.missions.views.read_direction") as paid:
+            result = self.client.post(self.url, payload, format="json")
+            paid.assert_not_called()
+        self.assertEqual(result.status_code, 200)
+        self.assertEqual(result.json()["estimates"], [])
+        self.assertEqual(result.json()["status"], "unavailable")
+        self.assertFalse(self.client.get(self.url).json()["direction_enabled"])
+        invalid = self.client.post(self.url, {**self.payload, "service": "direction"}, format="json")
+        self.assertEqual(invalid.status_code, 400)
+
+    @override_settings(
+        NESHAN_ROUTING_ENABLED=True,
+        NESHAN_DIRECTION_ENABLED=True,
+        NESHAN_ROUTING_API_KEY="fake-unit-test-key",
+        NESHAN_ROUTING_MAX_CALLS_PER_MISSION=2,
+        NESHAN_ROUTING_DAILY_MAX_CALLS=2,
+    )
+    def test_direction_uses_exact_offer_and_same_shared_budget(self):
+        payload = {**self.payload, "service": "direction", "offer_ids": ["a1"]}
+        with patch("apps.missions.views.read_direction", return_value={
+            "status": "ok", "duration_seconds": 480,
+            "route_distance_meters": 3100, "encoded_polyline": "abc",
+        }) as paid:
+            response = self.client.post(self.url, payload, format="json")
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.json()["route"]["offer_id"], "a1")
+            self.assertEqual(response.json()["route"]["duration_seconds"], 480)
+            self.assertFalse(response.json()["availability_verified"])
+            paid.assert_called_once()
+        mission = PurchaseMission.objects.get(pk=self.mission_id)
+        self.assertEqual(mission.state["neshan_route_calls"], 1)
+
 class MatrixParserTests(TestCase):
     @override_settings(
         NESHAN_ROUTING_ENABLED=True,
@@ -160,3 +201,41 @@ class MatrixParserTests(TestCase):
         sent_request = opener.open.call_args.args[0]
         self.assertTrue(sent_request.full_url.startswith("https://api.neshan.org/v1/distance-matrix?"))
         self.assertEqual(sent_request.get_header("Api-key"), "fake-test")
+
+class DirectionParserTests(TestCase):
+    @override_settings(
+        NESHAN_ROUTING_ENABLED=True,
+        NESHAN_DIRECTION_ENABLED=True,
+        NESHAN_ROUTING_API_KEY="fake-test",
+        NESHAN_ROUTING_MAX_CALLS_PER_MISSION=2,
+        NESHAN_ROUTING_DAILY_MAX_CALLS=2,
+    )
+    def test_direction_v4_parses_provider_geometry_and_rejects_missing_metrics(self):
+        from unittest.mock import MagicMock
+        from apps.missions.neshan_routing import RoutingUnavailable, read_direction
+
+        opener = MagicMock()
+        reply = MagicMock()
+        reply.status = 200
+        reply.read.return_value = json.dumps({"routes": [{
+            "overview_polyline": {"points": "abc"},
+            "legs": [{"duration": {"value": 440},
+                      "distance": {"value": 2800}, "summary": "test"}],
+        }]}).encode()
+        context = MagicMock()
+        context.__enter__.return_value = reply
+        opener.open.return_value = context
+        with patch("apps.missions.neshan_routing.build_opener", return_value=opener):
+            result = read_direction((35.7, 51.4), (35.71, 51.41), "car")
+        self.assertEqual(result["duration_seconds"], 440)
+        self.assertEqual(result["route_distance_meters"], 2800)
+        self.assertEqual(result["encoded_polyline"], "abc")
+        request = opener.open.call_args.args[0]
+        self.assertTrue(request.full_url.startswith("https://api.neshan.org/v4/direction?"))
+        self.assertEqual(request.get_header("Api-key"), "fake-test")
+
+        reply.read.return_value = b'{"routes":[{"legs":[{"distance":{"value":50}}]}]}'
+        with patch("apps.missions.neshan_routing.build_opener", return_value=opener):
+            with self.assertRaises(RoutingUnavailable):
+                read_direction((35.7, 51.4), (35.71, 51.41), "car")
+

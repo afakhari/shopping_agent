@@ -23,7 +23,9 @@ class NoRedirects(HTTPRedirectHandler):
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Offline-first one-call Neshan Matrix smoke test")
+    parser = argparse.ArgumentParser(description="Offline-first one-call Neshan smoke test")
+    parser.add_argument("--service", choices=("matrix", "direction"), default="matrix",
+                        help="One Neshan REST operation per explicit live invocation")
     parser.add_argument("--live", action="store_true",
                         help="Contact Neshan (potentially billable) exactly once")
     parser.add_argument("--authorize-one-call", action="store_true",
@@ -39,13 +41,21 @@ def main() -> int:
     if not key:
         parser.error("NESHAN_ROUTING_API_KEY must be set only in the private environment")
     # Fixed representative Tehran points; no geolocation, merchant name or private user data.
-    params = urlencode({
-        "type": "car",
-        "origins": "35.700100,51.400100",
-        "destinations": "35.702000,51.402000",
-    })
+    if args.service == "direction":
+        base = "https://api.neshan.org/v4/direction"
+        params = urlencode({
+            "type": "car", "origin": "35.700100,51.400100",
+            "destination": "35.702000,51.402000",
+            "alternative": "false",
+        })
+    else:
+        base = "https://api.neshan.org/v1/distance-matrix"
+        params = urlencode({
+            "type": "car", "origins": "35.700100,51.400100",
+            "destinations": "35.702000,51.402000",
+        })
     request = Request(
-        "https://api.neshan.org/v1/distance-matrix?" + params,
+        base + "?" + params,
         headers={"Api-Key": key, "Accept": "application/json"},
         method="GET",
     )
@@ -64,9 +74,13 @@ def main() -> int:
         return 2
     try:
         data = json.loads(content)
-        element = data["rows"][0]["elements"][0]
-        result = element["status"]
-        overall = data["status"]
+        if args.service == "direction":
+            element = data["routes"][0]["legs"][0]
+            result = overall = "Ok"
+        else:
+            element = data["rows"][0]["elements"][0]
+            result = element["status"]
+            overall = data["status"]
     except (ValueError, LookupError, TypeError):
         print("LIVE_RESULT=UNEXPECTED_JSON")
         return 2
@@ -79,7 +93,7 @@ def main() -> int:
     if not isinstance(duration, (int, float)) or not isinstance(distance, (int, float)):
         print("LIVE_RESULT=INVALID_NUMERIC_FIELDS")
         return 2
-    print("LIVE_RESULT=PASS; NESHAN_REQUESTS=1; result=Ok")
+    print("LIVE_RESULT=PASS; NESHAN_REQUESTS=1; service=" + args.service + "; result=Ok")
     print("duration_seconds=" + str(duration) + "; route_distance_meters=" + str(distance))
     print("These are live provider estimates for fixed DEMO coordinates, not stock or shop verification.")
     return 0

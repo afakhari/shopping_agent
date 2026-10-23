@@ -37,8 +37,9 @@ from apps.missions.serializers import (
 from apps.missions.services import append_events_locked, serialize_mission
 from apps.missions.visit_plan import build_visit_plan
 from apps.missions.neshan_routing import (
-    RoutingUnavailable, neshan_enabled, read_matrix,
-    safe_response, successful_response,
+    RoutingUnavailable, neshan_enabled, neshan_direction_enabled,
+    read_matrix, read_direction, safe_response, successful_response,
+    successful_direction_response,
 )
 from django.conf import settings
 from apps.catalog.services.normalization import normalize_persian_text
@@ -659,6 +660,7 @@ def route_estimates(request, mission_id: str):
     if request.method == "GET":
         enabled = neshan_enabled()
         return Response({"provider": "neshan", "enabled": enabled,
+                         "direction_enabled": neshan_direction_enabled(),
                          "modes": ["car", "motorcycle"] if enabled else []})
 
     serializer = RouteEstimatesSerializer(data=request.data)
@@ -703,7 +705,8 @@ def route_estimates(request, mission_id: str):
             raise ValidationError({"offer_ids": "مختصات همه فروشندگان باید در محدوده داده تهران معتبر باشد."})
 
     mode = data["mode"]
-    if not neshan_enabled():
+    service = data["service"]
+    if not neshan_enabled() or (service == "direction" and not neshan_direction_enabled()):
         return Response(safe_response(mode=mode))
 
     # DB row lock enforces per-mission cap across workers. A global paid-call
@@ -731,6 +734,16 @@ def route_estimates(request, mission_id: str):
         locked.state = locked_state
         locked.save(update_fields=["state", "updated_at"])
     try:
+        if service == "direction":
+            only = offers[0]
+            result = read_direction(
+                (origin["lat"], origin["lon"]),
+                (only.shop.lat, only.shop.lon),
+                mode,
+            )
+            return Response(successful_direction_response(
+                mode=mode, offer_id=only.source_id, route=result,
+            ))
         matrix = read_matrix(
             (origin["lat"], origin["lon"]),
             [(offer.shop.lat, offer.shop.lon) for offer in offers],
