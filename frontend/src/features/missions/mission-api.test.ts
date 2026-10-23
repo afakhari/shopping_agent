@@ -108,8 +108,8 @@ describe('Neshan route boundaries', () => {
     expect(value.estimates).toEqual([])
     expect(value.status).toBe('unavailable')
     const options = fetchMock.mock.calls[0][1]
-    expect(options.method).toBe('POST')
-    expect(JSON.parse(String(options.body))).toEqual({
+    expect(options?.method).toBe('POST')
+    expect(JSON.parse(String(options?.body))).toEqual({
       result_set_id: 'current', origin: { lat: 35.7, lon: 51.4, source: 'manual_region' },
       offer_ids: ['o1', 'o2'], mode: 'car',
     })
