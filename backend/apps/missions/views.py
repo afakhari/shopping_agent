@@ -590,6 +590,24 @@ def mission_turn(request, mission_id: str):
                         updated_state.pop("pending_dialogue", None)
                     else:
                         updated_state["pending_dialogue"] = pending_slot
+                        # A changed purchasing goal invalidates actions on old
+                        # cards, without erasing the historical evidence.
+                        # This keeps stale contact/visit targets unavailable
+                        # until a new eligible result set is committed.
+                        if (
+                            pending_slot.get("slot") in {
+                                "product_kind", "laptop_usage", "laptop_budget",
+                                "recommendation_family", "recommendation_usage",
+                                "recommendation_budget",
+                            }
+                            and updated_state.get("candidate_product_ids")
+                        ):
+                            updated_state.pop("visit_plan", None)
+                            updated_state.update(
+                                results_stale=True, selected_product_id=None,
+                                selected_offer_id=None, selected_shop_id=None,
+                                active_surface="products", visible_offer_ids=[],
+                            )
                     mission.state = updated_state
                     mission.status = PurchaseMission.Status.WAITING_FOR_USER
                     if pending_slot:
