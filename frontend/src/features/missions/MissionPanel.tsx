@@ -1338,6 +1338,11 @@ export function MissionPanel({
       void contact(offer)
       return
     }
+    if (action.type === 'open_region_picker') {
+      setShowRegionPicker(true)
+      setError(null)
+      return
+    }
     if (action.type === 'fill_query') {
       setMessage(action.query || lastQuery)
       composerInputRef.current?.focus()
