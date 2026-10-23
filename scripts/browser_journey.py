@@ -134,8 +134,7 @@ def main() -> None:
                     # persisted via the focus endpoint before the turn is sent.
                     composer.fill("این دو تا چه فرقی دارند؟")
                     page.get_by_role("button", name="ارسال پیام").click()
-                    page.locator(".genui-comparison-table").last.wait_for()
-                    assert page.locator(".genui-comparison-table").count() >= 2
+                    expect(page.locator(".genui-comparison-table")).to_have_count(2)
                     page.get_by_role("button", name="نمایش همه ویژگی‌ها").click()
                     page.get_by_role("button", name="نمایش فقط تفاوت‌ها").click()
                     page.locator(".mission-compare-clear").first.click()
