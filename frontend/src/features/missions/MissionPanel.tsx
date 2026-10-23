@@ -4,6 +4,7 @@ import { getProductOffers, type CatalogOffer, type CatalogSearchResult, type Pro
 import { buildComparisonSpecColumns } from './comparison-specs'
 import { classifyLocalConversation, localConversationReply } from './greeting-intent'
 import { completedTurnWasPersisted } from './recovery-state'
+import { canDrainQueuedTurn } from './queue-policy'
 import { findCurrentSearchMessage, shouldFollowConversation } from './conversation-behavior'
 import { GenUIRenderer } from './GenUIRenderer'
 import { formatDistance, formatLastPriceChange, getPriceQualityLabel, openStreetMapUrl } from './ui-formatters'
@@ -20,10 +21,12 @@ import {
   getMission,
   isProductResultPayload,
   sendMissionTurn,
+  updateMissionFocus,
   type ContactAttemptResponse,
   type ContactAttemptRecord,
   type MissionConstraints,
   type MissionEvent,
+  type MissionFocusAction,
 } from './mission-api'
 
 const money = new Intl.NumberFormat('fa-IR', { maximumFractionDigits: 0 })
@@ -207,6 +210,10 @@ function ProductResults({
   contactByOffer,
   selectedCompareProductIds,
   onToggleCompare,
+  onSelectProduct,
+  selectedProductId,
+  selectedOfferId,
+  onSelectOffer,
   offerViews,
   onToggleOffers,
   onLoadMoreOffers,
@@ -219,6 +226,10 @@ function ProductResults({
   contactByOffer: Record<string, ContactAttemptResponse>
   selectedCompareProductIds: string[]
   onToggleCompare: (result: CatalogSearchResult) => void
+  onSelectProduct: (productId: string) => void
+  selectedProductId: string | null
+  selectedOfferId: string | null
+  onSelectOffer: (offerId: string) => void
   offerViews: Record<string, ProductOfferView>
   onToggleOffers: (result: CatalogSearchResult) => void
   onLoadMoreOffers: (result: CatalogSearchResult) => void
@@ -230,7 +241,7 @@ function ProductResults({
   const visibleResults = showAllResults ? results : results.slice(0, 4)
   return (
     <div className="mission-product-results" aria-label="نتایج محصولات">
-      {visibleResults.map((result) => {
+      {visibleResults.map((result, productIndex) => {
         const offer = result.best_offer
         const contact = contactByOffer[offer.id]
         const offerView = offerViews[result.product.id]
@@ -243,6 +254,7 @@ function ProductResults({
         const distanceLabel = formatDistance(offer.shop.distance_m)
         const mapUrl = openStreetMapUrl(offer.shop.lat, offer.shop.lon)
         const isCompared = selectedCompareProductIds.includes(result.product.id)
+        const isSelected = selectedProductId === result.product.id
         const highlights = chooseProductHighlights(result.product)
         return (
           <article className={`mission-product-card ${isCompared ? 'is-compared' : ''} ${allowActions && offerView?.expanded ? 'is-offers-expanded' : ''}`} key={result.product.id}>
@@ -251,8 +263,10 @@ function ProductResults({
             </div>
             <div className="mission-product-main">
               <div className="mission-product-heading-row">
+                {productIndex < 4 && <span className="mission-product-rank" aria-label={`مدل شماره ${productIndex + 1}`}>{money.format(productIndex + 1)}</span>}
                 <strong title={result.product.title}>{result.product.title}</strong>
-                {isCompared && <span className="mission-compared-badge"><CheckCircle2 size={13} /> انتخاب‌شده</span>}
+                {isSelected && <span className="mission-compared-badge"><CheckCircle2 size={13} /> مدل منتخب</span>}
+                {isCompared && !isSelected && <span className="mission-compared-badge"><CheckCircle2 size={13} /> برای مقایسه</span>}
               </div>
               <div className="mission-product-price-line">
                 <strong className="mission-product-price">{formatPrice(offer.price_toman)}</strong>
@@ -302,6 +316,12 @@ function ProductResults({
                 </div>
               </details>
               <div className="mission-product-actions">
+                {allowActions && (
+                  <button type="button" className="mission-select-button" aria-pressed={isSelected}
+                    onClick={() => onSelectProduct(result.product.id)}>
+                    <CheckCircle2 size={15} /> {isSelected ? 'مدل منتخب' : 'انتخاب مدل'}
+                  </button>
+                )}
                 {allowActions ? (
                   <button
                     type="button"
@@ -343,7 +363,7 @@ function ProductResults({
                   {offerView.offers.length > 1 && (
                     <p className="mission-offer-shortlist-note">برچسب‌های مقایسه فقط بین فروشگاه‌های بارگذاری‌شده هستند؛ فاصله‌ها مستقیم و ساعت کار طبق داده ثبت‌شده است.</p>
                   )}
-                  {offerView.offers.map((sellerOffer) => {
+                  {offerView.offers.map((sellerOffer, offerIndex) => {
                     const attempt = contactByOffer[sellerOffer.id]
                     const sellerDistance = formatDistance(sellerOffer.shop.distance_m)
                     const sellerUpdatedAt = formatPersianDateTime(sellerOffer.last_price_changed_at)
@@ -352,6 +372,11 @@ function ProductResults({
                     return (
                       <article className="mission-offer-row" key={sellerOffer.id}>
                         <div className="mission-offer-copy">
+                          <button type="button" className="mission-select-button"
+                            aria-pressed={selectedOfferId === sellerOffer.id}
+                            onClick={() => onSelectOffer(sellerOffer.id)}>
+                            {money.format(offerIndex + 1)}. {selectedOfferId === sellerOffer.id ? 'فروشنده منتخب' : 'انتخاب فروشنده'}
+                          </button>
                           <div className="mission-seller-heading">
                             <strong>{sellerOffer.shop.name}</strong>
                             <span className="mission-offer-price">{formatPrice(sellerOffer.price_toman)}</span>
@@ -577,6 +602,20 @@ export function MissionPanel({
   const [contactingOfferId, setContactingOfferId] = useState<string | null>(null)
   const [contactByOffer, setContactByOffer] = useState<Record<string, ContactAttemptResponse>>({})
   const [offerViews, setOfferViews] = useState<Record<string, ProductOfferView>>({})
+  const [brandFilter, setBrandFilter] = useState<string | null>(null)
+  const [modelFilter, setModelFilter] = useState<string | null>(null)
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null)
+  const [selectedOfferId, setSelectedOfferId] = useState<string | null>(null)
+  const [resultSetId, setResultSetId] = useState<string | null>(null)
+  const resultSetIdRef = useRef<string | null>(null)
+  const [resultsStale, setResultsStale] = useState(false)
+  const [queuePaused, setQueuePaused] = useState(false)
+  const queuePausedRef = useRef(false)
+  const latestEventSeqRef = useRef(0)
+  const missionIdRef = useRef<string | null>(missionId)
+  const serverConstraintsRef = useRef<MissionConstraints | null>(null)
+  const queuedTurnsRef = useRef<Array<{ text: string; constraints: MissionConstraints; displayQuery: string }>>([])
+  const [queuedCount, setQueuedCount] = useState(0)
   const [activeFilterForm, setActiveFilterForm] = useState<GenUIComponent | null>(null)
   const filterDialogRef = useRef<HTMLDialogElement | null>(null)
   const transcriptRef = useRef<HTMLDivElement | null>(null)
@@ -599,6 +638,8 @@ export function MissionPanel({
     city: 'tehran',
     ...(budget.trim() ? { max_price_toman: budget.trim() } : {}),
     must_have_in_person_credit: mustHaveCredit,
+    brand_name: brandFilter,
+    model_exact: modelFilter,
     sort: location || sort !== 'distance_asc' ? sort : 'relevance',
     ...(location ? { lat: location.lat, lon: location.lon, radius_m: radiusM } : {}),
   }
@@ -617,6 +658,16 @@ export function MissionPanel({
       .then((snapshot) => {
         const history = snapshot.events ?? []
         setEvents(history)
+        latestEventSeqRef.current = Math.max(0, ...history.map((item) => item.seq))
+        resultSetIdRef.current = typeof snapshot.state?.result_set_id === 'string' ? snapshot.state.result_set_id : null
+        setResultSetId(resultSetIdRef.current)
+        setResultsStale(snapshot.state?.results_stale === true)
+        setSelectedOfferId(typeof snapshot.state?.selected_offer_id === 'string' ? snapshot.state.selected_offer_id : null)
+        serverConstraintsRef.current = snapshot.constraints
+        setBrandFilter(snapshot.constraints.brand_name ?? null)
+        setModelFilter(snapshot.constraints.model_exact ?? null)
+        missionIdRef.current = restoreId
+        setSelectedProductId(typeof snapshot.state?.selected_product_id === 'string' ? snapshot.state.selected_product_id : null)
         setContactByOffer(restoreContactResponses(history))
         const restoredMessages = rebuildChatFromEvents(history)
         setChatMessages(restoredMessages)
@@ -688,11 +739,32 @@ export function MissionPanel({
   }, [])
 
   const handleEvent = (event: MissionEvent) => {
+    latestEventSeqRef.current = Math.max(latestEventSeqRef.current, event.seq)
+    if (event.type === 'focus.updated') {
+      setSelectedProductId(typeof event.payload.selected_product_id === 'string' ? event.payload.selected_product_id : null)
+      setSelectedOfferId(typeof event.payload.selected_offer_id === 'string' ? event.payload.selected_offer_id : null)
+    }
+    if (event.type === 'turn.completed') {
+      if (typeof event.payload.result_set_id === 'string') {
+        resultSetIdRef.current = event.payload.result_set_id
+        setResultSetId(event.payload.result_set_id)
+      }
+      if (typeof event.payload.results_stale === 'boolean') setResultsStale(event.payload.results_stale)
+      if (Object.prototype.hasOwnProperty.call(event.payload, 'selected_offer_id')) {
+        setSelectedOfferId(typeof event.payload.selected_offer_id === 'string' ? event.payload.selected_offer_id : null)
+      }
+    }
     setEvents((current) => current.some((saved) => saved.seq === event.seq)
       ? current
       : [...current, event].sort((left, right) => left.seq - right.seq))
 
+    if (event.type === 'turn.completed' && Object.prototype.hasOwnProperty.call(event.payload, 'selected_product_id')) {
+      setSelectedProductId(typeof event.payload.selected_product_id === 'string' ? event.payload.selected_product_id : null)
+    }
     if (event.type === 'turn.completed' && isRecord(event.payload.constraints)) {
+      serverConstraintsRef.current = event.payload.constraints as MissionConstraints
+      setBrandFilter(serverConstraintsRef.current.brand_name ?? null)
+      setModelFilter(serverConstraintsRef.current.model_exact ?? null)
       // Reconcile inferred natural-language constraints with the visible filters.
       // The server decides eligibility; the client must not silently present stale filters.
       const interpreted = readText(event.payload, 'search_query') || lastQuery
@@ -729,6 +801,8 @@ export function MissionPanel({
       setChatMessages((current) => mergeUIEventIntoMessages(current, event))
       if (incoming.some((component) => PRIMARY_SEARCH_COMPONENTS.has(component.type))) {
         setSelectedCompareProductIds([])
+        setSelectedProductId(null)
+        setSelectedOfferId(null)
         setComparisonOpen(false)
         offerRequestControllers.current.forEach((controller) => controller.abort())
         offerRequestControllers.current.clear()
@@ -744,11 +818,59 @@ export function MissionPanel({
     }
   }
 
+  const applyFocus = async (input: Omit<MissionFocusAction, 'result_set_id'>) => {
+    const activeId = missionIdRef.current
+    const activeResultId = resultSetIdRef.current ?? resultSetId
+    if (isRunning || isRestoring || turnInFlightRef.current || queuePausedRef.current || resultsStale || !activeId || !activeResultId) {
+      setError('نتایج این جست‌وجو آماده یا معتبر نیستند؛ ابتدا وضعیت را به‌روز کن.')
+      return
+    }
+    try {
+      const response = await updateMissionFocus(activeId, { ...input, result_set_id: activeResultId })
+      response.events.forEach(handleEvent)
+      // A repeat focus is idempotent and may produce no event; state is still authoritative.
+      setSelectedProductId(typeof response.state.selected_product_id === 'string' ? response.state.selected_product_id : null)
+      setSelectedOfferId(typeof response.state.selected_offer_id === 'string' ? response.state.selected_offer_id : null)
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'انتخاب ثبت نشد؛ وضعیت مأموریت را بررسی کن.')
+    }
+  }
+
+  const removeQueuedTurn = (index: number, edit: boolean) => {
+    const item = queuedTurnsRef.current[index]
+    if (!item) return
+    queuedTurnsRef.current.splice(index, 1)
+    setQueuedCount(queuedTurnsRef.current.length)
+    if (edit) {
+      setMessage(item.text)
+      composerInputRef.current?.focus()
+    }
+  }
+
+  const resumeQueue = () => {
+    if (isRunning || isRestoring || turnInFlightRef.current) return
+    queuePausedRef.current = false
+    setQueuePaused(false)
+    const next = queuedTurnsRef.current.shift()
+    setQueuedCount(queuedTurnsRef.current.length)
+    if (next) void runTurn(next.text, serverConstraintsRef.current ?? next.constraints, next.displayQuery)
+  }
+
   const runTurn = async (turnMessage: string, turnConstraints: MissionConstraints = constraints, displayQuery = turnMessage) => {
     const trimmed = turnMessage.trim()
     // The ref is synchronous: two Enter clicks in the same React render cannot
     // launch duplicate POSTs or two paid model requests.
-    if (!trimmed || isRunning || isRestoring || turnInFlightRef.current) return
+    if (!trimmed) return
+    if (isRunning || isRestoring || turnInFlightRef.current || queuePausedRef.current) {
+      if (queuedTurnsRef.current.length >= 5) {
+        setError('حداکثر پنج پیام در صف است. پس از پردازش آن‌ها پیام جدید بفرست.')
+        return
+      }
+      queuedTurnsRef.current.push({ text: trimmed, constraints: { ...turnConstraints }, displayQuery })
+      setQueuedCount(queuedTurnsRef.current.length)
+      setMessage('')
+      return
+    }
     shouldAutoScrollRef.current = true
 
     const localIntent = classifyLocalConversation(trimmed)
@@ -772,9 +894,10 @@ export function MissionPanel({
     if (!results.length) setLastQuery(displayQuery.trim())
     turnCounter.current += 1
     const turnId = `${Date.now()}-${turnCounter.current}`
-    const lastSavedSequence = events.reduce((max, event) => Math.max(max, event.seq), 0)
-    let activeMissionId: string | null = missionId
+    const lastSavedSequence = latestEventSeqRef.current
+    let activeMissionId: string | null = missionIdRef.current
     let startedServerTurn = false
+    let confirmed = false
     setChatMessages((current) => [
       ...current,
       { id: `user-${turnId}`, role: 'user', text: trimmed, components: [] },
@@ -786,10 +909,12 @@ export function MissionPanel({
         const created = await createMission(trimmed, turnConstraints)
         activeMissionId = created.mission_id
         setMissionId(activeMissionId)
+        missionIdRef.current = activeMissionId
         storeMissionId(activeMissionId)
       }
       startedServerTurn = true
       await sendMissionTurn(activeMissionId, trimmed, turnConstraints, handleEvent)
+      confirmed = true
     } catch (reason) {
       // A response stream can disconnect AFTER Django commits the turn.
       // Restore that saved turn instead of suggesting a duplicate submission.
@@ -800,6 +925,15 @@ export function MissionPanel({
           if (completedTurnWasPersisted(snapshot, trimmed, lastSavedSequence)) {
             const history = snapshot.events ?? []
             setEvents(history)
+            latestEventSeqRef.current = Math.max(latestEventSeqRef.current, ...history.map(item => item.seq))
+            serverConstraintsRef.current = snapshot.constraints
+            setBrandFilter(snapshot.constraints.brand_name ?? null)
+            setModelFilter(snapshot.constraints.model_exact ?? null)
+            resultSetIdRef.current = typeof snapshot.state?.result_set_id === 'string' ? snapshot.state.result_set_id : null
+            setResultSetId(resultSetIdRef.current)
+            setResultsStale(snapshot.state?.results_stale === true)
+            setSelectedProductId(typeof snapshot.state?.selected_product_id === 'string' ? snapshot.state.selected_product_id : null)
+            setSelectedOfferId(typeof snapshot.state?.selected_offer_id === 'string' ? snapshot.state.selected_offer_id : null)
             setChatMessages(rebuildChatFromEvents(history))
             setContactByOffer(restoreContactResponses(history))
             const actualQuery = typeof snapshot.state?.search_query === 'string'
@@ -808,6 +942,7 @@ export function MissionPanel({
             onRestoreConstraints(snapshot.constraints, actualQuery)
             setStageLabel('نتیجه ثبت‌شده مأموریت از سرور بازیابی شد.')
             recovered = true
+            confirmed = true
           }
         } catch {
           // Do not mask the original error; an offline network may block GET too.
@@ -840,6 +975,19 @@ export function MissionPanel({
         }
         return next
       })
+      if (canDrainQueuedTurn(confirmed, queuePausedRef.current)) {
+        const queued = queuedTurnsRef.current.shift()
+        if (queued) {
+          setQueuedCount(queuedTurnsRef.current.length)
+          Promise.resolve().then(() => {
+            void runTurn(queued.text, serverConstraintsRef.current ?? queued.constraints, queued.displayQuery)
+          })
+        }
+      } else if (!confirmed) {
+        // Every uncertain failure pauses pending work even if no queue exists yet.
+        queuePausedRef.current = true
+        setQueuePaused(true)
+      }
     }
   }
 
@@ -850,6 +998,15 @@ export function MissionPanel({
       const snapshot = await getMission(missionId)
       const history = snapshot.events ?? []
       setEvents(history)
+      latestEventSeqRef.current = Math.max(latestEventSeqRef.current, ...history.map(item => item.seq))
+      resultSetIdRef.current = typeof snapshot.state?.result_set_id === 'string' ? snapshot.state.result_set_id : null
+      setResultSetId(resultSetIdRef.current)
+      setResultsStale(snapshot.state?.results_stale === true)
+      setSelectedOfferId(typeof snapshot.state?.selected_offer_id === 'string' ? snapshot.state.selected_offer_id : null)
+      serverConstraintsRef.current = snapshot.constraints
+      setBrandFilter(snapshot.constraints.brand_name ?? null)
+      setModelFilter(snapshot.constraints.model_exact ?? null)
+      setSelectedProductId(typeof snapshot.state?.selected_product_id === 'string' ? snapshot.state.selected_product_id : null)
       setChatMessages(rebuildChatFromEvents(history))
       setContactByOffer(restoreContactResponses(history))
       const rawQuery = typeof snapshot.state?.search_query === 'string'
@@ -1029,6 +1186,19 @@ export function MissionPanel({
           },
         }
       })
+      // Persist the *ordered* rendered seller IDs so "دومی" refers to
+      // this list, not to the second product in the previous search.
+      // The backend revalidates each offer against current hard filters.
+      const listed = append
+        ? [...(offerViews[productId]?.offers ?? []), ...response.results].filter(
+            (offer, index, all) => all.findIndex((candidate) => candidate.id === offer.id) === index
+          )
+        : response.results
+      await applyFocus({
+        action: 'view_sellers',
+        product_id: productId,
+        offer_ids: listed.slice(0, 24).map((offer) => offer.id),
+      })
     } catch (reason) {
       if (controller.signal.aborted) return
       setOfferViews((current) => {
@@ -1059,10 +1229,15 @@ export function MissionPanel({
     const current = offerViews[result.product.id]
     if (current?.expanded && !current.error) {
       setOfferViews((views) => ({ ...views, [result.product.id]: { ...views[result.product.id]!, expanded: false } }))
+      void applyFocus({ action: 'view_products' })
       return
     }
     if (current?.offers.length && !current.error) {
       setOfferViews((views) => ({ ...views, [result.product.id]: { ...views[result.product.id]!, expanded: true } }))
+      void applyFocus({
+        action: 'view_sellers', product_id: result.product.id,
+        offer_ids: current.offers.slice(0, 24).map(offer => offer.id),
+      })
       return
     }
     void fetchProductOffers(result, 1, false)
@@ -1136,6 +1311,8 @@ export function MissionPanel({
           fields: [
             { id: 'product_query', label: 'محصول', type: 'text', required: true, default_value: lastQuery },
             { id: 'max_price_toman', label: 'سقف بودجه (تومان)', type: 'number', required: false, min: 1, default_value: budget, helper_text: 'اختیاری؛ ارقام فارسی یا انگلیسی را وارد کن.' },
+            { id: 'brand_name', label: 'برند دقیق ثبت‌شده (اختیاری)', type: 'text', required: false, default_value: brandFilter ?? '', helper_text: 'اگر مشخص شود، تنها برند دقیق ثبت‌شده در دیتاست پذیرفته می‌شود.' },
+            { id: 'model_exact', label: 'مدل دقیق ثبت‌شده (اختیاری)', type: 'text', required: false, default_value: modelFilter ?? '', helper_text: 'در صورت نامشخص‌بودن مدل در دیتاست، نتایج ممکن است صفر شوند.' },
             { id: 'must_have_in_person_credit', label: 'فقط خرید اعتباری حضوری', type: 'checkbox', default_value: mustHaveCredit },
             ...(location ? [{ id: 'radius_m', label: 'حداکثر فاصلهٔ مستقیم', type: 'select' as const, required: true, default_value: String(radiusM), options: [
               { label: '۱ کیلومتر', value: '1000' },
@@ -1181,8 +1358,12 @@ export function MissionPanel({
       const rawRadius = values.radius_m
       const parsedRadius = Number(normalizeDigits(String(rawRadius ?? '')))
       const nextRadius = [1000, 3000, 5000, 10000].includes(parsedRadius) ? parsedRadius : radiusM
+      const brandValue = typeof values.brand_name === 'string' ? values.brand_name.trim().slice(0, 300) : brandFilter
+      const modelValue = typeof values.model_exact === 'string' ? values.model_exact.trim().slice(0, 500) : modelFilter
       const nextConstraints: MissionConstraints = {
         ...constraints,
+        brand_name: brandValue || null,
+        model_exact: modelValue || null,
         ...(hasBudgetField ? { max_price_toman: normalizedBudget || null } : {}),
         must_have_in_person_credit: credit,
         ...(location ? { lat: location.lat, lon: location.lon, radius_m: nextRadius } : {}),
@@ -1192,6 +1373,8 @@ export function MissionPanel({
         setError('نام محصول را وارد کن تا بتوانم گزینه‌ها را پیدا کنم.')
         return
       }
+      setBrandFilter(brandValue || null)
+      setModelFilter(modelValue || null)
       onRestoreConstraints(nextConstraints, query)
       setActiveFilterForm(null)
       void runTurn(query, nextConstraints, query)
@@ -1208,12 +1391,26 @@ export function MissionPanel({
     offerRequestControllers.current.clear()
     setOfferViews({})
     setMissionId(null)
+    missionIdRef.current = null
+    latestEventSeqRef.current = 0
+    resultSetIdRef.current = null
+    setResultSetId(null)
+    setResultsStale(false)
+    setSelectedOfferId(null)
+    serverConstraintsRef.current = null
     storeMissionId(null)
+    queuedTurnsRef.current = []
+    setQueuedCount(0)
+    queuePausedRef.current = false
+    setQueuePaused(false)
     setMessage('')
     setEvents([])
     setChatMessages([])
     setLastQuery('')
     setSelectedCompareProductIds([])
+    setSelectedProductId(null)
+    setBrandFilter(null)
+    setModelFilter(null)
     setComparisonOpen(false)
     setContactByOffer({})
     pendingContactIdsRef.current.clear()
@@ -1333,6 +1530,11 @@ export function MissionPanel({
                       {isCurrentResult && <button type="button" className="mission-edit-filters" onClick={() => handleGenUIAction({ type: 'open_filter_form' })} disabled={isRunning || isRestoring}><SlidersHorizontal size={15} /> تغییر شرایط</button>}
                     </div>
                   </div>
+                  {isCurrentResult && resultsStale && <div className="mission-stale-warning" role="status">
+                    شرایط مأموریت تغییر کرده است. کارت‌های قبلی فقط برای مراجعه تاریخی هستند و انتخاب یا استعلام از آن‌ها غیرفعال است.
+                    <button type="button" disabled={isRunning || isRestoring || !lastQuery}
+                      onClick={() => void runTurn(lastQuery, serverConstraintsRef.current ?? constraints, lastQuery)}>به‌روزرسانی نتایج</button>
+                  </div>}
                   {isCurrentResult && <ActiveShoppingFilters constraints={constraints} disabled={isRunning || isRestoring}
                     onEdit={() => handleGenUIAction({type:'open_filter_form'})} />}
                   {isCurrentResult && selectedCompareResults.length > 0 && (
@@ -1353,7 +1555,7 @@ export function MissionPanel({
                       </div>
                     </div>
                   )}
-                  {isCurrentResult && comparisonOpen && comparisonComponents.length > 0 && <GenUIRenderer components={comparisonComponents} defaults={{ query: lastQuery, max_price_toman: budget, must_have_in_person_credit: mustHaveCredit, sort: constraints.sort ?? 'relevance' }} disabled={isRunning || isRestoring} onAction={handleGenUIAction} />}
+                  {isCurrentResult && !resultsStale && comparisonOpen && comparisonComponents.length > 0 && <GenUIRenderer components={comparisonComponents} defaults={{ query: lastQuery, max_price_toman: budget, must_have_in_person_credit: mustHaveCredit, sort: constraints.sort ?? 'relevance' }} disabled={isRunning || isRestoring} onAction={handleGenUIAction} />}
                   <ProductResults
                     results={item.results}
                     missionId={missionId ?? ''}
@@ -1362,10 +1564,14 @@ export function MissionPanel({
                     contactByOffer={contactByOffer}
                     selectedCompareProductIds={isCurrentResult ? selectedCompareProductIds : []}
                     onToggleCompare={toggleComparedProduct}
+                    selectedProductId={isCurrentResult ? selectedProductId : null}
+                    selectedOfferId={isCurrentResult ? selectedOfferId : null}
+                    onSelectProduct={(id) => { void applyFocus({ action: 'select_product', product_id: id }) }}
+                    onSelectOffer={(id) => { void applyFocus({ action: 'select_offer', offer_id: id }) }}
                     offerViews={offerViews}
                     onToggleOffers={toggleProductOffers}
                     onLoadMoreOffers={loadMoreProductOffers}
-                    allowActions={isCurrentResult}
+                    allowActions={isCurrentResult && !resultsStale && !queuePaused && !isRunning && !isRestoring}
                   />
                 </div>
               )}
@@ -1378,6 +1584,9 @@ export function MissionPanel({
                   </div>}
                 </section>
               )}
+              {!isCurrentResult && currentResultsMessage && item.results !== undefined
+                && postComponents.some(component => component.type === 'visit_plan')
+                && <p className="mission-stale-warning" role="note">این برنامه مراجعه متعلق به جست‌وجوی قبلی است؛ برای مراجعه جدید، فروشنده‌ها و شرایط فعلی را دوباره بررسی کن.</p>}
               {postComponents.length > 0 && <GenUIRenderer components={postComponents} defaults={{ query: lastQuery, max_price_toman: budget, must_have_in_person_credit: mustHaveCredit, sort: constraints.sort ?? 'relevance' }} disabled={isRunning || isRestoring || !isCurrent} onAction={handleGenUIAction} />}
             </article>
           )
@@ -1410,6 +1619,18 @@ export function MissionPanel({
         <button type="button" onClick={() => setError(null)}>بستن</button>
       </div>}
       {isRunning && <div className="conversation-running-note" role="status" aria-live="polite"><span className="mission-progress-dot" />{stageLabel ?? 'در حال بررسی درخواست'}<span className="conversation-running-sub">اطلاعات محصول و شروط خرید در حال بررسی است</span></div>}
+      {queuedCount > 0 && <div className="conversation-queue" aria-label="پیام‌های در انتظار">
+        <p role="status">{queuePaused
+          ? 'ارسال پیام‌های بعدی متوقف شد. ابتدا وضعیت درخواست قبلی را بازیابی کن.'
+          : `${money.format(queuedCount)} پیام در صف پردازش است.`}</p>
+        <ol>{queuedTurnsRef.current.map((item, index) => <li key={index}>
+          <span>{item.text}</span>
+          <button type="button" onClick={() => removeQueuedTurn(index, true)}>ویرایش</button>
+          <button type="button" onClick={() => removeQueuedTurn(index, false)}>حذف</button>
+        </li>)}</ol>
+        {queuePaused && <button type="button" disabled={isRunning || isRestoring || Boolean(error)}
+          onClick={resumeQueue}>ادامه صف پس از بررسی وضعیت</button>}
+      </div>}
 
       <form className="conversation-composer" id="conversation-composer" onSubmit={submit}>
         {lastQuery && <button className="composer-tool" type="button" aria-label="تنظیم شرایط خرید" title="تنظیم شرایط خرید" disabled={isRunning || isRestoring} onClick={() => handleGenUIAction({ type: 'open_filter_form' })}><SlidersHorizontal size={18} /></button>}
@@ -1420,7 +1641,7 @@ export function MissionPanel({
           rows={1}
           maxLength={2000}
           value={message}
-          disabled={isRunning || isRestoring}
+          disabled={isRestoring}
           onChange={(event) => setMessage(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === 'Enter' && !event.shiftKey) {
@@ -1430,8 +1651,8 @@ export function MissionPanel({
           }}
           placeholder="مثلاً تا ۳ میلیون تومان یک هدفون مناسب برای رفت‌وآمد پیدا کن…"
         />
-        <button className="composer-send" type="submit" aria-label="ارسال پیام" title="ارسال پیام" disabled={!message.trim() || isRunning || isRestoring}>
-          {isRunning ? <LoaderCircle size={18} className="spin" /> : <Send size={17} />}
+        <button className="composer-send" type="submit" aria-label="ارسال پیام" title="ارسال پیام" disabled={!message.trim() || isRestoring}>
+          <Send size={17} />
         </button>
       </form>
       

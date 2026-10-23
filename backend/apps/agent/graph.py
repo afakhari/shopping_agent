@@ -23,7 +23,8 @@ STOP_WORDS = {
     "با", "و", "یا", "در", "رو", "را", "که", "چه", "تا", "سقف", "بودجه",
     "حداکثر", "قیمت", "تومان", "مناسب", "خرید", "بخرم", "بخر", "لطفا", "لطفاً",
     "من", "دنبال", "نیاز", "دارم", "میلیون", "هزار", "امروز", "حضوری", "تهران",
-    "فروشگاه", "فروشگاهی",
+    "فروشگاه", "فروشگاهی", "فقط", "قسطی", "اعتباری", "ترب", "پی",
+    "شد", "شده", "باشه", "بشه", "گفتم", "دیگه", "خوام", "میخام",
 }
 BUDGET_RE = re.compile(
     r"(?:تا\s+(?:سقف\s+)?|حداکثر(?:\s+بودجه)?\s*|سقف\s+بودجه\s+|بودجه\s+)"
@@ -138,6 +139,8 @@ def parse_request_node(state: MissionGraphState) -> dict[str, Any]:
             if constraints.get("max_price_toman") not in (None, "") else None
         ),
         "must_have_in_person_credit": bool(constraints.get("must_have_in_person_credit", False)),
+        "brand_name": constraints.get("brand_name"),
+        "model_exact": constraints.get("model_exact"),
         "lat": constraints.get("lat"),
         "lon": constraints.get("lon"),
         "radius_m": constraints.get("radius_m"),

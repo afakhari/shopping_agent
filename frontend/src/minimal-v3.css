@@ -992,3 +992,30 @@
   .redesign-v2 .genui-visit-key-facts { grid-template-columns: minmax(0,1fr); }
   .redesign-v2 .genui-visit-key-facts > div:has(dt:first-child):nth-child(4) { grid-column: auto; }
 }
+
+
+/* Adaptive shopping: numbered, referencable product choices. */
+.mission-product-rank { display:inline-flex; align-items:center; justify-content:center; flex:0 0 1.75rem; min-width:1.75rem; height:1.75rem; border-radius:.5rem; background:#fff0f1; color:#9f1c30; font-weight:800; font-variant-numeric:tabular-nums; }
+
+/* Keep primary seller exploration and secondary product-selection actions distinct. */
+.redesign-v2 .mission-select-button { display:inline-flex; align-items:center; gap:6px; min-height:42px; border:1px solid #f0dbdd; border-radius:10px; background:#fff9fa; color:#a42b3b; padding:7px 12px; cursor:pointer; font:inherit; font-weight:650; }
+.redesign-v2 .mission-select-button:hover:not(:disabled) { background:#ffeef1; }
+.redesign-v2 .mission-select-button[aria-pressed="true"] { border-color:#a42b3b; background:#fff0f2; }
+
+
+/* Scoped in-person seller evidence: data labels, not live stock badges. */
+.redesign-v2 .genui-sellers { display:grid; gap:10px; padding:14px; border:1px solid #efe0e3; border-radius:12px; background:#fff; }
+.redesign-v2 .genui-sellers > small { color:#6b6266; line-height:1.7; }
+.redesign-v2 .genui-sellers-list { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,235px),1fr)); gap:10px; }
+.redesign-v2 .genui-seller-item { display:grid; align-content:start; gap:6px; border:1px solid #f0e7e8; border-radius:10px; padding:12px; min-width:0; }
+.redesign-v2 .genui-seller-item p { margin:0; line-height:1.6; overflow-wrap:anywhere; font-size:.87rem; }
+.redesign-v2 .genui-seller-title { display:flex; align-items:center; gap:6px; }
+.redesign-v2 .genui-seller-item a { color:#9f1c30; font-weight:650; }
+.redesign-v2 .conversation-queue { border:1px solid #e8c6ac; border-radius:12px; padding:12px; background:#fffaf4; }
+.redesign-v2 .conversation-queue p { margin:0 0 7px; line-height:1.7; }
+.redesign-v2 .conversation-queue ol { display:grid; gap:7px; list-style:decimal inside; padding:0; margin:0; }
+.redesign-v2 .conversation-queue li { display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:7px; background:#fff; border-radius:8px; }
+.redesign-v2 .conversation-queue li span { flex:1 1 140px; overflow-wrap:anywhere; }
+.redesign-v2 .conversation-queue button { cursor:pointer; min-height:40px; padding:7px 10px; border:1px solid #d9c5bd; border-radius:8px; background:#fff; color:#763426; font:inherit; }
+.redesign-v2 .conversation-queue button:disabled { opacity:.5; cursor:not-allowed; }
+.redesign-v2 .mission-stale-warning { border:1px solid #d59b6d; background:#fff9f3; padding:12px; border-radius:10px; line-height:1.7; }

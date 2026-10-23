@@ -420,6 +420,41 @@ function ContactStatus({ component }: { component: GenUIComponent }) {
   )
 }
 
+function SellerEvidence({ component }: { component: GenUIComponent }) {
+  const raw = component.type === 'seller_details'
+    ? [component.data.offer]
+    : Array.isArray(component.data.offers) ? component.data.offers.slice(0, 12) : []
+  const offers = raw.filter(isRecord)
+  const prices = new Intl.NumberFormat('fa-IR')
+  return <section className="genui-sellers" aria-label="اطلاعات فروشندگان حضوری">
+    <strong>{component.type === 'seller_details' ? 'جزئیات فروشگاه منتخب' : 'فروشگاه‌های دارای آفر این مدل'}</strong>
+    <small>قیمت و ساعات از دیتاست ثبت‌شده‌اند؛ موجودی و تماس واقعی تأیید نشده است.</small>
+    <div className="genui-sellers-list">{offers.map((offer, index) => {
+      const shop = isRecord(offer.shop) ? offer.shop : {}
+      const opening = isRecord(shop.opening_status) ? shop.opening_status : {}
+      const price = typeof offer.price_toman === 'string' || typeof offer.price_toman === 'number'
+        ? String(offer.price_toman) : ''
+      const numeric = Number(price)
+      const lat = typeof shop.lat === 'number' ? shop.lat : null
+      const lon = typeof shop.lon === 'number' ? shop.lon : null
+      const mapHref = lat !== null && lon !== null
+        && lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180
+        ? `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=16/${lat}/${lon}`
+        : null
+      return <article className="genui-seller-item" key={text(offer.id, String(index))}>
+        <div className="genui-seller-title">
+          <Store size={16} aria-hidden="true" />
+          <strong>{component.type === 'seller_details' ? '' : `${prices.format(index + 1)}. `}{text(shop.name, 'نام فروشگاه ثبت نشده')}</strong>
+        </div>
+        <p>قیمت ثبت‌شده: {price && Number.isFinite(numeric) && numeric > 0 ? `${prices.format(numeric)} تومان` : 'نامشخص'}</p>
+        <p>نشانی ثبت‌شده: {text(shop.address, text(shop.location_label, 'نامشخص'))}</p>
+        <p>ساعت طبق برنامهٔ ثبت‌شده: {text(opening.label, 'نامشخص')}</p>
+        {mapHref && <a href={mapHref} target="_blank" rel="noopener noreferrer">موقعیت ثبت‌شده روی نقشه</a>}
+      </article>
+    })}</div>
+  </section>
+}
+
 function FallbackCard({ component }: { component: GenUIComponent }) {
   return <section className="genui-fallback-card"><HelpCircle size={18} /><div><strong>{text(component.data.title, 'اطلاعات تکمیلی')}</strong><p>{text(component.data.message, 'این بخش از رابط برای این نسخه هنوز نمایش اختصاصی ندارد.')}</p></div></section>
 }
@@ -448,6 +483,9 @@ function renderComponent(component: GenUIComponent, defaults: GenUIDefaults, onA
       return <ContactStatus key={component.id ?? component.type} component={component} />
     case 'notice':
       return <section className="genui-notice"><ClipboardList size={17} /><span>{text(component.data.message, text(component.data.title))}</span></section>
+    case 'seller_options':
+    case 'seller_details':
+      return <SellerEvidence key={component.id ?? component.type} component={component} />
     case 'alternative_options':
       return <RecoveryOptions key={component.id ?? component.type} component={component} onAction={onAction} disabled={disabled} />
     default:

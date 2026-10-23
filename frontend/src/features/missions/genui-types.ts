@@ -30,12 +30,28 @@ const ALLOWED_COMPONENT_TYPES = new Set([
   'contact_status',
   'notice',
   'alternative_options',
+  'seller_options',
+  'seller_details',
 ])
 
 const MAX_COMPONENTS_PER_EVENT = 12
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
+
+/** Fail closed for seller cards; historical component types stay compatible. */
+function isValidData(type: string, data: Record<string, unknown>): boolean {
+  if (type === 'seller_options') {
+    return Array.isArray(data.offers) && data.offers.length <= 12
+      && data.offers.every((offer) => isRecord(offer) && typeof offer.id === 'string'
+        && isRecord(offer.shop) && typeof offer.shop.id === 'string')
+  }
+  if (type === 'seller_details') {
+    return isRecord(data.offer) && typeof data.offer.id === 'string'
+      && isRecord(data.offer.shop) && typeof data.offer.shop.id === 'string'
+  }
+  return true
 }
 
 /** Accept only registered components and a bounded one-level stack.
@@ -52,6 +68,7 @@ export function getUIComponents(event: MissionEvent): GenUIComponent[] {
     return data.components.slice(0, MAX_COMPONENTS_PER_EVENT).flatMap((item, index) => {
       if (!isRecord(item) || typeof item.type !== 'string'
         || !ALLOWED_COMPONENT_TYPES.has(item.type)) return []
+      if (!isValidData(item.type, isRecord(item.data) ? item.data : {})) return []
       return [{
         type: item.type,
         data: isRecord(item.data) ? item.data : {},
@@ -60,6 +77,7 @@ export function getUIComponents(event: MissionEvent): GenUIComponent[] {
     })
   }
 
+  if (!isValidData(type, data)) return []
   return [{ type, data, id: `${event.seq}-${type}` }]
 }
 

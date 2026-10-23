@@ -20,7 +20,7 @@ describe('progressive shopping surface', () => {
   })
   it('leaves the last product results actionable after informational turns and respects manual scrolling', () => {
     expect(mission).toContain('currentResultsMessage?.id === item.id')
-    expect(mission).toContain('allowActions={isCurrentResult}')
+    expect(mission).toContain('allowActions={isCurrentResult && !resultsStale && !queuePaused && !isRunning && !isRestoring}')
     expect(mission).toContain('shouldFollowConversation(')
     expect(mission).not.toContain('scrollIntoView(')
     expect(mission).toContain('if (!results.length) setLastQuery(displayQuery.trim())')

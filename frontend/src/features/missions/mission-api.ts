@@ -4,6 +4,8 @@ export interface MissionConstraints {
   city?: 'tehran'
   max_price_toman?: string | null
   must_have_in_person_credit?: boolean
+  brand_name?: string | null
+  model_exact?: string | null
   lat?: number
   lon?: number
   radius_m?: number
@@ -174,7 +176,7 @@ export async function sendMissionTurn(
           && Boolean(event.payload.text.trim())) gotAssistantMessage = true
         if (event.type === 'turn.completed') {
           gotCompletion = true
-          if (event.payload.intent_parser === 'local_conversation') {
+          if (event.payload.intent_parser === 'local_conversation' || event.payload.intent_parser === 'contextual') {
             gotConversationalCompletion = true
           }
         }
@@ -203,6 +205,34 @@ export async function sendMissionTurn(
   } finally {
     reader.releaseLock()
   }
+}
+
+export interface MissionFocusAction {
+  action: 'select_product' | 'view_sellers' | 'view_products' | 'select_offer'
+  result_set_id: string
+  product_id?: string
+  offer_id?: string
+  offer_ids?: string[]
+}
+
+export interface MissionFocusResponse {
+  state: Record<string, unknown>
+  last_event_seq: number
+  events: MissionEvent[]
+}
+
+export async function updateMissionFocus(
+  missionId: string,
+  action: MissionFocusAction,
+  signal?: AbortSignal,
+): Promise<MissionFocusResponse> {
+  const response = await fetch(`/api/v1/missions/${encodeURIComponent(missionId)}/focus/`, {
+    method: 'POST',
+    signal,
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(action),
+  })
+  return readJson<MissionFocusResponse>(response)
 }
 
 export async function createContactAttempt(
