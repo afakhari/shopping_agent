@@ -30,12 +30,12 @@ _SELLER_WORDS = re.compile(r"(?:فروشنده|فروشگاه|مغازه|پاس�
 _STORE_QUESTION = re.compile(r"(?:ساعت|باز(?:ه| است)|بسته|آدرس|نشانی|کجا|موجودی|تلفن|تماس)")
 # A bare «لپ» can mean a cheek/cosmetic request or an abbreviated laptop.
 # Never let the model silently commit to a product category here.
-_BARE_LAP = re.compile(r"(?<!\\w)لپ(?!\\w)")
-_LAPTOP = re.compile(r"(?:لپ\\s*تاپ|لپتاپ|لپ\\s*تاب|نوت\\s*بوک)")
-_GPU_TERM = re.compile(r"(?:کارت\\s*گرافیک|گرافیک\\s*مجزا|گرافیک\\s*آن\\s*بورد)")
+_BARE_LAP = re.compile(r"(?<!\w)لپ(?!\w)")
+_LAPTOP = re.compile(r"(?:لپ\s*تاپ|لپتاپ|لپ\s*تاب|نوت\s*بوک)")
+_GPU_TERM = re.compile(r"(?:کارت\s*گرافیک|گرافیک\s*مجزا|گرافیک\s*آن\s*بورد)")
 _GPU_QUESTION = re.compile(
-    r"(?:نمیدونم|نمی\\s*دونم|نمی\\s*دانم|ایا|آیا|"
-    r"نیاز|لازم|ضروری|باید|یا\\s*نه|کافیه|فرق|تفاوت)"
+    r"(?:نمیدونم|نمی\s*دونم|نمی\s*دانم|ایا|آیا|"
+    r"نیاز|لازم|ضروری|باید|یا\s*نه|کافیه|فرق|تفاوت)"
 )
 
 
@@ -44,7 +44,7 @@ def _shopping_advice(message: str) -> str | None:
     if (_LAPTOP.search(message) and _GPU_TERM.search(message)
             and _GPU_QUESTION.search(message)):
         # A specific requested GPU model is a product search, not an advice request.
-        if re.search(r"(?<!\\w)(?:rtx|gtx|rx)\\s*\\d{3,4}(?!\\w)", message):
+        if re.search(r"(?<!\w)(?:rtx|gtx|rx)\s*\d{3,4}(?!\w)", message):
             return None
         return (
             "برای خرید لپ‌تاپ، همهٔ دستگاه‌ها پردازش گرافیکی دارند؛ "
