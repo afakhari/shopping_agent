@@ -172,6 +172,23 @@ def resolve_dialogue_policy(
             },
         }
 
+    # A recommendation question names a product family and a use case.
+    # Persist them before asking about budget; never search for "video" alone.
+    if (_LAPTOP.search(normalized) and _USAGE_EDIT.search(normalized)
+            and (asking or "مناسب" in normalized or "پیشنهاد" in normalized)):
+        amount = _budget(normalized)
+        if amount:
+            return {
+                "kind": "search", "query_override": "لپ تاپ",
+                "constraint_updates": {"max_price_toman": amount},
+                "usage_profile": "video_editing", "pending_dialogue": None,
+            }
+        return {
+            "kind": "clarify",
+            "reply": "برای تدوین ویدیو لپ‌تاپ بررسی می‌کنیم. سقف بودجه‌ات چند تومان است؟",
+            "pending_dialogue": {"slot": "laptop_budget", "usage": "editing"},
+        }
+
     if pending and pending["slot"] == "laptop_usage":
         if _USAGE_EDIT.search(normalized) or _USAGE_PRESENT.search(normalized):
             usage = "editing" if _USAGE_EDIT.search(normalized) else "presentation"
