@@ -58,6 +58,12 @@ class ContextualRouterTests(TestCase):
         self.assertEqual(classify_contextual_turn("فروشگاه دوم", state)["offer_id"], "o2")
         self.assertEqual(classify_contextual_turn("آدرس فروشگاه دوم", state)["kind"], "seller_details")
 
+    def test_seller_unavailability_does_not_become_product_search(self):
+        state = {"search_query": "هدفون", "selected_offer_id": "offer1"}
+        self.assertEqual(classify_contextual_turn("فروشنده جواب نداد", state), {
+            "kind": "seller_recovery", "offer_id": "offer1",
+        })
+
     def test_two_stage_request_preserves_product_and_seller_intent(self):
         state = {"search_query": "هدفون", "visible_product_ids": ["p1", "p2"],
                  "active_surface": "products"}
@@ -206,6 +212,38 @@ class ContextualMissionApiTests(TestCase):
              "result_set_id": before}, format="json",
         )
         self.assertEqual(rejected.status_code, 400)
+
+    def test_reported_seller_failure_shows_grounded_backup_without_contact(self):
+        mission = PurchaseMission.objects.get(pk=self.mission_id)
+        current_product = mission.state["visible_product_ids"][0]
+        original = Offer.objects.filter(product_id=current_product).first()
+        self.assertIsNotNone(original)
+        second_shop = Shop.objects.create(
+            source_id="context_backup_shop", name="فروشگاه پشتیبان",
+        )
+        backup = Offer.objects.create(
+            source_id="context_backup_offer", shop=second_shop,
+            product_id=current_product, price_toman=Decimal("820000"),
+        )
+        endpoint = f"/api/v1/missions/{self.mission_id}/focus/"
+        token = mission.state["result_set_id"]
+        self.client.post(endpoint, {
+            "action": "view_sellers", "product_id": current_product,
+            "result_set_id": token, "offer_ids": [original.source_id, backup.source_id],
+        }, format="json")
+        chosen = self.client.post(endpoint, {
+            "action": "select_offer", "offer_id": original.source_id,
+            "result_set_id": token,
+        }, format="json")
+        self.assertEqual(chosen.status_code, 200, chosen.content)
+        with patch("apps.missions.views.simulate_contact") as contact:
+            events = self.turn("فروشنده جواب نداد")
+            contact.assert_not_called()
+        cards = [entry["payload"] for entry in events if entry["type"] == "ui.component"]
+        self.assertTrue(cards)
+        self.assertEqual(cards[0]["component"], "seller_options")
+        self.assertEqual(cards[0]["data"]["offers"][0]["id"], backup.source_id)
+        self.assertIn("طبق گزارشی که دادی", events[1]["payload"]["text"])
 
     def test_ambiguous_reference_never_runs_catalogue(self):
         with patch("apps.missions.views.run_purchase_graph") as graph:
