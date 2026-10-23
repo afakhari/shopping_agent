@@ -1249,22 +1249,21 @@ export function MissionPanel({
     void fetchProductOffers(result, current.page + 1, true)
   }
 
-  const contact = async (result: CatalogSearchResult | CatalogOffer) => {
-    if (!missionId || contactingOfferId || contactInFlightRef.current || isRunning) return
-    const offer = 'best_offer' in result ? result.best_offer : result
+  const contactById = async (offerId: string, shopId: string) => {
+    if (!missionId || contactingOfferId || contactInFlightRef.current || isRunning || resultsStale || queuePausedRef.current) return
     contactInFlightRef.current = true
-    setContactingOfferId(offer.id)
+    setContactingOfferId(offerId)
     setError(null)
-    const requestKey = `${missionId}:${offer.id}`
+    const requestKey = `${missionId}:${offerId}`
     const clientRequestId = pendingContactIdsRef.current.get(requestKey)
       ?? globalThis.crypto.randomUUID()
     pendingContactIdsRef.current.set(requestKey, clientRequestId)
     try {
       const response = await createContactAttempt(missionId, {
-        shopId: offer.shop.id, offerId: offer.id, clientRequestId,
+        shopId, offerId, clientRequestId,
       })
       pendingContactIdsRef.current.delete(requestKey)
-      setContactByOffer((current) => ({ ...current, [offer.id]: response }))
+      setContactByOffer((current) => ({ ...current, [offerId]: response }))
       if (response.events?.length) {
         setEvents((current) => {
           const bySequence = new Map(current.map((event) => [event.seq, event]))
@@ -1282,8 +1281,23 @@ export function MissionPanel({
     }
   }
 
+  const contact = (result: CatalogSearchResult | CatalogOffer) => {
+    const offer = 'best_offer' in result ? result.best_offer : result
+    void contactById(offer.id, offer.shop.id)
+  }
+
   const handleGenUIAction = (action: GenUIAction) => {
     if (isRunning || isRestoring) return
+    if (action.type === 'verify_selected_offer') {
+      if (resultsStale || queuePausedRef.current || selectedOfferId !== action.offerId) {
+        setError('فروشنده انتخاب‌شده تغییر کرده است. فروشندهٔ فعلی را بررسی کن.')
+        return
+      }
+      // Explicit consent from the current card only. Backend independently
+      // validates offer/shop and keeps the deterministic result demo-only.
+      void contactById(action.offerId, action.shopId)
+      return
+    }
     if (action.type === 'verify_offer') {
       // Only allow options returned for this session's prior contact attempts.
       const offer = resolveRecoveryOffer(contactByOffer, action.offerId, action.shopId)
