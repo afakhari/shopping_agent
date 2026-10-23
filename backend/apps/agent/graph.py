@@ -33,6 +33,33 @@ BUDGET_RE = re.compile(
 )
 
 
+# Common explicitly requested brands from the competition catalogue.
+# These are hard requirements ONLY if the user's language says "only".
+_EXCLUSIVE_BRANDS = (
+    "سامسونگ", "شیائومی", "اپل", "سونی", "لنوو", "ایسوس", "کانن",
+    "فیلیپس", "بوش", "نوکیا", "داهوا", "رونیکس", "کاسیو", "پاناسونیک",
+)
+
+
+def _explicit_exclusive_brand(message: str) -> str | None:
+    normalized = normalize_persian_text(message)
+    cue = re.search(r"(?:^|\s)(?:فقط|صرفا|تنها|حتما)\s+", normalized)
+    if not cue:
+        return None
+    phrase = normalized[cue.end():cue.end() + 60]
+    found = [
+        (match.start(), brand)
+        for brand in _EXCLUSIVE_BRANDS
+        for match in re.finditer(rf"(?<!\w){re.escape(brand)}(?!\w)", phrase)
+    ]
+    if not found:
+        return None
+    first, brand = min(found, key=lambda row: row[0])
+    if re.search(r"(?:^|\s)(?:نه|غیر|بدون)\s+", phrase[:first]):
+        return None
+    return brand
+
+
 class MissionGraphState(TypedDict, total=False):
     mission_id: str
     user_message: str
@@ -91,6 +118,9 @@ def parse_request_node(state: MissionGraphState) -> dict[str, Any]:
     ))
     if credit_mentioned:
         constraints["must_have_in_person_credit"] = not credit_denied
+    exclusive_brand = _explicit_exclusive_brand(user_message)
+    if exclusive_brand:
+        constraints["brand_name"] = exclusive_brand
 
     # A newly stated budget in the current message supersedes an older filter value.
     heuristic_budget = _budget_from_message(user_message)

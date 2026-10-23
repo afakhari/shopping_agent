@@ -39,3 +39,5 @@ REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"] = {
 
 # A listening web process is not production-ready until the catalog is populated.
 REQUIRE_DATASET_FOR_READINESS = True
+# Fixed competition snapshot counts; incomplete imports must not pass health probes.
+CATALOG_MINIMUM_ROWS = {"products": 225903, "shops": 6476, "offers": 331506}

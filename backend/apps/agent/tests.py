@@ -39,6 +39,19 @@ class MissionRequestParserTests(SimpleTestCase):
             "هدفون بی سیم",
         )
 
+    def test_exclusive_brand_is_promoted_to_a_hard_constraint(self):
+        from apps.agent.graph import _explicit_exclusive_brand
+        self.assertEqual(_explicit_exclusive_brand("فقط گوشی سامسونگ میخوام"), "سامسونگ")
+        self.assertEqual(_explicit_exclusive_brand("فقط شیائومی، نه سامسونگ"), "شیائومی")
+        self.assertIsNone(_explicit_exclusive_brand("گوشی سامسونگ یا شیائومی"))
+        state = parse_request_node({
+            "user_message": "فقط هدفون سامسونگ",
+            "constraints": {"city": "tehran"},
+            "intent_resolved": True,
+            "intent_result": None,
+        })
+        self.assertEqual(state["constraints"]["brand_name"], "سامسونگ")
+
     def test_credit_intent_is_preserved_in_structured_constraints(self):
         state = parse_request_node(
             {
