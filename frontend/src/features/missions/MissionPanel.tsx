@@ -1526,19 +1526,6 @@ export function MissionPanel({
     { label: 'خرید اعتباری', detail: 'فقط پیشنهادهای دارای شرط اعتبار ثبت‌شده', icon: <CreditCard size={18} />, prompt: 'یک هدفون بی‌سیم در تهران می‌خواهم؛ فقط گزینه‌های فروشگاه‌هایی را نشان بده که خرید اعتباری حضوری می‌پذیرند.' },
   ]
   const isEmptyConversation = chatMessages.length === 0 && !isRestoring
-  // Only evidence from the most recent discovery determines progress.
-  const latestProductsIndex = chatMessages.reduce((latest, item, index) =>
-    item.results && item.results.length > 0 ? index : latest, -1)
-  const recentSearchMessages = latestProductsIndex >= 0 ? chatMessages.slice(latestProductsIndex) : []
-  const hasRecentVisitPlan = recentSearchMessages.some(item =>
-    item.components.some(component => component.type === 'visit_plan'))
-  const hasRecentContact = contactingOfferId !== null || recentSearchMessages.some(item =>
-    item.components.some(component => ['contact_progress', 'contact_status'].includes(component.type)))
-  const hasSellerExploration = Boolean(selectedProductId || selectedOfferId)
-    || Object.values(offerViews).some(view => view.expanded)
-  const journeyStep = hasRecentVisitPlan ? 4 : hasRecentContact ? 3 : hasSellerExploration ? 2 : 1
-  const journeyLabels = ['انتخاب مدل', 'بررسی فروشگاه', 'استعلام آزمایشی', 'برنامه مراجعه']
-
   return (
     <section className={`conversation-panel${isEmptyConversation ? ' conversation-panel-empty' : ''}`} aria-labelledby="conversation-heading">
       <div className="conversation-panel-header">
@@ -1547,25 +1534,6 @@ export function MissionPanel({
         </div>
         {chatMessages.length > 0 && <button className="conversation-reset" type="button" disabled={isRunning || isRestoring || contactingOfferId !== null} onClick={startNewMission}><RotateCcw size={15} /> گفتگوی تازه</button>}
       </div>
-
-      {latestProductsIndex >= 0 && (
-        <nav className="shopping-journey" aria-label="مراحل خرید حضوری">
-          <div className="shopping-journey-intro">
-            <strong>مسیر خرید شما</strong>
-            <span>گام {money.format(journeyStep)} از ۴ · قابل تغییر در هر مرحله</span>
-          </div>
-          <ol className="shopping-journey-steps">
-            {journeyLabels.map((label, index) => {
-              const step = index + 1
-              return <li key={label} className={step < journeyStep ? 'is-done' : step === journeyStep ? 'is-active' : ''}
-                aria-current={step === journeyStep ? 'step' : undefined}>
-                <span className="journey-index" aria-hidden="true">{step < journeyStep ? <CheckCircle2 size={14} /> : money.format(step)}</span>
-                <span>{label}</span>
-              </li>
-            })}
-          </ol>
-        </nav>
-      )}
 
       <div className="conversation-transcript" ref={transcriptRef} onScroll={(event) => {
         const transcript = event.currentTarget
