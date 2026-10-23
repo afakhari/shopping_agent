@@ -143,6 +143,42 @@ class CatalogSearchApiTests(TestCase):
         educational_ids = [item["product"]["id"] for item in educational.json()["results"]]
         self.assertIn(toy_laptop.source_id, educational_ids)
 
+    def test_taxonomy_prevents_laptop_accessories_and_toys_polluting_computers(self):
+        catalog = (
+            ("pc", "لپ تاپ لنوو مدل تست", "لپ تاپ و نوت بوک"),
+            ("toy", "لپ تاپ آموزشی کودک", "لپ تاپ اسباب بازی"),
+            ("charger", "شارژر لپ تاپ لنوو", "شارژر لپ تاپ"),
+            ("bag", "کیف لپ تاپ برزنتی", "کیف و کاور لپ تاپ"),
+            ("battery", "باتری لپ تاپ لنوو", "باتری لپ تاپ"),
+            ("ram", "رم لپ تاپ DDR4", "رم لپ تاپ"),
+        )
+        for key, title, category in catalog:
+            product = Product.objects.create(
+                source_id=f"taxonomy_{key}", persian_title=title,
+                normalized_title=normalize_persian_text(title),
+                category_name=category,
+            )
+            Offer.objects.create(
+                source_id=f"taxonomy_offer_{key}", product=product,
+                shop=self.cash_shop, price_toman=Decimal("20000000"),
+            )
+        test_cases = (
+            ("لپ تاپ", {"taxonomy_pc"}),
+            ("لپ تاپ با رم زیاد", {"taxonomy_pc"}),
+            ("لپ تاپ با باتری قوی", {"taxonomy_pc"}),
+            ("لپ تاپ آموزشی کودک", {"taxonomy_toy"}),
+            ("شارژر لپ تاپ", {"taxonomy_charger"}),
+            ("کیف لپ تاپ", {"taxonomy_bag"}),
+            ("رم لپ تاپ", {"taxonomy_ram"}),
+        )
+        for query, expected in test_cases:
+            with self.subTest(query=query):
+                response = self.client.get("/api/v1/catalog/search/", {"q": query})
+                self.assertEqual(response.status_code, 200, response.content)
+                actual = {item["product"]["id"] for item in response.json()["results"]}
+                self.assertEqual(actual, expected)
+                self.assertEqual(response.json()["total"], len(expected))
+
     def test_search_returns_only_products_with_matching_offers(self):
         response = self.client.get("/api/v1/catalog/search/", {"q": "هدفون"})
         self.assertEqual(response.status_code, 200, response.content)
