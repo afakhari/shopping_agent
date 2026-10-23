@@ -8,6 +8,7 @@ from decimal import Decimal
 from typing import Any, Iterator
 
 from django.db import transaction
+from django.utils import timezone
 from django.http import StreamingHttpResponse
 from django.shortcuts import get_object_or_404
 from rest_framework.decorators import api_view, renderer_classes
@@ -23,7 +24,7 @@ from apps.agent.comparison import build_evidence_comparison
 from apps.agent.simulator import serialize_contact_attempt, simulate_contact
 from apps.agent.contact_evidence import build_contact_evidence
 from apps.catalog.models import Offer, Product
-from apps.missions.models import ContactAttempt, PurchaseMission
+from apps.missions.models import ContactAttempt, PurchaseMission, RoutingDailyUsage
 from apps.missions.renderers import ServerSentEventRenderer
 from apps.missions.serializers import (
     ContactAttemptCreateSerializer,
@@ -719,6 +720,13 @@ def route_estimates(request, mission_id: str):
         used = int(locked_state.get("neshan_route_calls", 0))
         if used >= settings.NESHAN_ROUTING_MAX_CALLS_PER_MISSION:
             return Response(safe_response(mode=mode, reason="mission_budget_exhausted"))
+        daily, _ = RoutingDailyUsage.objects.select_for_update().get_or_create(
+            day=timezone.localdate()
+        )
+        if daily.requests >= settings.NESHAN_ROUTING_DAILY_MAX_CALLS:
+            return Response(safe_response(mode=mode, reason="daily_budget_exhausted"))
+        daily.requests += 1
+        daily.save(update_fields=["requests"])
         locked_state["neshan_route_calls"] = used + 1
         locked.state = locked_state
         locked.save(update_fields=["state", "updated_at"])
