@@ -133,6 +133,9 @@ NESHAN_ROUTING_API_KEY = os.environ.get("NESHAN_ROUTING_API_KEY", "").strip()
 NESHAN_ROUTING_MAX_CALLS_PER_MISSION = max(
     0, min(10, int(os.environ.get("NESHAN_ROUTING_MAX_CALLS_PER_MISSION", "0")))
 )
+NESHAN_ROUTING_DAILY_MAX_CALLS = max(
+    0, min(100, int(os.environ.get("NESHAN_ROUTING_DAILY_MAX_CALLS", "0")))
+)
 
 
 LOGGING = {
