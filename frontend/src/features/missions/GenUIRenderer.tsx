@@ -420,6 +420,30 @@ function ContactStatus({ component }: { component: GenUIComponent }) {
   )
 }
 
+function ContactConsent({ component, disabled, onAction }: {
+  component: GenUIComponent
+  disabled: boolean
+  onAction: (action: GenUIAction) => void
+}) {
+  const offerId = text(component.data.offer_id)
+  const shopId = text(component.data.shop_id)
+  const shopName = text(component.data.shop_name, 'فروشگاه انتخاب‌شده')
+  const productTitle = text(component.data.product_title, 'محصول انتخاب‌شده')
+  return <section className="genui-contact-consent" aria-label="رضایت برای شبیه‌سازی استعلام">
+    <div className="genui-card-heading">
+      <span className="genui-icon"><HelpCircle size={17} aria-hidden="true" /></span>
+      <div><h4>بررسی آزمایشی موجودی</h4>
+        <p>{productTitle}، {shopName}</p></div>
+    </div>
+    <p>این اقدام فقط یک شبیه‌سازی مسابقه است. هیچ تماس یا پیام واقعی به فروشگاه ارسال نمی‌شود
+      و نتیجه به معنای موجودی تأییدشده نیست.</p>
+    <button className="genui-primary-action" type="button" disabled={disabled || !offerId || !shopId}
+      onClick={() => onAction({ type: 'verify_selected_offer', offerId, shopId })}>
+      <CheckCircle2 size={16} aria-hidden="true" /> تأیید و اجرای شبیه‌سازی
+    </button>
+  </section>
+}
+
 function SellerEvidence({ component }: { component: GenUIComponent }) {
   const raw = component.type === 'seller_details'
     ? [component.data.offer]
@@ -483,6 +507,9 @@ function renderComponent(component: GenUIComponent, defaults: GenUIDefaults, onA
       return <ContactStatus key={component.id ?? component.type} component={component} />
     case 'notice':
       return <section className="genui-notice"><ClipboardList size={17} /><span>{text(component.data.message, text(component.data.title))}</span></section>
+    case 'contact_prompt':
+      return <ContactConsent key={component.id ?? component.type} component={component}
+        disabled={disabled} onAction={onAction} />
     case 'seller_options':
     case 'seller_details':
       return <SellerEvidence key={component.id ?? component.type} component={component} />
