@@ -5,16 +5,16 @@ Usage:
   python scripts/neshan_smoke.py
   NESHAN_ROUTING_API_KEY=... python scripts/neshan_smoke.py --live --authorize-one-call
 
-Never pass secrets as CLI arguments. Never run in CI or a public demo.
+Never pass secrets as CLI arguments. Never run LIVE mode in CI or a public demo.
 """
 from __future__ import annotations
 
 import argparse
 import json
 import os
-from urllib.error import HTTPError, URLError
+from urllib.error import HTTPError
 from urllib.parse import urlencode
-from urllib.request import HTTPSHandler, HTTPRedirectHandler, Request, build_opener
+from urllib.request import HTTPRedirectHandler, HTTPSHandler, Request, build_opener
 
 
 class NoRedirects(HTTPRedirectHandler):
@@ -56,7 +56,7 @@ def main() -> int:
     except HTTPError as error:
         print("LIVE_RESULT=HTTP_ERROR; http_status=" + str(error.code))
         return 2
-    except (URLError, OSError, TimeoutError):
+    except OSError:
         print("LIVE_RESULT=NETWORK_OR_TLS_FAILURE (credentials and headers hidden)")
         return 2
     if status != 200 or len(content) > 24000:
