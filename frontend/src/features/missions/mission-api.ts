@@ -208,9 +208,10 @@ export async function sendMissionTurn(
 }
 
 export interface MissionFocusAction {
-  action: 'select_product' | 'view_sellers' | 'view_products' | 'select_offer'
+  action: 'select_product' | 'view_sellers' | 'view_products' | 'select_offer' | 'set_compare'
   result_set_id: string
   product_id?: string
+  product_ids?: string[]
   offer_id?: string
   offer_ids?: string[]
 }
