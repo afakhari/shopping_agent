@@ -592,6 +592,7 @@ export function MissionPanel({
   const [offerViews, setOfferViews] = useState<Record<string, ProductOfferView>>({})
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null)
   const missionIdRef = useRef<string | null>(missionId)
+  const serverConstraintsRef = useRef<MissionConstraints | null>(null)
   const queuedTurnsRef = useRef<Array<{ text: string; constraints: MissionConstraints; displayQuery: string }>>([])
   const [queuedCount, setQueuedCount] = useState(0)
   const [activeFilterForm, setActiveFilterForm] = useState<GenUIComponent | null>(null)
@@ -634,6 +635,8 @@ export function MissionPanel({
       .then((snapshot) => {
         const history = snapshot.events ?? []
         setEvents(history)
+        serverConstraintsRef.current = snapshot.constraints
+        missionIdRef.current = restoreId
         setSelectedProductId(typeof snapshot.state?.selected_product_id === 'string' ? snapshot.state.selected_product_id : null)
         setContactByOffer(restoreContactResponses(history))
         const restoredMessages = rebuildChatFromEvents(history)
@@ -714,6 +717,7 @@ export function MissionPanel({
       setSelectedProductId(typeof event.payload.selected_product_id === 'string' ? event.payload.selected_product_id : null)
     }
     if (event.type === 'turn.completed' && isRecord(event.payload.constraints)) {
+      serverConstraintsRef.current = event.payload.constraints as MissionConstraints
       // Reconcile inferred natural-language constraints with the visible filters.
       // The server decides eligibility; the client must not silently present stale filters.
       const interpreted = readText(event.payload, 'search_query') || lastQuery
@@ -876,7 +880,9 @@ export function MissionPanel({
       const queued = queuedTurnsRef.current.shift()
       if (queued) {
         setQueuedCount(queuedTurnsRef.current.length)
-        Promise.resolve().then(() => { void runTurn(queued.text, queued.constraints, queued.displayQuery) })
+        Promise.resolve().then(() => {
+          void runTurn(queued.text, serverConstraintsRef.current ?? queued.constraints, queued.displayQuery)
+        })
       }
     }
   }
@@ -888,6 +894,7 @@ export function MissionPanel({
       const snapshot = await getMission(missionId)
       const history = snapshot.events ?? []
       setEvents(history)
+      serverConstraintsRef.current = snapshot.constraints
       setSelectedProductId(typeof snapshot.state?.selected_product_id === 'string' ? snapshot.state.selected_product_id : null)
       setChatMessages(rebuildChatFromEvents(history))
       setContactByOffer(restoreContactResponses(history))
@@ -1248,6 +1255,7 @@ export function MissionPanel({
     setOfferViews({})
     setMissionId(null)
     missionIdRef.current = null
+    serverConstraintsRef.current = null
     storeMissionId(null)
     queuedTurnsRef.current = []
     setQueuedCount(0)
