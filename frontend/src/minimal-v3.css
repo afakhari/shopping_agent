@@ -1134,3 +1134,35 @@
   .redesign-v2 .mission-location-choice,
   .redesign-v2 .mission-location-preview button { transition: none; }
 }
+
+
+/* Neshan ETA is opt-in, source-labelled and independent from the basic seller list. */
+.redesign-v2 .mission-neshan-routing {
+  display: grid; gap: 9px; padding: 12px; border: 1px solid #e7d9c9;
+  border-radius: 10px; background: #fffdfa; min-width: 0;
+}
+.redesign-v2 .mission-neshan-routing > p { margin: 0; line-height: 1.85; font-size: .82rem; overflow-wrap: anywhere; }
+.redesign-v2 .mission-neshan-routing > small { color: #665e5b; font-size: .75rem; }
+.redesign-v2 .mission-route-actions { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; }
+.redesign-v2 .mission-route-actions label { display: grid; gap: 4px; font-size: .82rem; }
+.redesign-v2 .mission-route-actions select,
+.redesign-v2 .mission-route-actions button {
+  min-height: 44px; padding: 8px 12px; border-radius: 9px;
+  border: 1px solid #cbb9b6; background: #fff; font: inherit;
+}
+.redesign-v2 .mission-route-actions button { cursor: pointer; color: #9f2440; font-weight: 700; }
+.redesign-v2 .mission-route-actions button:disabled { cursor: not-allowed; opacity: .6; }
+.redesign-v2 .mission-route-results { display: grid; gap: 9px; }
+.redesign-v2 .mission-route-results > small { line-height: 1.8; color: #625958; }
+.redesign-v2 .mission-route-results ul { display: grid; gap: 7px; padding: 0; margin: 0; list-style: none; }
+.redesign-v2 .mission-route-results li {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 10px;
+  padding: 9px; border-radius: 8px; background: white; border: 1px solid #eee1dd;
+}
+.redesign-v2 .mission-route-results li span { flex: 1 1 120px; overflow-wrap: anywhere; }
+.redesign-v2 .mission-route-results li strong { color: #523b40; }
+.redesign-v2 .mission-route-results li small { color: #625958; }
+@media (max-width: 480px) {
+  .redesign-v2 .mission-route-actions { display: grid; }
+  .redesign-v2 .mission-route-actions button { width: 100%; }
+}
