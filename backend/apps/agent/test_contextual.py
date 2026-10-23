@@ -409,6 +409,15 @@ class ContextualMissionApiTests(TestCase):
         )
         ui_events = [event for event in completed if event["type"] == "ui.component"]
         self.assertTrue(ui_events)
+        returned = ui_events[0]["payload"]["data"]["results"]
+        self.assertEqual([row["product"]["id"] for row in returned],
+                         ["edit_laptop", "basic_laptop"])
+        evidence = returned[0]["recommendation_evidence"]
+        self.assertEqual(evidence["source"], "snapshot_catalog")
+        self.assertTrue(evidence["usage_declared"])
+        self.assertFalse(evidence["suitability_verified"])
+        self.assertIsNone(evidence["ram_gb"])
+        self.assertFalse(returned[1]["recommendation_evidence"]["usage_declared"])
         self.assertEqual(completed[-1]["payload"]["intent_parser"], "contextual")
         self.assertEqual(completed[-1]["payload"]["search_query"], "لپ تاپ")
 
