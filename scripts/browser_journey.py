@@ -9,7 +9,7 @@ import time
 import urllib.request
 from pathlib import Path
 
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import expect, sync_playwright
 
 BASE = "http://127.0.0.1:5173"
 OUTPUT = Path("browser-artifacts")
@@ -122,8 +122,7 @@ def main() -> None:
                     # A model-card choice must not invent a chat message.
                     previous_user_turns = page.locator(".chat-message-user").count()
                     page.locator(".mission-product-card .mission-select-button").first.click()
-                    page.locator(".mission-product-card .mission-select-button").first.wait_for()
-                    assert page.locator(".mission-product-card .mission-select-button").first.get_attribute("aria-pressed") == "true"
+                    expect(page.locator(".mission-product-card .mission-select-button").first).to_have_attribute("aria-pressed", "true")
                     assert page.locator(".chat-message-user").count() == previous_user_turns
 
                     # Comparison remains a user-controlled, difference-first tool.
@@ -140,7 +139,7 @@ def main() -> None:
                     page.locator(".mission-offer-row").nth(1).wait_for()
                     assert page.locator(".mission-offer-row").count() == 2
                     page.locator(".mission-offer-row .mission-select-button").nth(1).click()
-                    assert page.locator(".mission-offer-row .mission-select-button").nth(1).get_attribute("aria-pressed") == "true"
+                    expect(page.locator(".mission-offer-row .mission-select-button").nth(1)).to_have_attribute("aria-pressed", "true")
                     # Bare "دومی" now means the second seller, not the second product.
                     composer.fill("دومی")
                     page.get_by_role("button", name="ارسال پیام").click()
