@@ -419,7 +419,7 @@ function ProductResults({
                           type="button"
                           className="mission-offer-verify"
                           onClick={() => onContact({ ...result, best_offer: sellerOffer })}
-                          disabled={contactingOfferId === sellerOffer.id || !missionId}
+                          disabled={!allowActions || contactingOfferId === sellerOffer.id || !missionId}
                         >
                           {contactingOfferId === sellerOffer.id ? <LoaderCircle size={15} className="spin" /> : <ShieldCheck size={15} />}
                           {contactingOfferId === sellerOffer.id ? 'در حال بررسی…' : 'استعلام آزمایشی فروشنده'}
@@ -429,7 +429,7 @@ function ProductResults({
                     )
                   })}
                   {offerView.offers.length < offerView.total && (
-                    <button type="button" className="mission-offer-load-more" onClick={() => onLoadMoreOffers(result)} disabled={offerView.loading}>
+                    <button type="button" className="mission-offer-load-more" onClick={() => onLoadMoreOffers(result)} disabled={!allowActions || offerView.loading}>
                       {offerView.loading ? <LoaderCircle size={15} className="spin" /> : null}
                       {offerView.loading ? 'در حال دریافت…' : `نمایش فروشگاه‌های بیشتر (${money.format(offerView.offers.length)} از ${money.format(offerView.total)})`}
                     </button>
