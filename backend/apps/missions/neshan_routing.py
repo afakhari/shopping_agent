@@ -117,7 +117,8 @@ def read_direction(
     }
     overview = route.get("overview_polyline")
     encoded = overview.get("points") if isinstance(overview, dict) else None
-    if isinstance(encoded, str) and 0 < len(encoded) <= 16_000 and encoded.isascii():
+    if (isinstance(encoded, str) and 0 < len(encoded) <= 16_000
+        and all(63 <= ord(char) <= 126 for char in encoded)):
         result["encoded_polyline"] = encoded
     return result
 
