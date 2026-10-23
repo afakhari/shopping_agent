@@ -24,6 +24,8 @@ export function ActiveShoppingFilters({
   const entries = [
     budgetLabel(constraints.max_price_toman),
     constraints.must_have_in_person_credit ? 'خرید اعتباری حضوری' : null,
+    constraints.brand_name ? `برند دقیق: ${constraints.brand_name}` : null,
+    constraints.model_exact ? `مدل دقیق: ${constraints.model_exact}` : null,
     typeof constraints.lat === 'number' && typeof constraints.lon === 'number'
       ? `تا ${money.format((constraints.radius_m ?? 3000)/1000)} کیلومتر از محدوده انتخاب‌شده` : null,
     constraints.sort && constraints.sort !== 'relevance' ? sortLabels[constraints.sort] : null,
