@@ -269,6 +269,12 @@ def render_results_node(state: MissionGraphState) -> dict[str, Any]:
         current_stage = "awaiting_product_details"
     elif count:
         message = f"برای «{query}»، {count} محصول با آفر واجد شرایط پیدا کردم. می‌توانی فروشگاه‌های هر محصول را مقایسه کنی."
+        if state.get("search_filters", {}).get("usage_profile") == "video_editing":
+            message += (
+                " برای تدوین ویدیو، ابتدا مدل‌هایی با اشارهٔ ثبت‌شده به این کاربری "
+                "نمایش داده می‌شوند. صرف وجود در نتایج به معنی مناسب‌بودن قطعی "
+                "پردازنده، رم یا گرافیک نیست؛ مشخصات هر مدل را بررسی کن."
+            )
         product_component = {"type": "product_results", "data": response}
         # When the catalogue flags a genuinely ambiguous generic term, give the user a one-tap
         # domain switch rather than mixing unrelated categories or asking them to retype it.
