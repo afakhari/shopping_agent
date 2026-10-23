@@ -41,12 +41,12 @@ export function SellerLocationBoard({
   offers, selectedOfferId, onSelectOffer, disabled, missionId, resultSetId, origin,
 }: Props) {
   const [openMapOfferId, setOpenMapOfferId] = useState<string | null>(null)
-  const [routingCapability, setRoutingCapability] = useState<RoutingCapability | null>(null)
-  const [routingChecked, setRoutingChecked] = useState(false)
+  const [routingCapability, setRoutingCapability] = useState<{missionId: string; data: RoutingCapability} | null>(null)
+  const [routingCheckedMission, setRoutingCheckedMission] = useState<string | null>(null)
   const [routeMode, setRouteMode] = useState<'car' | 'motorcycle'>('car')
   const [routeBusy, setRouteBusy] = useState(false)
-  const [routeResult, setRouteResult] = useState<RouteEstimateResponse | null>(null)
-  const [routeError, setRouteError] = useState<string | null>(null)
+  const [routeResult, setRouteResult] = useState<{scope: string; data: RouteEstimateResponse} | null>(null)
+  const [routeError, setRouteError] = useState<{scope: string; message: string} | null>(null)
   const mapped = geographicallyMappedOffers(offers)
   const distinctMappedShopCount = new Set(mapped.map(offer => offer.shop.id)).size
   const currentOffer = offers.find(offer => offer.id === selectedOfferId)
@@ -58,17 +58,27 @@ export function SellerLocationBoard({
   const uniqueDestinations = mapped.filter((offer, index, all) =>
     all.findIndex((candidate) => candidate.shop.id === offer.shop.id) === index
   ).slice(0, 5)
+  const routingChecked = routingCheckedMission === missionId
+  const activeCapability = routingCapability?.missionId === missionId ? routingCapability.data : null
+  // A late answer for an old mission, result set, origin, mode or seller list
+  // is kept out of sight, even if the provider response arrives successfully.
+  const routeScope = [missionId, resultSetId ?? '', origin?.lat ?? '', origin?.lon ?? '',
+    routeMode, ...uniqueDestinations.map(offer =>
+      [offer.id, offer.shop.lat, offer.shop.lon].join('/'))].join(':')
+  const visibleRouteResult = !disabled && routeResult?.scope === routeScope ? routeResult.data : null
+  const visibleRouteError = routeError?.scope === routeScope ? routeError.message : null
 
   const checkRouting = (opened: boolean) => {
-    if (!opened || routingChecked || !missionId) return
-    setRoutingChecked(true)
+    if (!opened || disabled || !resultSetId || routingChecked || !missionId) return
+    setRoutingCheckedMission(missionId)
     void getRoutingCapability(missionId)
-      .then(setRoutingCapability)
-      .catch(() => setRouteError('وضعیت سرویس مسیریابی در دسترس نیست؛ فهرست و مکان ثبت‌شده برقرار است.'))
+      .then(data => setRoutingCapability({missionId, data}))
+      .catch(() => setRouteError({scope: routeScope,
+        message: 'وضعیت سرویس مسیریابی در دسترس نیست؛ فهرست و مکان ثبت‌شده برقرار است.'}))
   }
 
   const calculateRoutes = async () => {
-    if (!routingCapability?.enabled || !origin || !resultSetId || routeBusy || disabled
+    if (!activeCapability?.enabled || !origin || !resultSetId || routeBusy || disabled
       || uniqueDestinations.length === 0) return
     setRouteBusy(true)
     setRouteError(null)
@@ -80,9 +90,10 @@ export function SellerLocationBoard({
         offer_ids: uniqueDestinations.map((offer) => offer.id),
         mode: routeMode,
       })
-      setRouteResult(result)
+      setRouteResult({scope: routeScope, data: result})
     } catch (error) {
-      setRouteError(error instanceof Error ? error.message : 'دریافت زمان سفر ممکن نشد.')
+      setRouteError({scope: routeScope,
+        message: error instanceof Error ? error.message : 'دریافت زمان سفر ممکن نشد.'})
     } finally {
       setRouteBusy(false)
     }
@@ -152,12 +163,12 @@ export function SellerLocationBoard({
           <p>این بخش فقط در صورت فعال‌بودن سرویس، بعد از انتخاب مبدأ و درخواست مستقیم تو محاسبه می‌شود.
             زمان‌های نشان تخمینی‌اند؛ نام فروشگاه‌ها و موجودی آن‌ها تأیید نشده‌اند.</p>
           {!routingChecked && <small>وضعیت سرویس پس از بازکردن این بخش بررسی می‌شود.</small>}
-          {routingChecked && !routingCapability && !routeError && <small>در حال بررسی قابلیت مسیریابی…</small>}
-          {routingCapability && !routingCapability.enabled && <p role="status">
+          {routingChecked && !activeCapability && !visibleRouteError && <small>در حال بررسی قابلیت مسیریابی…</small>}
+          {activeCapability && !activeCapability.enabled && <p role="status">
             اتصال مسیریابی نشان هنوز فعال نشده است. فهرست و نشانی‌های ثبت‌شده همچنان قابل استفاده‌اند.
           </p>}
           {!origin && <p>ابتدا از تنظیمات جست‌وجو، منطقه مبدأ تهران را مشخص کن.</p>}
-          {routingCapability?.enabled && origin && <div className="mission-route-actions">
+          {activeCapability?.enabled && origin && <div className="mission-route-actions">
             <label>نوع سفر
               <select value={routeMode} disabled={disabled || routeBusy}
                 onChange={(event) => { setRouteMode(event.target.value as 'car' | 'motorcycle'); setRouteResult(null) }}>
@@ -170,13 +181,13 @@ export function SellerLocationBoard({
               {routeBusy ? 'در حال دریافت از نشان…' : 'محاسبه زمان سفر (درخواست به نشان)'}
             </button>
           </div>}
-          {routeError && <p role="status">{routeError} هیچ زمان فرضی نمایش داده نمی‌شود.</p>}
-          {routeResult?.status === 'unavailable' && <p role="status">
+          {visibleRouteError && <p role="status">{visibleRouteError} هیچ زمان فرضی نمایش داده نمی‌شود.</p>}
+          {visibleRouteResult?.status === 'unavailable' && <p role="status">
             مسیریابی در حال حاضر در دسترس نیست؛ زمان سفر قابل اعتماد نداریم.
           </p>}
-          {routeResult?.status === 'ok' && <div className="mission-route-results">
+          {visibleRouteResult?.status === 'ok' && <div className="mission-route-results">
             <small>زمان تخمینی با ترافیک از نشان، در لحظه درخواست. ممکن است تغییر کند و تأیید موجودی نیست.</small>
-            <ul>{routeResult.estimates.map((estimate) => {
+            <ul>{visibleRouteResult.estimates.map((estimate) => {
               const offer = offers.find((row) => row.id === estimate.offer_id)
               if (!offer) return null
               const duration = estimate.status === 'ok' && typeof estimate.duration_seconds === 'number'
