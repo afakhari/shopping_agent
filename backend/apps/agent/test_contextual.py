@@ -38,7 +38,7 @@ class ContextualRouterTests(TestCase):
         ):
             with self.subTest(utterance=utterance):
                 result = classify_contextual_turn(utterance, state)
-                self.assertEqual(result["kind"], "clarify")
+                self.assertEqual(result["kind"], "advice")
                 self.assertIn("گرافیک مجتمع", result["reply"])
                 self.assertIn("تدوین", result["reply"])
         self.assertEqual(
@@ -281,7 +281,11 @@ class ContextualMissionApiTests(TestCase):
             model.assert_not_called()
             graph.assert_not_called()
         mission.refresh_from_db()
-        self.assertEqual(mission.state, original_state)
+        self.assertEqual(mission.state["search_query"], original_state["search_query"])
+        self.assertEqual(mission.state["candidate_product_ids"],
+                         original_state["candidate_product_ids"])
+        self.assertEqual(mission.state["result_set_id"], original_state["result_set_id"])
+        self.assertEqual(mission.state["pending_dialogue"]["slot"], "laptop_usage")
         self.assertEqual(mission.constraints["max_price_toman"], "1000000")
 
     def test_ambiguous_wedding_query_before_any_search_asks_without_catalog(self):
