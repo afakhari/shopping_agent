@@ -519,7 +519,7 @@ def mission_turn(request, mission_id: str):
         )
         result_set_id = uuid.uuid4().hex
         mission.state = {
-            **{k: v for k, v in last_state.items() if k in {"last_contact_attempt_id", "last_contact_outcome"}},
+            **{k: v for k, v in last_state.items() if k in {"last_contact_attempt_id", "last_contact_outcome", "neshan_route_calls"}},
             "result_set_id": result_set_id,
             "results_stale": False,
             "active_surface": "products",
@@ -682,6 +682,8 @@ def route_estimates(request, mission_id: str):
             raise ValidationError({"origin": "منطقه مبدأ باید از انتخاب ثبت‌شده در همین مأموریت باشد."})
     filters = _search_filterset(mission.constraints or {})
     selected_id = state.get("selected_product_id")
+    if not isinstance(selected_id, str) or not selected_id:
+        raise ValidationError({"offer_ids": "ابتدا یک محصول دارای آفر معتبر انتخاب کن."})
     valid = eligible_offer_list(filters, product_id=selected_id).filter(
         source_id__in=ids
     ).select_related("shop", "product")
