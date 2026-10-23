@@ -1504,6 +1504,11 @@ export function MissionPanel({
                       {isCurrentResult && <button type="button" className="mission-edit-filters" onClick={() => handleGenUIAction({ type: 'open_filter_form' })} disabled={isRunning || isRestoring}><SlidersHorizontal size={15} /> تغییر شرایط</button>}
                     </div>
                   </div>
+                  {isCurrentResult && resultsStale && <div className="mission-stale-warning" role="status">
+                    شرایط مأموریت تغییر کرده است. کارت‌های قبلی فقط برای مراجعه تاریخی هستند و انتخاب یا استعلام از آن‌ها غیرفعال است.
+                    <button type="button" disabled={isRunning || isRestoring || !lastQuery}
+                      onClick={() => void runTurn(lastQuery, serverConstraintsRef.current ?? constraints, lastQuery)}>به‌روزرسانی نتایج</button>
+                  </div>}
                   {isCurrentResult && <ActiveShoppingFilters constraints={constraints} disabled={isRunning || isRestoring}
                     onEdit={() => handleGenUIAction({type:'open_filter_form'})} />}
                   {isCurrentResult && selectedCompareResults.length > 0 && (
@@ -1524,7 +1529,7 @@ export function MissionPanel({
                       </div>
                     </div>
                   )}
-                  {isCurrentResult && comparisonOpen && comparisonComponents.length > 0 && <GenUIRenderer components={comparisonComponents} defaults={{ query: lastQuery, max_price_toman: budget, must_have_in_person_credit: mustHaveCredit, sort: constraints.sort ?? 'relevance' }} disabled={isRunning || isRestoring} onAction={handleGenUIAction} />}
+                  {isCurrentResult && !resultsStale && comparisonOpen && comparisonComponents.length > 0 && <GenUIRenderer components={comparisonComponents} defaults={{ query: lastQuery, max_price_toman: budget, must_have_in_person_credit: mustHaveCredit, sort: constraints.sort ?? 'relevance' }} disabled={isRunning || isRestoring} onAction={handleGenUIAction} />}
                   <ProductResults
                     results={item.results}
                     missionId={missionId ?? ''}
@@ -1540,7 +1545,7 @@ export function MissionPanel({
                     offerViews={offerViews}
                     onToggleOffers={toggleProductOffers}
                     onLoadMoreOffers={loadMoreProductOffers}
-                    allowActions={isCurrentResult}
+                    allowActions={isCurrentResult && !resultsStale}
                   />
                 </div>
               )}
