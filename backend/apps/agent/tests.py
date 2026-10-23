@@ -2,7 +2,7 @@ import io
 import json
 from unittest.mock import patch
 
-from django.test import SimpleTestCase, override_settings
+from django.test import SimpleTestCase, TestCase, override_settings
 
 from apps.agent.graph import _budget_from_message, _query_from_message, parse_request_node, render_results_node
 
@@ -253,6 +253,33 @@ class OptionalLLMAdapterTests(SimpleTestCase):
 
         self.assertIsNone(extract_intent("هدفون بی‌سیم", {"city": "tehran"}))
         mocked_urlopen.assert_called_once()
+
+
+class SharedLLMBudgetTests(TestCase):
+    @override_settings(
+        LLM_ENABLED=True, LLM_PROVIDER="openai_compatible",
+        LLM_API_KEY="test-key", LLM_MODEL="test-model",
+        LLM_BASE_URL="https://model.example.test/v1", LLM_DAILY_MAX_CALLS=1,
+    )
+    @patch("apps.agent.llm.urlopen")
+    def test_provider_budget_is_shared_and_counts_one_call(self, mocked_urlopen):
+        from apps.agent.llm import extract_intent
+        from apps.missions.models import LLMDailyUsage
+
+        response = {"choices": [{"message": {"content": json.dumps({
+            "search_query": "هدفون", "max_price_toman": None,
+            "must_have_in_person_credit": False, "sort": None,
+        }, ensure_ascii=False)}}]}
+        mocked_urlopen.return_value = io.BytesIO(json.dumps(response).encode())
+        self.assertIsNotNone(extract_intent("هدفون", {"city": "tehran"}))
+        self.assertIsNone(extract_intent("گوشی", {"city": "tehran"}))
+        self.assertEqual(mocked_urlopen.call_count, 1)
+        self.assertEqual(LLMDailyUsage.objects.get().requests, 1)
+
+    @override_settings(LLM_DAILY_MAX_CALLS=0)
+    def test_zero_daily_quota_skips_external_request(self):
+        from apps.agent.llm import _reserve_model_call
+        self.assertFalse(_reserve_model_call())
 
 
 class GenerativeUIComponentSchemaTests(SimpleTestCase):

@@ -69,6 +69,9 @@ Development can be temporarily broken on feature branches. Run narrow local chec
 
 ## آماده‌سازی انتشار مسابقه
 
+> **پیش از دیپلوی (شاخه hardening):** [چک‌لیست قابل اجرا و راهنمای TLS](docs/PREDEPLOY-RUNBOOK-2026-10-23.fa.md)، [گزارش ۲۰ سناریو و ۱۲ مسیر با گیت شواهد](docs/release-evidence-template.json)، [دستور کنترل شواهد](scripts/check_release_evidence.py)، [بنچمارک ۵۰ پرس‌وجوی بدون برچسب](scripts/retrieval_benchmark.py)، و [متن ضبط ویدئو](docs/FINAL-DEMO-RECORDING.fa.md). هیچ‌کدام به‌تنهایی نشانه انتشار عمومی یا تکمیل آزمون انسانی نیستند.
+
+
 - [گزارش دقیق پوشش سناریوهای داوری و محدودیت‌های تأیید](docs/RELEASE-ACCEPTANCE-2026-10-23.fa.md)
 - [راهنمای انتشار امن و آزمون پیش از دمو](docs/SAFE-PRODUCTION-2026-10-23.fa.md)
 - [تست Chromium با داده ساختگی و شواهد تصویری](docs/BROWSER-E2E-2026-10-23.fa.md)

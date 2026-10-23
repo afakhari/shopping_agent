@@ -6,7 +6,7 @@ from . import base as base_settings
 from .base import *  # noqa: F403
 
 DEBUG = False
-if not SECRET_KEY or SECRET_KEY == "local-only-insecure-key-change-before-deploy":  # noqa: F405
+if not SECRET_KEY or len(SECRET_KEY) < 32 or SECRET_KEY == "local-only-insecure-key-change-before-deploy":  # noqa: F405
     raise ImproperlyConfigured("DJANGO_SECRET_KEY must be set to a strong, unique secret.")
 production_hosts = [
     host.strip()
@@ -22,8 +22,14 @@ CSRF_TRUSTED_ORIGINS = [
     for origin in os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",")
     if origin.strip()
 ]
+# Only trust a TLS proxy after loopback-binding the internal HTTP application.
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+SECURE_SSL_REDIRECT = True
+# Container health probes use internal HTTP, not the public reverse proxy.
+SECURE_REDIRECT_EXEMPT = [r"^api/v1/health/(live|ready)/$"]
 SESSION_COOKIE_SECURE = True
+SESSION_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_SAMESITE = "Lax"
 CSRF_COOKIE_SECURE = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
@@ -43,3 +49,7 @@ REST_FRAMEWORK = {
 REQUIRE_DATASET_FOR_READINESS = True
 # Fixed competition snapshot counts; incomplete imports must not pass health probes.
 CATALOG_MINIMUM_ROWS = {"products": 225903, "shops": 6476, "offers": 331506}
+# Disable legacy turn endpoints without request IDs in public deployments.
+REQUIRE_REQUEST_IDS = True
+# Default zero disables paid model calls until the owner explicitly approves a budget.
+LLM_DAILY_MAX_CALLS = max(0, min(10000, int(os.environ.get("LLM_DAILY_MAX_CALLS", "0"))))

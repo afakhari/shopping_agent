@@ -1,0 +1,330 @@
+{
+  "status": "PREDEPLOY_PENDING_EVIDENCE",
+  "note": "Evidence template only, not a claim of any test run or release readiness",
+  "git_sha": null,
+  "production_url": null,
+  "ci_url": null,
+  "demo_video_url": null,
+  "checks": [
+    {
+      "id": "EDGE-01",
+      "kind": "edge",
+      "title": "درخواست مدل دقیق و شماره مدل محفوظ",
+      "result": "PENDING",
+      "evidence": null,
+      "tested_at": null,
+      "sha": null
+    },
+    {
+      "id": "EDGE-02",
+      "kind": "edge",
+      "title": "توصیه براساس کاربرد و حد بودجه",
+      "result": "PENDING",
+      "evidence": null,
+      "tested_at": null,
+      "sha": null
+    },
+    {
+      "id": "EDGE-03",
+      "kind": "edge",
+      "title": "درخواست مبهم و روشن‌سازی",
+      "result": "PENDING",
+      "evidence": null,
+      "tested_at": null,
+      "sha": null
+    },
+    {
+      "id": "EDGE-04",
+      "kind": "edge",
+      "title": "جست‌وجوی بی‌نتیجه و بازیابی",
+      "result": "PENDING",
+      "evidence": null,
+      "tested_at": null,
+      "sha": null
+    },
+    {
+      "id": "EDGE-05",
+      "kind": "edge",
+      "title": "بودجه سه‌میلیونی با ارقام فارسی و جداکننده",
+      "result": "PENDING",
+      "evidence": null,
+      "tested_at": null,
+      "sha": null
+    },
+    {
+      "id": "EDGE-06",
+      "kind": "edge",
+      "title": "شرط پرداخت حضوری معتبر برای آفر",
+      "result": "PENDING",
+      "evidence": null,
+      "tested_at": null,
+      "sha": null
+    },
+    {
+      "id": "EDGE-07",
+      "kind": "edge",
+      "title": "قیمت NULL یا timestamp نامشخص",
+      "result": "PENDING",
+      "evidence": null,
+      "tested_at": null,
+      "sha": null
+    },
+    {
+      "id": "EDGE-08",
+      "kind": "edge",
+      "title": "فروشگاهِ فاقد آفر از نتایج حذف شود",
+      "result": "PENDING",
+      "evidence": null,
+      "tested_at": null,
+      "sha": null
+    },
+    {
+      "id": "EDGE-09",
+      "kind": "edge",
+      "title": "ساعت کاری مجهول یا عبور نیمه‌شب",
+      "result": "PENDING",
+      "evidence": null,
+      "tested_at": null,
+      "sha": null
+    },
+    {
+      "id": "EDGE-10",
+      "kind": "edge",
+      "title": "نتیجه شبیه‌سازی confirmed_available با برچسب",
+      "result": "PENDING",
+      "evidence": null,
+      "tested_at": null,
+      "sha": null
+    },
+    {
+      "id": "EDGE-11",
+      "kind": "edge",
+      "title": "no_answer و پیشنهاد فروشنده پشتیبان",
+      "result": "PENDING",
+      "evidence": null,
+      "tested_at": null,
+      "sha": null
+    },
+    {
+      "id": "EDGE-12",
+      "kind": "edge",
+      "title": "تغییر قیمت و تأیید دوباره سقف",
+      "result": "PENDING",
+      "evidence": null,
+      "tested_at": null,
+      "sha": null
+    },
+    {
+      "id": "EDGE-13",
+      "kind": "edge",
+      "title": "unavailable و گزینه جایگزین",
+      "result": "PENDING",
+      "evidence": null,
+      "tested_at": null,
+      "sha": null
+    },
+    {
+      "id": "EDGE-14",
+      "kind": "edge",
+      "title": "گارانتی ثبت‌شده و اختلاف فروشندگان",
+      "result": "PENDING",
+      "evidence": null,
+      "tested_at": null,
+      "sha": null
+    },
+    {
+      "id": "EDGE-15",
+      "kind": "edge",
+      "title": "تغییر فیلتر در میان درخواست طولانی",
+      "result": "PENDING",
+      "evidence": null,
+      "tested_at": null,
+      "sha": null
+    },
+    {
+      "id": "EDGE-16",
+      "kind": "edge",
+      "title": "قطع SSE و بازیابی بدون تکرار",
+      "result": "PENDING",
+      "evidence": null,
+      "tested_at": null,
+      "sha": null
+    },
+    {
+      "id": "EDGE-17",
+      "kind": "edge",
+      "title": "رد مجوز مکان و انتخاب محدوده دستی",
+      "result": "PENDING",
+      "evidence": null,
+      "tested_at": null,
+      "sha": null
+    },
+    {
+      "id": "EDGE-18",
+      "kind": "edge",
+      "title": "قطع/خرابی نقشه بدون ساخت ETA",
+      "result": "PENDING",
+      "evidence": null,
+      "tested_at": null,
+      "sha": null
+    },
+    {
+      "id": "EDGE-19",
+      "kind": "edge",
+      "title": "نشانی فاقد طبقه یا واحد، بدون جعل",
+      "result": "PENDING",
+      "evidence": null,
+      "tested_at": null,
+      "sha": null
+    },
+    {
+      "id": "EDGE-20",
+      "kind": "edge",
+      "title": "refresh هم‌زمان با استعلام و تکرار امن",
+      "result": "PENDING",
+      "evidence": null,
+      "tested_at": null,
+      "sha": null
+    },
+    {
+      "id": "JOURNEY-01",
+      "kind": "e2e",
+      "title": "جست‌وجوی هدفون تا مقایسه دو مدل و فروشگاه",
+      "result": "PENDING",
+      "evidence": null,
+      "tested_at": null,
+      "sha": null
+    },
+    {
+      "id": "JOURNEY-02",
+      "kind": "e2e",
+      "title": "گوشی با برند انحصاری و مدل دقیق",
+      "result": "PENDING",
+      "evidence": null,
+      "tested_at": null,
+      "sha": null
+    },
+    {
+      "id": "JOURNEY-03",
+      "kind": "e2e",
+      "title": "محصول با بودجه محدود و رد قیمت بالاتر",
+      "result": "PENDING",
+      "evidence": null,
+      "tested_at": null,
+      "sha": null
+    },
+    {
+      "id": "JOURNEY-04",
+      "kind": "e2e",
+      "title": "خرید اعتباری حضوری با فیلتر آفر واجد شرایط",
+      "result": "PENDING",
+      "evidence": null,
+      "tested_at": null,
+      "sha": null
+    },
+    {
+      "id": "JOURNEY-05",
+      "kind": "e2e",
+      "title": "انتخاب مکان دستی و محدودیت شعاع",
+      "result": "PENDING",
+      "evidence": null,
+      "tested_at": null,
+      "sha": null
+    },
+    {
+      "id": "JOURNEY-06",
+      "kind": "e2e",
+      "title": "رد geolocation و fallback بدون نقشه",
+      "result": "PENDING",
+      "evidence": null,
+      "tested_at": null,
+      "sha": null
+    },
+    {
+      "id": "JOURNEY-07",
+      "kind": "e2e",
+      "title": "فروشنده بی‌پاسخ و جست‌وجوی پشتیبان",
+      "result": "PENDING",
+      "evidence": null,
+      "tested_at": null,
+      "sha": null
+    },
+    {
+      "id": "JOURNEY-08",
+      "kind": "e2e",
+      "title": "فروشنده ناموجود و تعویض گزینه",
+      "result": "PENDING",
+      "evidence": null,
+      "tested_at": null,
+      "sha": null
+    },
+    {
+      "id": "JOURNEY-09",
+      "kind": "e2e",
+      "title": "price_changed، توقف مراجعه و اصلاح فیلتر",
+      "result": "PENDING",
+      "evidence": null,
+      "tested_at": null,
+      "sha": null
+    },
+    {
+      "id": "JOURNEY-10",
+      "kind": "e2e",
+      "title": "مقایسه سه محصول، انتخاب محصول دوم و بازگشت",
+      "result": "PENDING",
+      "evidence": null,
+      "tested_at": null,
+      "sha": null
+    },
+    {
+      "id": "JOURNEY-11",
+      "kind": "e2e",
+      "title": "قطع شبکه/refresh و بازپخش ایمن مأموریت",
+      "result": "PENDING",
+      "evidence": null,
+      "tested_at": null,
+      "sha": null
+    },
+    {
+      "id": "JOURNEY-12",
+      "kind": "e2e",
+      "title": "بازبودن فروشنده در آینده، ساعات نامشخص و برنامه مراجعه",
+      "result": "PENDING",
+      "evidence": null,
+      "tested_at": null,
+      "sha": null
+    }
+  ],
+  "other_gates": [
+    {
+      "id": "PROD-HTTPS",
+      "title": "External HTTPS, Secure session cookie and TLS redirect verified",
+      "result": "PENDING",
+      "evidence": null
+    },
+    {
+      "id": "DATASET",
+      "title": "Full dataset import counts and integrity verified at production SHA",
+      "result": "PENDING",
+      "evidence": null
+    },
+    {
+      "id": "BOXAPI",
+      "title": "Real provider call on production with authorized daily budget",
+      "result": "PENDING",
+      "evidence": null
+    },
+    {
+      "id": "MOBILE-A11Y",
+      "title": "Human mobile RTL, keyboard, contrast and reduced-motion audit",
+      "result": "PENDING",
+      "evidence": null
+    },
+    {
+      "id": "SEARCH-GOLD",
+      "title": "50 human-labeled queries and validated retrieval metrics",
+      "result": "PENDING",
+      "evidence": null
+    }
+  ]
+}

@@ -452,6 +452,46 @@ class MissionApiTests(TestCase):
         mission = PurchaseMission.objects.create(initial_message="legacy", constraints={})
         self.assertEqual(APIClient().get(f"/api/v1/missions/{mission.id}/").status_code, 404)
 
+    def test_single_flight_turn_lease_blocks_inflight_duplicate_and_other_turns(self):
+        from django.utils import timezone
+        from apps.missions.models import TurnLease
+
+        mission_id = self._create_mission_and_search()
+        TurnLease.objects.create(
+            mission_id=mission_id, client_request_id="busy-1",
+            message="هدفون", request_constraints={}, issued_at=timezone.now(),
+        )
+        url = f"/api/v1/missions/{mission_id}/turns/"
+        for request_id in ("busy-1", "busy-2"):
+            response = self.client.post(url, {
+                "message": "هدفون", "client_request_id": request_id,
+            }, format="json", HTTP_ACCEPT="text/event-stream")
+            self.assertEqual(response.status_code, 409)
+
+        changed = self.client.post(url, {
+            "message": "لپ تاپ", "client_request_id": "busy-1",
+        }, format="json", HTTP_ACCEPT="text/event-stream")
+        self.assertEqual(changed.status_code, 400)
+
+    def test_expired_turn_lease_is_reclaimed_and_committed(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        from apps.missions.models import TurnLease
+
+        mission_id = self._create_mission_and_search()
+        lease = TurnLease.objects.create(
+            mission_id=mission_id, client_request_id="expired-1",
+            message="هدفون", request_constraints={},
+            issued_at=timezone.now() - timedelta(minutes=3),
+        )
+        response = self.client.post(f"/api/v1/missions/{mission_id}/turns/", {
+            "message": "هدفون", "client_request_id": "expired-1",
+        }, format="json", HTTP_ACCEPT="text/event-stream")
+        self.assertEqual(response.status_code, 200)
+        list(response.streaming_content)
+        lease.refresh_from_db()
+        self.assertIsNotNone(lease.finished_at)
+
     def test_mission_creation_retry_returns_same_mission_and_rejects_mismatched_body(self):
         payload = {
             "initial_message": "هدفون",

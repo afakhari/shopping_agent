@@ -1,0 +1,13 @@
+# Host-level TLS ingress example. Copy to /etc/caddy/Caddyfile and configure
+# PUBLIC_DOMAIN privately on the server. Do not put private keys in this file.
+# compose.production.yaml binds the backend-facing frontend to 127.0.0.1:8080.
+# DNS A/AAAA must point to the host; firewall exposes only 80/443 externally.
+{$PUBLIC_DOMAIN} {
+    encode zstd gzip
+    header Strict-Transport-Security "max-age=2592000"
+    reverse_proxy 127.0.0.1:8080 {
+        header_up Host {host}
+        header_up X-Forwarded-Proto {scheme}
+        header_up X-Forwarded-For {remote_host}
+    }
+}
