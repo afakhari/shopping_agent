@@ -210,6 +210,15 @@ def mission_turn(request, mission_id: str):
         with transaction.atomic():
             mission = _owned_mission(request, mission_id, lock=True)
             decision = classify_contextual_turn(data["message"], mission.state)
+            if (
+                decision["kind"] == "refine"
+                and decision["constraint_updates"].get("sort") == "distance_asc"
+                and preflight_constraints.get("lat") is None
+            ):
+                decision = {
+                    "kind": "clarify",
+                    "reply": "برای مرتب‌سازی بر اساس نزدیکی، ابتدا محدوده تهران را انتخاب کن.",
+                }
             selected_id = None
             if decision["kind"] == "select_product":
                 selected_id = decision["product_id"]
