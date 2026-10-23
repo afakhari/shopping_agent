@@ -52,6 +52,21 @@ describe('controlled Generative UI protocol', () => {
     }))).toEqual([])
   })
 
+  it('requires server-issued source IDs and demo provenance for contact consent', () => {
+    const valid = event('contact_prompt', {
+      offer_id: 'offer1', shop_id: 'shop1', product_id: 'product1',
+      source_type: 'demo_simulation',
+    })
+    expect(getUIComponents(valid)).toHaveLength(1)
+    expect(getUIComponents(event('contact_prompt', {
+      offer_id: 'offer1', shop_id: 'shop1', product_id: 'product1',
+      source_type: 'live_verified',
+    }))).toEqual([])
+    expect(getUIComponents(event('contact_prompt', {
+      shop_id: 'shop1', source_type: 'demo_simulation',
+    }))).toEqual([])
+  })
+
   it('limits one incoming component stack to twelve entries', () => {
     const components = getUIComponents(event('component_stack', {
       components: Array.from({ length: 30 }, () => ({ type: 'notice', data: { message: 'notice' } })),
