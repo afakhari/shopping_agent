@@ -179,6 +179,41 @@ class CatalogSearchApiTests(TestCase):
                 self.assertEqual(actual, expected)
                 self.assertEqual(response.json()["total"], len(expected))
 
+    def test_consumer_taxonomy_excludes_accessories_from_core_product_queries(self):
+        extra = (
+            ("phone", "گوشی موبایل نمونه", "گوشی موبایل"),
+            ("phone_case", "کیف گوشی نمونه", "کیف و کاور گوشی"),
+            ("phone_medical", "گوشی پزشکی نمونه", "گوشی پزشکی"),
+            ("headphone_case", "کیف هدفون نمونه", "کیف و کاور هدفون و هندزفری"),
+            ("tablet", "تبلت نمونه", "تبلت"),
+            ("tablet_case", "کیف تبلت نمونه", "کیف و کاور تبلت"),
+            ("tv", "تلویزیون نمونه", "تلویزیون"),
+            ("tv_stand", "پایه تلویزیون نمونه", "پایه تلویزیون"),
+        )
+        for name, title, category in extra:
+            product = Product.objects.create(
+                source_id=f"ontology_{name}", persian_title=title,
+                normalized_title=normalize_persian_text(title), category_name=category,
+            )
+            Offer.objects.create(
+                source_id=f"ontology_offer_{name}", product=product,
+                shop=self.cash_shop, price_toman=Decimal("2500000"),
+            )
+        cases = (
+            ("گوشی", {"ontology_phone"}),
+            ("کیف گوشی", {"ontology_phone_case"}),
+            ("گوشی پزشکی", {"ontology_phone_medical"}),
+            ("تبلت", {"ontology_tablet"}),
+            ("تلویزیون", {"ontology_tv"}),
+            ("هدفون", {"product_headphone", "product_wired"}),
+        )
+        for query, expected in cases:
+            with self.subTest(query=query):
+                response = self.client.get("/api/v1/catalog/search/", {"q": query})
+                self.assertEqual(response.status_code, 200, response.content)
+                found = {item["product"]["id"] for item in response.json()["results"]}
+                self.assertEqual(found, expected)
+
     def test_search_returns_only_products_with_matching_offers(self):
         response = self.client.get("/api/v1/catalog/search/", {"q": "هدفون"})
         self.assertEqual(response.status_code, 200, response.content)
