@@ -44,6 +44,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 /** Fail closed for seller cards; historical component types stay compatible. */
 function isValidData(type: string, data: Record<string, unknown>): boolean {
+  if (type === 'comparison_table') {
+    return data.source_type === 'registered_catalog'
+      && Array.isArray(data.columns) && data.columns.length >= 2 && data.columns.length <= 16
+      && data.columns.every((column) => isRecord(column) && typeof column.key === 'string'
+        && typeof column.label === 'string')
+      && Array.isArray(data.rows) && data.rows.length >= 2 && data.rows.length <= 3
+      && data.rows.every((row) => isRecord(row)
+        && typeof row.id === 'string' && typeof row.product === 'string')
+      && data.availability_verified === false
+  }
   if (type === 'contact_prompt') {
     return typeof data.offer_id === 'string' && data.offer_id.length > 0
       && typeof data.shop_id === 'string' && data.shop_id.length > 0
