@@ -49,5 +49,7 @@ REST_FRAMEWORK = {
 REQUIRE_DATASET_FOR_READINESS = True
 # Fixed competition snapshot counts; incomplete imports must not pass health probes.
 CATALOG_MINIMUM_ROWS = {"products": 225903, "shops": 6476, "offers": 331506}
+# Disable legacy turn endpoints without request IDs in public deployments.
+REQUIRE_REQUEST_IDS = True
 # Default zero disables paid model calls until the owner explicitly approves a budget.
 LLM_DAILY_MAX_CALLS = max(0, min(10000, int(os.environ.get("LLM_DAILY_MAX_CALLS", "0"))))
