@@ -13,6 +13,39 @@ from apps.missions.models import PurchaseMission
 
 
 class ContextualRouterTests(TestCase):
+    def test_wedding_lap_ambiguity_never_guesses_a_product(self):
+        state = {"search_query": "هدفون", "visible_product_ids": ["p1"]}
+        for utterance in (
+            "من یه لپ می خواهم مناسب مراسم عروسی",
+            "یه لپ برای عروسی میخوام",
+            "لپ می خواهم",
+        ):
+            with self.subTest(utterance=utterance):
+                result = classify_contextual_turn(utterance, state)
+                self.assertEqual(result["kind"], "clarify")
+                self.assertIn("لپ‌تاپ", result["reply"])
+                self.assertIn("آرایش", result["reply"])
+        self.assertEqual(
+            classify_contextual_turn("یه لپ تاپ برای تدوین عروسی میخوام", state)["kind"],
+            "search",
+        )
+
+    def test_laptop_gpu_question_gives_grounded_advice_not_catalog_search(self):
+        state = {"search_query": "لپ تاپ", "candidate_product_ids": ["p1"]}
+        for utterance in (
+            "من دقیقا نمیدونم لپ تاپی که باید بخرم باید کارت گرافیک داشته باشه یا نه",
+            "آیا لپ تاپ برای مراسم عروسی نیاز به کارت گرافیک مجزا داره؟",
+        ):
+            with self.subTest(utterance=utterance):
+                result = classify_contextual_turn(utterance, state)
+                self.assertEqual(result["kind"], "clarify")
+                self.assertIn("گرافیک مجتمع", result["reply"])
+                self.assertIn("تدوین", result["reply"])
+        self.assertEqual(
+            classify_contextual_turn("لپ تاپ با کارت گرافیک RTX 4060 میخوام", state)["kind"],
+            "search",
+        )
+
     def test_budget_change_reuses_catalogue_query(self):
         decision = classify_contextual_turn("بودجه‌م شد ۲ میلیون", {"search_query": "هدفون"})
         self.assertEqual(decision["kind"], "refine")
@@ -226,6 +259,49 @@ class ContextualMissionApiTests(TestCase):
         )
         self.assertEqual(response.status_code, 200, getattr(response, "content", b""))
         return [json.loads(row[6:]) for row in b"".join(response.streaming_content).decode("utf-8").splitlines() if row.startswith("data: ")]
+
+    def test_wedding_lap_and_gpu_advice_preserve_results_and_skip_paid_model(self):
+        mission = PurchaseMission.objects.get(pk=self.mission_id)
+        original_state = mission.state.copy()
+        prompts = (
+            ("من یه لپ می خواهم مناسب مراسم عروسی", "لپ‌تاپ"),
+            ("من دقیقا نمیدونم لپ تاپی که باید بخرم باید کارت گرافیک داشته باشه یا نه",
+             "گرافیک مجتمع"),
+        )
+        with patch("apps.missions.views.extract_intent") as model, patch(
+            "apps.missions.views.run_purchase_graph"
+        ) as graph:
+            for message, expected in prompts:
+                events = self.turn(message)
+                self.assertEqual([e["type"] for e in events], [
+                    "user.message", "assistant.message", "turn.completed",
+                ])
+                self.assertIn(expected, events[1]["payload"]["text"])
+                self.assertEqual(events[-1]["payload"]["intent_parser"], "contextual")
+            model.assert_not_called()
+            graph.assert_not_called()
+        mission.refresh_from_db()
+        self.assertEqual(mission.state, original_state)
+        self.assertEqual(mission.constraints["max_price_toman"], "1000000")
+
+    def test_ambiguous_wedding_query_before_any_search_asks_without_catalog(self):
+        created = self.client.post(
+            "/api/v1/missions/",
+            {"initial_message": "من یه لپ می خواهم مناسب مراسم عروسی"},
+            format="json",
+        )
+        self.assertEqual(created.status_code, 201)
+        self.mission_id = created.json()["mission_id"]
+        with patch("apps.missions.views.extract_intent") as model, patch(
+            "apps.missions.views.run_purchase_graph"
+        ) as graph:
+            events = self.turn("من یه لپ می خواهم مناسب مراسم عروسی")
+            model.assert_not_called()
+            graph.assert_not_called()
+        self.assertIn("آرایش", events[1]["payload"]["text"])
+        self.assertNotIn("ui.component", [e["type"] for e in events])
+        mission = PurchaseMission.objects.get(pk=self.mission_id)
+        self.assertFalse((mission.state or {}).get("candidate_product_ids"))
 
     def test_product_reference_keeps_previous_results_and_does_not_search(self):
         mission = PurchaseMission.objects.get(pk=self.mission_id)
