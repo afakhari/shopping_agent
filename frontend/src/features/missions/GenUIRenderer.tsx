@@ -290,7 +290,8 @@ function ComparisonTable({ component }: { component: GenUIComponent }) {
           {onlyDifferences ? 'نمایش همه ویژگی‌ها' : 'نمایش فقط تفاوت‌ها'}
         </button>
       </div>
-      <div className="genui-table-wrap">
+      <p className="genui-scroll-hint">برای مشاهده سایر ستون‌ها، جدول را به طرفین بکش یا با کلیدهای جهت‌نما پیمایش کن.</p>
+      <div className="genui-table-wrap" role="region" tabIndex={0} aria-label="جدول مقایسه قابل پیمایش افقی">
         <table className="genui-table genui-comparison-table">
           <caption>مقایسه ویژگی‌به‌ویژگی محصولات انتخاب‌شده</caption>
           <thead><tr>

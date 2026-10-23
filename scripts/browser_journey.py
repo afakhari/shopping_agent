@@ -103,6 +103,11 @@ def main() -> None:
                 page.get_by_role("button", name="ارسال پیام").click()
                 page.locator(".mission-product-card").first.wait_for()
                 assert page.locator(".mission-product-highlights").first.is_visible()
+                expect(page.locator('.shopping-journey [aria-current="step"]')).to_contain_text("انتخاب مدل")
+                assert page.locator(".mission-product-price-line .mission-price-eyebrow").first.is_visible()
+                assert page.locator(".mission-product-actions button").first.evaluate(
+                    "(el) => el.getBoundingClientRect().height >= 44"
+                ), "Primary shopping action must remain thumb-friendly"
                 if width == 390:
                     # After a real search, smalltalk should not fabricate or replace
                     # products; the previous search remains available.
@@ -124,12 +129,14 @@ def main() -> None:
                     page.locator(".mission-product-card .mission-select-button").first.click()
                     expect(page.locator(".mission-product-card .mission-select-button").first).to_have_attribute("aria-pressed", "true")
                     assert page.locator(".chat-message-user").count() == previous_user_turns
+                    expect(page.locator('.shopping-journey [aria-current="step"]')).to_contain_text("بررسی فروشگاه")
 
                     # Comparison remains a user-controlled, difference-first tool.
                     page.locator(".mission-compare-button").first.click()
                     page.locator(".mission-compare-button").nth(1).click()
                     page.locator(".genui-comparison-table").first.wait_for()
                     assert page.locator(".genui-comparison-table tbody tr").count() >= 2
+                    assert page.locator(".genui-table-wrap").first.get_attribute("tabindex") == "0"
                     # Dialogue comparison must use the same selected models,
                     # persisted via the focus endpoint before the turn is sent.
                     composer.fill("این دو تا چه فرقی دارند؟")
@@ -143,6 +150,9 @@ def main() -> None:
                     page.locator(".mission-offers-toggle").first.click()
                     page.locator(".mission-offer-row").nth(1).wait_for()
                     assert page.locator(".mission-offer-row").count() == 2
+                    assert page.locator(".mission-offer-list").first.evaluate(
+                        "(el) => el.parentElement?.classList.contains('mission-product-card')"
+                    ), "Seller evidence should fill the card rather than a narrow text column"
                     page.locator(".mission-seller-location-board summary").first.click()
                     # The server's paid Neshan provider is off by default;
                     # the map/list UX remains fully functional without a secret.
@@ -193,6 +203,7 @@ def main() -> None:
                     page.get_by_text("فروشگاه در سناریوی دمو پاسخ نداد").first.wait_for()
                     page.locator(".mission-offer-verify").nth(1).click()
                     page.locator(".genui-visit-plan").first.wait_for()
+                    expect(page.locator('.shopping-journey [aria-current="step"]')).to_contain_text("برنامه مراجعه")
                     page.screenshot(path=str(OUTPUT / "visit-plan-mobile.png"), full_page=True)
                     assert_no_horizontal_overflow(page, width)
 
