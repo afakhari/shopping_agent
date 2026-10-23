@@ -17,6 +17,7 @@ from rest_framework.response import Response
 from apps.agent.graph import _query_from_message, run_purchase_graph
 from apps.agent.llm import extract_intent
 from apps.agent.conversation import classify_conversation_intent, conversation_reply
+from apps.agent.contextual import classify_contextual_turn
 from apps.agent.simulator import serialize_contact_attempt, simulate_contact
 from apps.agent.contact_evidence import build_contact_evidence
 from apps.catalog.models import Offer, Product
@@ -193,15 +194,104 @@ def mission_turn(request, mission_id: str):
     preflight_constraints = _validate_full_constraints(
         initial_mission.constraints, data.get("constraints", {})
     )
-    intent_result = (
-        extract_intent(data["message"], preflight_constraints)
-        if _query_from_message(data["message"])
-        else None
-    )
+    decision = classify_contextual_turn(data["message"], initial_mission.state)
+    if decision["kind"] in {"select_product", "explain", "clarify"}:
+        # Text-only follow-ups must not trigger paid inference or an unrelated
+        # catalogue search. Validate the reference again under the mission lock.
+        with transaction.atomic():
+            mission = _owned_mission(request, mission_id, lock=True)
+            decision = classify_contextual_turn(data["message"], mission.state)
+            selected_id = None
+            if decision["kind"] == "select_product":
+                selected_id = decision["product_id"]
+                allowed = selected_id in (mission.state or {}).get("visible_product_ids", [])
+                allowed = allowed and selected_id in (mission.state or {}).get("candidate_product_ids", [])
+                if allowed:
+                    allowed = eligible_offer_list(
+                        _search_filterset(mission.constraints or {}), product_id=selected_id
+                    ).exists()
+                if allowed:
+                    product = Product.objects.filter(source_id=selected_id).first()
+                    if product:
+                        mission.state = {**(mission.state or {}), "selected_product_id": selected_id}
+                        mission.current_stage = "product_selected"
+                        mission.save(update_fields=["state", "current_stage", "updated_at"])
+                        reply = (
+                            f"«{product.persian_title or selected_id}» را انتخاب کردی. "
+                            "می‌توانی از کارت همین کالا فروشگاه‌های دارای آفر ثبت‌شده را ببینی."
+                        )
+                    else:
+                        selected_id = None
+                        reply = "این مدل دیگر در داده‌های معتبر مأموریت پیدا نشد؛ نتایج را دوباره بررسی کن."
+                else:
+                    selected_id = None
+                    reply = "این مدل دیگر با شرایط فعلی مطابقت ندارد؛ فیلترها را بررسی کن."
+            elif decision["kind"] == "explain":
+                chosen = (mission.state or {}).get("selected_product_id")
+                product = Product.objects.filter(source_id=chosen).first() if chosen else None
+                if product:
+                    reply = (
+                        f"«{product.persian_title}» در نتایج عبارت «{(mission.state or {}).get('search_query', '')}» "
+                        "دارای آفر ثبت‌شده و مطابق فیلترهای مأموریت بوده است. "
+                        "این به معنی موجودی تأییدشده یا برتری قطعی نسبت به مدل‌های دیگر نیست."
+                    )
+                else:
+                    reply = (
+                        "این نتیجه از تطبیق متن محصول و آفرهای واجد شرایط با جست‌وجو و فیلترهای تو آمده است؛ "
+                        "برای توضیح یک مدل مشخص، آن را انتخاب کن. موجودی واقعی تأیید نشده است."
+                    )
+            else:
+                reply = decision.get("reply", "لطفاً منظورت را دقیق‌تر مشخص کن.")
+            created_events = append_events_locked(mission, [
+                ("user.message", {"message": data["message"]}),
+                ("assistant.message", {"text": reply}),
+                ("turn.completed", {
+                    "status": mission.status,
+                    "current_stage": mission.current_stage,
+                    "intent_parser": "contextual",
+                    "agent_runtime": "deterministic_guard",
+                    "search_query": (mission.state or {}).get("search_query", ""),
+                    "selected_product_id": selected_id or (mission.state or {}).get("selected_product_id"),
+                    "constraints": mission.constraints,
+                }),
+            ])
+        response_stream = StreamingHttpResponse(
+            _sse_stream(created_events), content_type="text/event-stream; charset=utf-8"
+        )
+        response_stream["Cache-Control"] = "no-cache, no-transform"
+        response_stream["X-Accel-Buffering"] = "no"
+        response_stream["X-Mission-ID"] = str(mission.pk)
+        return response_stream
+
+    if decision["kind"] == "refine":
+        # A change such as "بودجه‌م شد دو میلیون" is not a new product query.
+        # Keep the last catalogue phrase and recheck all offer-level constraints.
+        preflight_constraints = _validate_full_constraints(
+            preflight_constraints, decision["constraint_updates"]
+        )
+        prior_query = decision["query"]
+        intent_result = {
+            "search_query": prior_query,
+            "max_price_toman": preflight_constraints.get("max_price_toman"),
+            "must_have_in_person_credit": preflight_constraints.get("must_have_in_person_credit", False),
+            "sort": preflight_constraints.get("sort", "relevance"),
+        }
+    else:
+        intent_result = (
+            extract_intent(data["message"], preflight_constraints)
+            if _query_from_message(data["message"])
+            else None
+        )
 
     with transaction.atomic():
         mission = _owned_mission(request, mission_id, lock=True)
         constraints = _validate_full_constraints(mission.constraints, data.get("constraints", {}))
+        if decision["kind"] == "refine":
+            # Server-owned context is checked again inside the lock.
+            locked_decision = classify_contextual_turn(data["message"], mission.state)
+            if locked_decision["kind"] != "refine" or locked_decision["query"] != decision["query"]:
+                raise ValidationError({"message": "زمینه جست‌وجو تغییر کرده است؛ درخواست را دوباره بررسی کن."})
+            constraints = _validate_full_constraints(constraints, locked_decision["constraint_updates"])
         mission.constraints = constraints
         mission.status = PurchaseMission.Status.ACTIVE
         mission.current_stage = "understanding_request"
@@ -209,11 +299,13 @@ def mission_turn(request, mission_id: str):
 
         graph_state = run_purchase_graph(
             mission_id=str(mission.pk),
-            message=data["message"],
+            message=decision["query"] if decision["kind"] == "refine" else data["message"],
             constraints=constraints,
             intent_result=intent_result,
             intent_resolved=True,
         )
+        if decision["kind"] == "refine":
+            graph_state["intent_parser"] = "contextual"
         # Persist constraints inferred from the user's natural-language message (e.g. budget or
         # in-person credit), not only the filter values supplied by the UI. The same effective
         # constraints must be reused for contact validation and alternative generation.
@@ -222,7 +314,24 @@ def mission_turn(request, mission_id: str):
         )
         mission.constraints = effective_constraints
         response = graph_state.get("search_response", {})
+        last_state = dict(mission.state or {})
+        new_query = graph_state.get("search_query", "")
+        # Visible ordinal references target only the first four cards by default.
+        # An expanded list will require explicit UI selection, never a guess.
+        visible_products = [
+            item.get("product", {}).get("id")
+            for item in response.get("results", [])[:4]
+            if isinstance(item, dict) and isinstance(item.get("product"), dict)
+        ]
+        previous_selection = last_state.get("selected_product_id")
+        selected_product = (
+            previous_selection if previous_selection in graph_state.get("candidate_product_ids", [])
+            and new_query == last_state.get("search_query") else None
+        )
         mission.state = {
+            **{k: v for k, v in last_state.items() if k in {"last_contact_attempt_id", "last_contact_outcome"}},
+            "selected_product_id": selected_product,
+            "visible_product_ids": visible_products,
             "candidate_product_ids": graph_state.get("candidate_product_ids", []),
             "eligible_offer_ids": graph_state.get("eligible_offer_ids", []),
             "search_query": graph_state.get("search_query", ""),
