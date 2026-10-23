@@ -390,7 +390,8 @@ class ContextualMissionApiTests(TestCase):
             mission.refresh_from_db()
             self.assertEqual(
                 mission.state["pending_dialogue"],
-                {"slot": "laptop_budget", "usage": "editing"},
+                {"slot": "recommendation_budget", "family": "laptop",
+                 "usage": "video_editing", "intensity": ""},
             )
             self.assertEqual(mission.state["candidate_product_ids"], previous_results)
             completed = self.turn("تدوین ویدیوی سبک و قیمت تا سقف 200 میلیون")
@@ -399,6 +400,8 @@ class ContextualMissionApiTests(TestCase):
         self.assertEqual(mission.constraints["max_price_toman"], "200000000")
         self.assertEqual(mission.state["search_query"], "لپ تاپ")
         self.assertEqual(mission.state["usage_profile"], "video_editing")
+        self.assertEqual(mission.state["shopping_need"]["family"], "laptop")
+        self.assertEqual(mission.state["shopping_need"]["intensity"], "light")
         self.assertNotIn("pending_dialogue", mission.state)
         self.assertEqual(
             mission.state["candidate_product_ids"],
