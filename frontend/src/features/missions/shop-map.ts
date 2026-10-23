@@ -1,3 +1,10 @@
+/** Broad dataset bounds, not a geocoding or route-eligibility guarantee. */
+export function isTehranCatalogPoint(lat: number | null, lon: number | null): boolean {
+  return typeof lat === 'number' && Number.isFinite(lat)
+    && typeof lon === 'number' && Number.isFinite(lon)
+    && lat >= 35.35 && lat <= 35.95 && lon >= 50.9 && lon <= 51.85
+}
+
 /** Map-only fallback: opening this optional iframe sends its location to OpenStreetMap.
  * No ETA, indoor navigation or real-time shop availability is implied.
  */
