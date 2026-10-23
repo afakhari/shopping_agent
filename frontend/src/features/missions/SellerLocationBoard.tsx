@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { ExternalLink, LocateFixed, MapPin, Store } from 'lucide-react'
 import type { CatalogOffer } from '../search/catalog-api'
-import { isTehranCatalogPoint, osmEmbedUrl } from './shop-map'
+import { isTehranCatalogPoint, neshanDrivingUrl, neshanPointUrl, osmEmbedUrl } from './shop-map'
 import { formatDistance, openStreetMapUrl } from './ui-formatters'
 import { currentRouteEvidence, routeEvidenceScope } from './routing-evidence'
 import {
@@ -55,6 +55,8 @@ export function SellerLocationBoard({
   const active = selectedMappedOffer(offers, selectedOfferId)
   const iframeUrl = active ? osmEmbedUrl(active.shop.lat, active.shop.lon) : null
   const externalUrl = active ? openStreetMapUrl(active.shop.lat, active.shop.lon) : null
+  const neshanPoint = active ? neshanPointUrl(active.shop.lat, active.shop.lon) : null
+  const neshanDrive = active ? neshanDrivingUrl(origin, {lat: active.shop.lat, lon: active.shop.lon}) : null
 
   const mapVisible = Boolean(active && openMapOfferId === active.id)
   const uniqueDestinations = mapped.filter((offer, index, all) =>
@@ -156,6 +158,21 @@ export function SellerLocationBoard({
                         <button type="button" onClick={() => setOpenMapOfferId(null)}>بستن نقشه</button>
                       </div>}
                   <small>با نمایش نقشه، مختصات این فروشنده برای OpenStreetMap ارسال می‌شود؛ نام فروشگاه یا موجودی تأیید نمی‌شود.</small>
+                  {neshanPoint && !disabled && <a href={neshanPoint} target="_blank" rel="noopener noreferrer"
+                    aria-label="بازکردن مختصات ثبت‌شده در نقشه نشان، نه تأیید فروشگاه">
+                    <ExternalLink size={13} aria-hidden="true" />
+                    بازکردن نقطه ثبت‌شده در نشان
+                  </a>}
+                  {neshanDrive && !disabled && <a href={neshanDrive} target="_blank" rel="noopener noreferrer"
+                    aria-label="بازکردن مسیر خودرو از مبدأ انتخابی تا مختصات ثبت‌شده در نشان">
+                    <ExternalLink size={13} aria-hidden="true" />
+                    مسیر خودرو در نشان تا مختصات ثبت‌شده
+                  </a>}
+                  {!origin && <small>برای لینک مسیریابی از محدوده انتخابی، ابتدا مبدأ تهران را در فیلترها تعیین کن.</small>}
+                  {(neshanPoint || neshanDrive) && <small>
+                    با بازکردن این لینک، مختصات مربوطه به نشان ارسال می‌شود. ممکن است نشان مسیر را در سایت یا اپ خودش نمایش دهد؛
+                    این کار به معنی وجود فروشگاه در آن نقطه، بازبودن یا موجودی واقعی نیست. هزینه API پروژه ایجاد نمی‌شود.
+                  </small>}
                   {externalUrl && !disabled && <a href={externalUrl} target="_blank" rel="noopener noreferrer">
                     <ExternalLink size={13} aria-hidden="true" /> بازکردن نقطه در OpenStreetMap
                   </a>}
