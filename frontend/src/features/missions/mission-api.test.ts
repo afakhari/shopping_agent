@@ -92,7 +92,7 @@ describe('Neshan route boundaries', () => {
     const capability = await getRoutingCapability('mission')
     expect(capability.enabled).toBe(false)
     expect(fetchMock).toHaveBeenCalledTimes(1)
-    expect(fetchMock.mock.calls[0][1]?.method ?? 'GET').toBe('GET')
+    expect(fetchMock.mock.calls[0]?.[1]?.method ?? 'GET').toBe('GET')
   })
 
   it('sends only scoped offer IDs and the explicitly chosen Tehran origin', async () => {
@@ -107,7 +107,7 @@ describe('Neshan route boundaries', () => {
     })
     expect(value.estimates).toEqual([])
     expect(value.status).toBe('unavailable')
-    const options = fetchMock.mock.calls[0][1]
+    const options = fetchMock.mock.calls[0]?.[1]
     expect(options?.method).toBe('POST')
     expect(JSON.parse(String(options?.body))).toEqual({
       result_set_id: 'current', origin: { lat: 35.7, lon: 51.4, source: 'manual_region' },
