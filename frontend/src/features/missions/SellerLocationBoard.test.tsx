@@ -51,8 +51,21 @@ describe('seller location trust and coordinated selection', () => {
       missionId="mission1" resultSetId="set1" origin={null} />)
     expect(markup).toContain('نمایش نقشه OpenStreetMap')
     expect(markup).toContain('با نمایش نقشه')
+    expect(markup).toContain('بازکردن نقطه ثبت‌شده در نشان')
+    expect(markup).toContain('به معنی وجود فروشگاه')
+    expect(markup).not.toContain('مسیر خودرو در نشان تا مختصات ثبت‌شده')
     expect(markup).not.toContain('<iframe')
     expect(markup).toContain('aria-pressed="true"')
+  })
+
+  it('shows keyless Neshan directions only after the user has chosen a Tehran origin', () => {
+    const markup = renderToStaticMarkup(<SellerLocationBoard
+      offers={shops} selectedOfferId="second" onSelectOffer={() => {}} disabled={false}
+      missionId="mission1" resultSetId="set1" origin={{lat: 35.7, lon: 51.4}} />)
+    expect(markup).toContain('مسیر خودرو در نشان تا مختصات ثبت‌شده')
+    expect(markup).toContain('destination=35.68%2C51.42')
+    expect(markup).toContain('origin=35.7%2C51.4')
+    expect(markup).not.toContain('<iframe')
   })
 
   it('does not render ETA or contact Neshan before user action', () => {
