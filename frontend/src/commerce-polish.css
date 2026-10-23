@@ -535,3 +535,32 @@
 @media (prefers-reduced-motion: reduce) {
   .redesign-v2 :is(.quick-prompt, .mission-product-card, .mission-offer-row) { transition: none; }
 }
+
+/* Product evidence is a sibling of the summary, spanning the full card width. */
+.redesign-v2 .conversation-results-block .mission-product-card > .mission-offer-list,
+.redesign-v2 .conversation-results-block .mission-product-card > .mission-contact-result {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+.redesign-v2 .conversation-results-block .mission-product-card > .mission-contact-result {
+  margin-top: 9px;
+}
+.redesign-v2 .genui-scroll-hint {
+  margin: 8px 0 5px;
+  color: #5f6470; font-size: 11px; line-height: 1.75;
+}
+.redesign-v2 .genui-table-wrap:focus-visible {
+  outline: 2px solid #c9233a;
+  outline-offset: 3px;
+}
+/* Legacy 3-column :has rule has higher specificity; keep two comfortably-sized cards. */
+@media (min-width: 1120px) {
+  .redesign-v2 .conversation-results-block .mission-product-results:has(> .mission-product-card:nth-child(3):last-child) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+/* Avoid masking focused footer controls on shorter mobile screens. */
+@media (max-width: 700px) {
+  .redesign-v2 .conversation-results-block .mission-product-card > .mission-offer-list { grid-column: 1/-1; }
+  .redesign-v2 .genui-comparison-table th:first-child { min-width: 102px; max-width: 124px; }
+}
