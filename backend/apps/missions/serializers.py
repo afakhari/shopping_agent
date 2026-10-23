@@ -165,6 +165,12 @@ class RouteOriginSerializer(serializers.Serializer):
     lon = serializers.FloatField(min_value=50.9, max_value=51.85)
     source = serializers.ChoiceField(choices=("manual_region", "geolocation_opt_in"))
 
+    def validate(self, attrs):
+        from math import isfinite
+        if not isfinite(attrs["lat"]) or not isfinite(attrs["lon"]):
+            raise serializers.ValidationError("مختصات مبدأ باید عدد متناهی باشد.")
+        return attrs
+
 
 class RouteEstimatesSerializer(serializers.Serializer):
     """Only explicitly opted-in, bounded, currently visible offer IDs."""
