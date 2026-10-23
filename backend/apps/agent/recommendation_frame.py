@@ -33,7 +33,7 @@ _CANONICAL = {
 _FAMILIES = (
     ("laptop", re.compile(r"(?:لپ\s*تاپ\w*|لپتاپ\w*|نوت\s*بوک\w*)")),
     ("phone", re.compile(r"(?<!\w)(?:گوشی|موبایل)(?!\w)")),
-    ("headphones", re.compile(r"(?<!\w)(?:هدفون|هندزفری)(?!\w)")),
+    ("headphones", re.compile(r"(?<!\w)(?:هدفون|هندزفری)(?:ی)?(?!\w)")),
     ("tablet", re.compile(r"(?<!\w)تبلت(?!\w)")),
     ("television", re.compile(r"(?<!\w)تلویزیون(?!\w)")),
 )
