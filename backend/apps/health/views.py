@@ -47,6 +47,20 @@ def ready(_request):
                 status=503,
             )
         checks["catalog"] = "ok" if all(populated.values()) else "incomplete"
+        minimums = getattr(settings, "CATALOG_MINIMUM_ROWS", None)
+        if checks["catalog"] == "ok" and isinstance(minimums, dict) and minimums:
+            try:
+                counts = {
+                    "products": Product.objects.count(), "shops": Shop.objects.count(),
+                    "offers": Offer.objects.count(),
+                }
+            except DatabaseError:
+                return JsonResponse(
+                    {"status": "not_ready", "checks": {"database": "ok", "catalog": "error"}},
+                    status=503,
+                )
+            if any(counts.get(key, 0) < minimum for key, minimum in minimums.items()):
+                checks["catalog"] = "incomplete"
         if checks["catalog"] != "ok":
             return JsonResponse({"status": "not_ready", "checks": checks}, status=503)
 

@@ -71,6 +71,19 @@ class ProductionDatasetReadinessTests(TestCase):
         self.assertEqual(response.status_code, 503)
         self.assertEqual(response.json()["checks"]["catalog"], "incomplete")
 
+    @override_settings(CATALOG_MINIMUM_ROWS={"products": 2, "shops": 1, "offers": 1})
+    def test_partial_fixture_is_not_a_ready_full_catalog(self):
+        from decimal import Decimal
+        from apps.catalog.models import Offer, Product, Shop
+
+        product = Product.objects.create(source_id="part_p", persian_title="نمونه")
+        shop = Shop.objects.create(source_id="part_s", name="نمونه")
+        Offer.objects.create(source_id="part_o", product=product, shop=shop,
+                             price_toman=Decimal("100"))
+        response = Client().get("/api/v1/health/ready/")
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json()["checks"]["catalog"], "incomplete")
+
     def test_linked_catalog_is_ready(self):
         from decimal import Decimal
 

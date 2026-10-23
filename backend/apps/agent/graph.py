@@ -6,10 +6,11 @@ language, but it never generates product facts or bypasses hard purchasing const
 from __future__ import annotations
 
 import re
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from typing import Any, TypedDict
 
 from apps.agent.llm import extract_intent
+from apps.agent.amounts import NUMBER_TOKEN, toman_amount
 from apps.agent.conversation import classify_conversation_intent
 from apps.catalog.services.normalization import normalize_persian_text
 from apps.search.services import product_search_page
@@ -28,8 +29,35 @@ STOP_WORDS = {
 }
 BUDGET_RE = re.compile(
     r"(?:تا\s+(?:سقف\s+)?|حداکثر(?:\s+بودجه)?\s*|سقف\s+بودجه\s+|بودجه\s+)"
-    r"(\d+(?:[.,]\d+)?)\s*(میلیون|هزار)?",
+    rf"({NUMBER_TOKEN})\s*(میلیون|هزار)?",
 )
+
+
+# Common explicitly requested brands from the competition catalogue.
+# These are hard requirements ONLY if the user's language says "only".
+_EXCLUSIVE_BRANDS = (
+    "سامسونگ", "شیائومی", "اپل", "سونی", "لنوو", "ایسوس", "کانن",
+    "فیلیپس", "بوش", "نوکیا", "داهوا", "رونیکس", "کاسیو", "پاناسونیک",
+)
+
+
+def _explicit_exclusive_brand(message: str) -> str | None:
+    normalized = normalize_persian_text(message)
+    cue = re.search(r"(?:^|\s)(?:فقط|صرفا|تنها|حتما)\s+", normalized)
+    if not cue:
+        return None
+    phrase = normalized[cue.end():cue.end() + 60]
+    found = [
+        (match.start(), brand)
+        for brand in _EXCLUSIVE_BRANDS
+        for match in re.finditer(rf"(?<!\w){re.escape(brand)}(?!\w)", phrase)
+    ]
+    if not found:
+        return None
+    first, brand = min(found, key=lambda row: row[0])
+    if re.search(r"(?:^|\s)(?:نه|غیر|بدون)\s+", phrase[:first]):
+        return None
+    return brand
 
 
 class MissionGraphState(TypedDict, total=False):
@@ -56,18 +84,7 @@ def _budget_from_message(message: str) -> str | None:
     match = BUDGET_RE.search(normalized)
     if not match:
         return None
-    try:
-        amount = Decimal(match.group(1).replace(",", "."))
-    except InvalidOperation:
-        return None
-    unit = match.group(2)
-    if unit == "میلیون":
-        amount *= Decimal(1_000_000)
-    elif unit == "هزار":
-        amount *= Decimal(1_000)
-    if amount < 0 or amount >= Decimal("1e30"):
-        return None
-    return str(amount.quantize(Decimal("1")))
+    return toman_amount(match.group(1), match.group(2))
 
 
 def _query_from_message(message: str) -> str:
@@ -76,7 +93,7 @@ def _query_from_message(message: str) -> str:
         return ""
     normalized = normalize_persian_text(message)
     normalized = BUDGET_RE.sub(" ", normalized)
-    normalized = re.sub(r"\d+(?:[.,]\d+)?", " ", normalized)
+    # Preserve product model identifiers, capacities and CPU generations.
     tokens = []
     for token in normalized.split():
         if token in STOP_WORDS or len(token) < 2:
@@ -93,9 +110,17 @@ def parse_request_node(state: MissionGraphState) -> dict[str, Any]:
     constraints.setdefault("sort", "relevance")
     user_message = state.get("user_message", "")
     normalized_message = normalize_persian_text(user_message)
-    if any(phrase in normalized_message for phrase in ("اعتباری", "قسطی", "قسط", "ترب پی")):
-        # Explicit natural-language hard intent must not be weakened by an unchecked UI toggle.
-        constraints["must_have_in_person_credit"] = True
+    credit_mentioned = any(phrase in normalized_message for phrase in ("اعتباری", "قسطی", "قسط", "ترب پی"))
+    credit_denied = bool(re.search(
+        r"(?:بدون|نمی ?خوام|نمی ?خواهم|لازم نیست).{0,35}(?:قسط|اعتبار|ترب پی)"
+        r"|(?:قسط|اعتبار|ترب پی).{0,35}(?:نمی ?خوام|نمی ?خواهم|نباشه|لازم نیست)",
+        normalized_message,
+    ))
+    if credit_mentioned:
+        constraints["must_have_in_person_credit"] = not credit_denied
+    exclusive_brand = _explicit_exclusive_brand(user_message)
+    if exclusive_brand:
+        constraints["brand_name"] = exclusive_brand
 
     # A newly stated budget in the current message supersedes an older filter value.
     heuristic_budget = _budget_from_message(user_message)
@@ -116,7 +141,7 @@ def parse_request_node(state: MissionGraphState) -> dict[str, Any]:
         parser_backend = "llm"
         if not heuristic_budget and not constraints.get("max_price_toman") and llm_intent.get("max_price_toman"):
             constraints["max_price_toman"] = llm_intent["max_price_toman"]
-        if llm_intent.get("must_have_in_person_credit"):
+        if llm_intent.get("must_have_in_person_credit") and not credit_denied:
             constraints["must_have_in_person_credit"] = True
         # The model may suggest a preference, but a hard credit constraint already present is
         # never removed by the model output.

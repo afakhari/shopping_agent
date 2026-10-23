@@ -19,6 +19,11 @@ class ContextualRouterTests(TestCase):
         self.assertEqual(decision["query"], "هدفون")
         self.assertEqual(decision["constraint_updates"]["max_price_toman"], "2000000")
 
+    def test_budget_grouped_thousands_refines_to_actual_toman(self):
+        decision = classify_contextual_turn("بودجه م شد ۳٬۰۰۰٬۰۰۰ تومان", {"search_query": "هدفون"})
+        self.assertEqual(decision["kind"], "refine")
+        self.assertEqual(decision["constraint_updates"]["max_price_toman"], "3000000")
+
     def test_credit_is_an_offer_filter_not_a_new_product(self):
         decision = classify_contextual_turn("فقط قسطی", {"search_query": "هدفون"})
         self.assertEqual(decision["kind"], "refine")
@@ -126,6 +131,73 @@ class ContextualMissionApiTests(TestCase):
         self.assertEqual(created.status_code, 201)
         self.mission_id = created.json()["mission_id"]
         self.turn("هدفون")
+
+    def test_future_seller_hours_are_not_misreported_as_current_open_status(self):
+        mission = PurchaseMission.objects.get(pk=self.mission_id)
+        mission.state = {**mission.state, "active_surface": "sellers",
+                         "visible_offer_ids": ["context_offer_0"],
+                         "selected_product_id": self.first.source_id,
+                         "selected_offer_id": "context_offer_0"}
+        mission.save(update_fields=["state"])
+        events = self.turn("فروشنده اول فردا صبح بازه؟")
+        reply = next(event["payload"]["text"] for event in events if event["type"] == "assistant.message")
+        self.assertIn("برنامه هفتگی ثبت‌شده", reply)
+        self.assertNotIn("طبق برنامه ثبت‌شده باز است", reply)
+
+    def test_turn_request_id_replays_without_duplicate_events(self):
+        payload = {"message": "هدفون", "client_request_id": "turn-idempotent-001"}
+        url = f"/api/v1/missions/{self.mission_id}/turns/"
+        first = self.client.post(url, payload, format="json", HTTP_ACCEPT="text/event-stream")
+        self.assertEqual(first.status_code, 200)
+        saved_payload = b"".join(first.streaming_content)
+        count = PurchaseMission.objects.get(pk=self.mission_id).events.count()
+        repeated = self.client.post(url, payload, format="json", HTTP_ACCEPT="text/event-stream")
+        self.assertEqual(repeated.status_code, 200)
+        def decoded_events(raw):
+            return [json.loads(line[6:]) for line in raw.decode("utf-8").splitlines()
+                    if line.startswith("data: ")]
+        self.assertEqual(decoded_events(b"".join(repeated.streaming_content)),
+                         decoded_events(saved_payload))
+        self.assertEqual(PurchaseMission.objects.get(pk=self.mission_id).events.count(), count)
+        changed = self.client.post(url, {
+            "message": "دوربین", "client_request_id": "turn-idempotent-001",
+        }, format="json", HTTP_ACCEPT="text/event-stream")
+        self.assertEqual(changed.status_code, 400)
+
+    def test_paired_null_coordinates_clear_existing_geofence(self):
+        created = self.client.post("/api/v1/missions/", {
+            "initial_message": "هدفون",
+            "constraints": {"lat": 35.7, "lon": 51.4, "radius_m": 3000,
+                            "sort": "distance_asc"},
+        }, format="json")
+        self.assertEqual(created.status_code, 201)
+        self.mission_id = created.json()["mission_id"]
+        self.turn("هدفون")
+        response = self.client.post(
+            f"/api/v1/missions/{self.mission_id}/turns/",
+            {"message": "هدفون", "constraints": {
+                "lat": None, "lon": None, "radius_m": None, "sort": "relevance",
+            }}, format="json", HTTP_ACCEPT="text/event-stream",
+        )
+        self.assertEqual(response.status_code, 200)
+        list(response.streaming_content)
+        saved = PurchaseMission.objects.get(pk=self.mission_id).constraints
+        self.assertNotIn("lat", saved)
+        self.assertNotIn("lon", saved)
+        self.assertNotIn("radius_m", saved)
+
+    def test_focus_change_invalidates_previous_visit_plan(self):
+        mission = PurchaseMission.objects.get(pk=self.mission_id)
+        mission.state = {**mission.state, "visit_plan": {"offer_id": "old_offer"}}
+        mission.save(update_fields=["state"])
+        response = self.client.post(f"/api/v1/missions/{self.mission_id}/focus/", {
+            "action": "select_product", "result_set_id": mission.state["result_set_id"],
+            "product_id": self.first.source_id,
+        }, format="json")
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("visit_plan", response.json()["state"])
+        self.assertEqual(self.client.get(
+            f"/api/v1/missions/{self.mission_id}/visit-plan/").status_code, 404)
 
     def test_explicit_brand_model_are_true_hard_offer_filters(self):
         self.first.brand_name = "برند الف"

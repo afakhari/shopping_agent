@@ -14,11 +14,43 @@ class MissionRequestParserTests(SimpleTestCase):
             "3000000",
         )
 
+    def test_budget_thousands_separators_and_decimal_millions(self):
+        self.assertEqual(_budget_from_message("هدفون تا ۳٬۰۰۰٬۰۰۰ تومان"), "3000000")
+        self.assertEqual(_budget_from_message("هدفون تا ۳,۰۰۰,۰۰۰ تومان"), "3000000")
+        self.assertEqual(_budget_from_message("هدفون تا ۲,۵ میلیون"), "2500000")
+
+    def test_model_digits_survive_fallback_query(self):
+        self.assertIn("s24", _query_from_message("گوشی سامسونگ S24 Ultra میخوام"))
+        self.assertIn("13", _query_from_message("آیفون ۱۳ میخوام"))
+
+    def test_negated_credit_requirement_is_not_enabled(self):
+        state = parse_request_node({
+            "user_message": "گوشی قسطی نمیخوام",
+            "constraints": {"city": "tehran", "must_have_in_person_credit": False},
+            "intent_resolved": True,
+            "intent_result": {"search_query": "گوشی", "max_price_toman": None,
+                              "must_have_in_person_credit": True, "sort": None},
+        })
+        self.assertFalse(state["constraints"]["must_have_in_person_credit"])
+
     def test_query_parser_removes_purchase_filler_and_budget(self):
         self.assertEqual(
             _query_from_message("یک هدفون بی‌سیم تا سقف ۳ میلیون تومان می‌خواهم"),
             "هدفون بی سیم",
         )
+
+    def test_exclusive_brand_is_promoted_to_a_hard_constraint(self):
+        from apps.agent.graph import _explicit_exclusive_brand
+        self.assertEqual(_explicit_exclusive_brand("فقط گوشی سامسونگ میخوام"), "سامسونگ")
+        self.assertEqual(_explicit_exclusive_brand("فقط شیائومی، نه سامسونگ"), "شیائومی")
+        self.assertIsNone(_explicit_exclusive_brand("گوشی سامسونگ یا شیائومی"))
+        state = parse_request_node({
+            "user_message": "فقط هدفون سامسونگ",
+            "constraints": {"city": "tehran"},
+            "intent_resolved": True,
+            "intent_result": None,
+        })
+        self.assertEqual(state["constraints"]["brand_name"], "سامسونگ")
 
     def test_credit_intent_is_preserved_in_structured_constraints(self):
         state = parse_request_node(

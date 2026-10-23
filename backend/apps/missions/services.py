@@ -45,7 +45,9 @@ def append_events_locked(
     return envelopes
 
 
-def serialize_mission(mission: PurchaseMission, *, include_events: bool = False) -> dict[str, Any]:
+def serialize_mission(
+    mission: PurchaseMission, *, include_events: bool = False, before_seq: int | None = None
+) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "mission_id": str(mission.pk),
         "status": mission.status,
@@ -59,7 +61,10 @@ def serialize_mission(mission: PurchaseMission, *, include_events: bool = False)
     }
     if include_events:
         # Return the newest bounded window, but preserve chronological order for UI replay.
-        recent_events = list(mission.events.order_by("-seq")[:100])
+        event_qs = mission.events.order_by("-seq")
+        if before_seq is not None:
+            event_qs = event_qs.filter(seq__lt=before_seq)
+        recent_events = list(event_qs[:100])
         recent_events.reverse()
         payload["events"] = [
             public_event(str(mission.pk), event.seq, event.event_type, event.payload)

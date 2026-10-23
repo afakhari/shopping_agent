@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 import secrets
 import uuid
 from decimal import Decimal
@@ -24,7 +25,7 @@ from apps.agent.comparison import build_evidence_comparison
 from apps.agent.simulator import serialize_contact_attempt, simulate_contact
 from apps.agent.contact_evidence import build_contact_evidence
 from apps.catalog.models import Offer, Product
-from apps.missions.models import ContactAttempt, PurchaseMission, RoutingDailyUsage
+from apps.missions.models import ContactAttempt, MissionEvent, PurchaseMission, RoutingDailyUsage
 from apps.missions.renderers import ServerSentEventRenderer
 from apps.missions.serializers import (
     ContactAttemptCreateSerializer,
@@ -61,6 +62,10 @@ def _validate_full_constraints(
 ) -> dict[str, Any]:
     merged: dict[str, Any] = {"city": "tehran", "sort": "relevance", **(existing or {})}
     merged.update(updates or {})
+    # A paired null is the explicit location-clear command. Omission retains the geofence.
+    if updates and "lat" in updates and "lon" in updates and updates["lat"] is None and updates["lon"] is None:
+        for key in ("lat", "lon", "radius_m"):
+            merged.pop(key, None)
     serializer = MissionConstraintsSerializer(data=merged)
     serializer.is_valid(raise_exception=True)
     data = dict(serializer.validated_data)
@@ -81,6 +86,40 @@ def _sse_stream(events: list[dict[str, Any]]) -> Iterator[str]:
     for event in events:
         encoded = json.dumps(event, ensure_ascii=False, separators=(",", ":"))
         yield f"id: {event['seq']}\ndata: {encoded}\n\n"
+
+
+def _replay_turn_if_completed(mission: PurchaseMission, data: dict[str, Any]):
+    """Replay an earlier completed turn by request key without repeating server-side effects."""
+    request_id = data.get("client_request_id")
+    if not request_id:
+        return None
+    completed = MissionEvent.objects.filter(
+        mission=mission, event_type="turn.completed",
+        payload__client_request_id=request_id,
+    ).order_by("-seq").first()
+    if completed is None:
+        return None
+    started = MissionEvent.objects.filter(
+        mission=mission, event_type="user.message", seq__lt=completed.seq,
+    ).order_by("-seq").first()
+    if (started is None or started.payload.get("message") != data["message"]
+        or completed.payload.get("request_constraints", {}) != data.get("constraints", {})):
+        raise ValidationError({"client_request_id": "این شناسه قبلاً برای پیام یا شروط متفاوتی استفاده شده است."})
+    saved = MissionEvent.objects.filter(
+        mission=mission, seq__gte=started.seq, seq__lte=completed.seq,
+    ).order_by("seq")
+    events = [
+        {"schema_version": 1, "mission_id": str(mission.pk), "seq": event.seq,
+         "type": event.event_type, "payload": event.payload}
+        for event in saved
+    ]
+    response = StreamingHttpResponse(
+        _sse_stream(events), content_type="text/event-stream; charset=utf-8"
+    )
+    response["Cache-Control"] = "no-cache, no-transform"
+    response["X-Accel-Buffering"] = "no"
+    response["X-Mission-ID"] = str(mission.pk)
+    return response
 
 
 def _search_filterset(constraints: dict[str, Any]) -> dict[str, Any]:
@@ -144,6 +183,23 @@ def create_mission(request):
     if "bazaar_owner_token" not in request.session:
         request.session["bazaar_owner_token"] = secrets.token_hex(24)
     with transaction.atomic():
+        request_id = data.get("client_request_id")
+        if request_id:
+            existing = PurchaseMission.objects.filter(
+                owner_token=request.session["bazaar_owner_token"],
+                client_request_id=request_id,
+            ).order_by("created_at").first()
+            if existing is not None:
+                if existing.initial_message != data["initial_message"] or existing.constraints != constraints:
+                    raise ValidationError({
+                        "client_request_id": "این شناسه قبلاً برای مأموریت یا شروط متفاوتی استفاده شده است."
+                    })
+                initial_events = [
+                    {"schema_version": 1, "mission_id": str(existing.pk), "seq": event.seq,
+                     "type": event.event_type, "payload": event.payload}
+                    for event in existing.events.filter(event_type="mission.created").order_by("seq")[:1]
+                ]
+                return Response({**serialize_mission(existing), "initial_events": initial_events})
         mission = PurchaseMission.objects.create(
             initial_message=data["initial_message"],
             owner_token=request.session["bazaar_owner_token"],
@@ -162,7 +218,13 @@ def create_mission(request):
 @api_view(["GET"])
 def get_mission(request, mission_id: str):
     mission = _owned_mission(request, mission_id)
-    return Response(serialize_mission(mission, include_events=True))
+    raw_cursor = request.query_params.get("before_seq")
+    before_seq = None
+    if raw_cursor is not None:
+        if len(raw_cursor) > 20 or not raw_cursor.isdecimal() or int(raw_cursor) < 1:
+            raise ValidationError({"before_seq": "شناسه صفحه رویدادها معتبر نیست."})
+        before_seq = int(raw_cursor)
+    return Response(serialize_mission(mission, include_events=True, before_seq=before_seq))
 
 
 @api_view(["POST"])
@@ -171,6 +233,10 @@ def mission_turn(request, mission_id: str):
     serializer = MissionTurnSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     data = serializer.validated_data
+    # Repeat response is read before any optional model call or catalog search.
+    previous = _replay_turn_if_completed(_owned_mission(request, mission_id), data)
+    if previous is not None:
+        return previous
     created_events: list[dict[str, Any]] = []
     local_intent = classify_conversation_intent(data["message"])
     if local_intent is not None:
@@ -179,6 +245,9 @@ def mission_turn(request, mission_id: str):
         # hard constraints intact, and do not call BoxAPI or the catalogue.
         with transaction.atomic():
             mission = _owned_mission(request, mission_id, lock=True)
+            previous = _replay_turn_if_completed(mission, data)
+            if previous is not None:
+                return previous
             _validate_full_constraints(mission.constraints, data.get("constraints", {}))
             message = conversation_reply(local_intent)
             created_events = append_events_locked(mission, [
@@ -188,6 +257,8 @@ def mission_turn(request, mission_id: str):
                     "status": mission.status,
                     "current_stage": mission.current_stage,
                     "intent_parser": "local_conversation",
+                    "client_request_id": data.get("client_request_id"),
+                    "request_constraints": data.get("constraints", {}),
                     "agent_runtime": "deterministic_guard",
                     "search_query": (mission.state or {}).get("search_query", ""),
                     "constraints": mission.constraints,
@@ -222,6 +293,9 @@ def mission_turn(request, mission_id: str):
         # selection with the *effective* constraints inside the row lock.
         with transaction.atomic():
             mission = _owned_mission(request, mission_id, lock=True)
+            previous = _replay_turn_if_completed(mission, data)
+            if previous is not None:
+                return previous
             decision = classify_contextual_turn(data["message"], mission.state)
             if decision["kind"] == "refine" and decision["constraint_updates"].get("sort") == "distance_asc" and preflight_constraints.get("lat") is None:
                 decision = {"kind": "location_clarify", "reply": "برای نزدیکی، ابتدا محدوده تهران را انتخاب کن."}
@@ -260,7 +334,7 @@ def mission_turn(request, mission_id: str):
                 if allowed:
                     product = Product.objects.filter(source_id=selected_id).first()
                     if product:
-                        mission.state = {**state, "selected_product_id": selected_id}
+                        mission.state = {**state, "selected_product_id": selected_id, "visit_plan": None}
                         mission.current_stage = "product_selected"
                         reply = (f"«{product.persian_title or selected_id}» انتخاب شد. "
                                  "آفر ثبت‌شده به معنی موجودی تأییدشده نیست.")
@@ -345,19 +419,29 @@ def mission_turn(request, mission_id: str):
                         reply = "آفر فروشنده دیگر با شروط خرید مطابقت ندارد."
                     else:
                         mission.state = {**state, "selected_offer_id": offer_id,
-                                         "selected_shop_id": offer.shop_id, "active_surface": "sellers"}
+                                         "selected_shop_id": offer.shop_id, "active_surface": "sellers",
+                                         "visit_plan": None}
                         mission.save(update_fields=["state", "updated_at"])
                         if decision["kind"] == "select_offer":
                             reply = (f"فروشگاه «{offer.shop.name}» برای «{offer.product.persian_title}» انتخاب شد. "
                                      "موجودی و قیمت فعلی به‌صورت واقعی تأیید نشده‌اند.")
                         else:
                             from apps.catalog.services.visit_context import opening_status
-                            hours = opening_status(offer.shop.weekly_hours)
+                            from apps.missions.visit_plan import format_weekly_hours
+                            future_question = bool(re.search(
+                                r"امشب|فردا|پس فردا|هفته بعد|شنبه|یکشنبه|دوشنبه|سه شنبه|چهارشنبه|پنجشنبه|جمعه",
+                                normalize_persian_text(data["message"]),
+                            ))
+                            hours_label = (
+                                "زمان آینده از این پیام محاسبه نشده است؛ برنامه هفتگی ثبت‌شده: "
+                                + format_weekly_hours(offer.shop.weekly_hours)
+                                if future_question else opening_status(offer.shop.weekly_hours)["label"]
+                            )
                             price = f"{offer.price_toman:,.0f} تومان" if offer.price_toman is not None else "نامشخص"
                             reply = (
                                 f"«{offer.shop.name}»؛ نشانی ثبت‌شده: "
                                 f"{offer.shop.address or offer.shop.location_label or 'نامشخص'}. "
-                                f"ساعات طبق داده ثبت‌شده: {hours.get('label', 'نامشخص')}. "
+                                f"ساعات طبق داده ثبت‌شده: {hours_label}. "
                                 f"قیمت ثبت‌شده: {price}. موجودی واقعی مشخص نیست."
                             )
                             extra_ui = ("seller_details", {"offer": serialize_offer(offer)})
@@ -381,7 +465,7 @@ def mission_turn(request, mission_id: str):
                             mission.state = {
                                 **state, "visible_offer_ids": [x["id"] for x in backup],
                                 "selected_offer_id": None, "selected_shop_id": None,
-                                "active_surface": "sellers",
+                                "active_surface": "sellers", "visit_plan": None,
                             }
                             mission.save(update_fields=["state", "updated_at"])
                             reply = (
@@ -437,6 +521,8 @@ def mission_turn(request, mission_id: str):
                 "status": mission.status,
                 "current_stage": mission.current_stage,
                 "intent_parser": "contextual",
+                "client_request_id": data.get("client_request_id"),
+                "request_constraints": data.get("constraints", {}),
                 "agent_runtime": "deterministic_guard",
                 "search_query": (mission.state or {}).get("search_query", ""),
                 "selected_product_id": (mission.state or {}).get("selected_product_id"),
@@ -476,6 +562,9 @@ def mission_turn(request, mission_id: str):
 
     with transaction.atomic():
         mission = _owned_mission(request, mission_id, lock=True)
+        previous = _replay_turn_if_completed(mission, data)
+        if previous is not None:
+            return previous
         constraints = _validate_full_constraints(mission.constraints, data.get("constraints", {}))
         if decision["kind"] == "refine":
             # Server-owned context is checked again inside the lock.
@@ -561,6 +650,8 @@ def mission_turn(request, mission_id: str):
                     "total": response.get("total", 0),
                     "agent_runtime": graph_state.get("graph_runtime", "langgraph"),
                     "intent_parser": graph_state.get("intent_parser", "heuristic"),
+                    "client_request_id": data.get("client_request_id"),
+                    "request_constraints": data.get("constraints", {}),
                     "search_query": graph_state.get("search_query", ""),
                     "selected_product_id": selected_product,
                     "result_set_id": result_set_id,
@@ -635,6 +726,9 @@ def mission_focus(request, mission_id: str):
                 raise ValidationError({"offer_id": "این آفر دیگر با شروط مأموریت مطابقت ندارد."})
             state.update(active_surface="sellers", selected_offer_id=offer_id,
                          selected_shop_id=offer.shop_id)
+        # A visit plan is evidence tied to a particular active selection.
+        if action in {"select_product", "view_sellers", "view_products", "select_offer"}:
+            state.pop("visit_plan", None)
         if state == (mission.state or {}):
             return Response({
                 "state": mission.state, "last_event_seq": mission.last_event_seq,
@@ -879,7 +973,7 @@ def create_contact_attempt(request, mission_id: str):
                 "alternative_offer_ids": [item["id"] for item in alternatives],
                 "alternative_product_ids": alternative_product_ids,
                 "candidate_product_ids": candidate_product_ids,
-                **({"visit_plan": visit_plan} if visit_plan is not None else {}),
+                "visit_plan": visit_plan,
             }
             locked_mission.current_stage = "contact_checked"
             locked_mission.status = PurchaseMission.Status.WAITING_FOR_USER

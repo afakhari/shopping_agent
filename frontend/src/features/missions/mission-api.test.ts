@@ -22,6 +22,22 @@ describe('API failure modes never expose raw Nginx HTML', () => {
   })
 })
 
+describe('bounded mission history pagination', () => {
+  it('backfills older persisted events while retaining chronological order', async () => {
+    const older = { schema_version: 1, mission_id: 'm', seq: 1, type: 'user.message', payload: { message: 'هدفون' } }
+    const newer = { schema_version: 1, mission_id: 'm', seq: 101, type: 'turn.completed', payload: {} }
+    const fetchMock = vi.fn(async (url: string) => new Response(JSON.stringify({
+      mission_id: 'm', status: 'waiting_for_user', current_stage: 'results_ready',
+      initial_message: 'هدفون', constraints: {}, last_event_seq: 101,
+      events: url.includes('before_seq=') ? [older] : [newer],
+    }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+    const snapshot = await getMission('m')
+    expect(snapshot.events?.map(e => e.seq)).toEqual([1, 101])
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+})
+
 describe('SSE stream terminal state', () => {
   const event = (type: string, seq: number): MissionEvent => ({
     schema_version: 1, mission_id: 'mission', seq, type, payload: {},
