@@ -1590,7 +1590,9 @@ export function MissionPanel({
               )}
               {visiblePreComponents.length > 0 && <GenUIRenderer components={visiblePreComponents} defaults={{ query: lastQuery, max_price_toman: budget, must_have_in_person_credit: mustHaveCredit, sort: constraints.sort ?? 'relevance' }} disabled={isRunning || isRestoring || !isActionableSearch} onAction={handleGenUIAction} />}
               {item.results && item.results.length > 0 && (
-                <div className="mission-results-block conversation-results-block">
+                <details className="conversation-results-history" open={isCurrentResult}>
+                  <summary>{isCurrentResult ? 'نتایج جست‌وجوی فعلی' : `نمایش نتایج جست‌وجوی قبلی (${money.format(item.resultCount ?? item.results.length)} محصول)`}</summary>
+                  <div className="mission-results-block conversation-results-block">
                   <div className="mission-results-header">
                     <div><h3>مدل‌هایی که می‌توانی بررسی کنی</h3>
                       {isCurrentResult && <p className="mission-results-guidance">مدل را مقایسه کن یا فروشگاه‌هایش را ببین.</p>}
@@ -1651,7 +1653,8 @@ export function MissionPanel({
                       ? { lat: constraints.lat, lon: constraints.lon } : null}
                     allowActions={isCurrentResult && !resultsStale && !queuePaused && !isRunning && !isRestoring}
                   />
-                </div>
+                  </div>
+                </details>
               )}
               {item.results && item.results.length === 0 && !hasDedicatedEmptyState && (
                 <section className="mission-empty-results" aria-labelledby={`empty-heading-${item.id}`}>
