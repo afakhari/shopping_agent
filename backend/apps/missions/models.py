@@ -150,6 +150,16 @@ class ContactAttempt(models.Model):
         return f"Contact {self.id} to {self.shop_id}: {self.outcome}"
 
 
+
+class LLMDailyUsage(models.Model):
+    """Shared daily model-call cap, across workers and application processes."""
+    day = models.DateField(primary_key=True)
+    requests = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        db_table = "mission_llm_daily_usage"
+
+
 class RoutingDailyUsage(models.Model):
     """Database-backed shared cap across workers and missions for paid Neshan calls."""
 

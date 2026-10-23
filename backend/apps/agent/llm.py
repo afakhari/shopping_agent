@@ -14,6 +14,8 @@ from urllib.request import Request, urlopen
 from urllib.parse import urlparse
 
 from django.conf import settings
+from django.db import DatabaseError, transaction
+from django.utils import timezone
 
 from apps.catalog.services.normalization import normalize_persian_text
 
@@ -108,6 +110,30 @@ def validate_intent_payload(payload: object) -> dict[str, Any] | None:
     }
 
 
+def _reserve_model_call() -> bool:
+    """Fail-closed daily reservation shared by all app workers."""
+    cap = getattr(settings, "LLM_DAILY_MAX_CALLS", None)
+    if cap is None:
+        return True  # Explicitly local development; production sets the limit.
+    if cap <= 0:
+        return False
+    from apps.missions.models import LLMDailyUsage
+
+    try:
+        with transaction.atomic():
+            row, _ = LLMDailyUsage.objects.select_for_update().get_or_create(
+                day=timezone.localdate()
+            )
+            if row.requests >= cap:
+                return False
+            row.requests += 1
+            row.save(update_fields=["requests"])
+        return True
+    except DatabaseError:
+        logger.warning("Shared LLM budget unavailable; denying provider call")
+        return False
+
+
 def extract_intent(message: str, constraints: dict[str, Any]) -> dict[str, Any] | None:
     """Call an optional OpenAI-compatible chat-completions API; fail closed to the heuristic.
 
@@ -168,6 +194,9 @@ def extract_intent(message: str, constraints: dict[str, Any]) -> dict[str, Any] 
     # max_completion_tokens or response_format on every hackathon model.
     # The system prompt requests JSON and validate_intent_payload checks it.
     # Do NOT retry speculative parameter combinations: this is a $3 credit.
+    if not _reserve_model_call():
+        logger.info("LLM call blocked by shared daily budget; using deterministic fallback")
+        return None
     body = json.dumps(request_payload, ensure_ascii=False).encode("utf-8")
     request = Request(
         f"{base_url}/chat/completions",
