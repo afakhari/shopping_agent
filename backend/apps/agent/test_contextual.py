@@ -340,6 +340,10 @@ class ContextualMissionApiTests(TestCase):
         events = self.turn("نزدیک ترین")
         self.assertEqual(events[-1]["payload"]["intent_parser"], "contextual")
         self.assertIn("محدوده", events[1]["payload"]["text"])
+        location_components = [e["payload"] for e in events if e["type"] == "ui.component"]
+        self.assertEqual(len(location_components), 1)
+        self.assertEqual(location_components[0]["component"], "location_choice")
+        self.assertEqual(location_components[0]["data"]["city"], "tehran")
 
     def test_credit_followup_keeps_prior_product_query(self):
         self.turn("فقط قسطی")
