@@ -53,6 +53,7 @@ class TurnLease(models.Model):
     The committed turn.completed event remains the replay source of truth.
     An expired lease may be reclaimed after a crashed process.
     """
+    id = models.BigAutoField(primary_key=True)
     mission = models.ForeignKey(
         PurchaseMission, on_delete=models.CASCADE, related_name="turn_leases"
     )
