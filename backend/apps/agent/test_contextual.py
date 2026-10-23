@@ -171,6 +171,21 @@ class ContextualMissionApiTests(TestCase):
         self.assertEqual(mission.state["visible_product_ids"], visible)
         self.assertEqual(events[-1]["payload"]["intent_parser"], "contextual")
 
+    def test_sellers_for_explicitly_selected_product_outside_ordinal_cards(self):
+        mission = PurchaseMission.objects.get(pk=self.mission_id)
+        product_id = mission.state["candidate_product_ids"][0]
+        mission.state = {
+            **mission.state, "selected_product_id": product_id,
+            "visible_product_ids": [],
+        }
+        mission.save(update_fields=["state"])
+        events = self.turn("فروشنده ها")
+        cards = [e["payload"] for e in events if e["type"] == "ui.component"]
+        self.assertEqual(len(cards), 1)
+        self.assertEqual(cards[0]["component"], "seller_options")
+        self.assertTrue(cards[0]["data"]["offers"])
+        self.assertEqual(cards[0]["data"]["product_id"], product_id)
+
     def test_chat_contact_consent_does_not_run_simulator_or_search(self):
         mission = PurchaseMission.objects.get(pk=self.mission_id)
         product_id = mission.state["visible_product_ids"][0]
