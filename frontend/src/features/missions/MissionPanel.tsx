@@ -316,7 +316,7 @@ function ProductResults({
                 </div>
               </details>
               <div className="mission-product-actions">
-                {allowActions && productIndex < 4 && (
+                {allowActions && (
                   <button type="button" className="mission-select-button" aria-pressed={isSelected}
                     onClick={() => onSelectProduct(result.product.id)}>
                     <CheckCircle2 size={15} /> {isSelected ? 'مدل منتخب' : 'انتخاب مدل'}
