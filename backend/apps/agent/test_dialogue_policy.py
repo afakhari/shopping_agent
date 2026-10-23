@@ -86,9 +86,23 @@ class DialoguePolicyContractTests(SimpleTestCase):
             with self.subTest(query=query):
                 self.assertIsNone(resolve_dialogue_policy(query, {}))
 
-    def test_not_every_word_containing_ram_is_a_memory_question(self):
+    def test_unrelated_verb_is_not_mistaken_for_laptop_memory(self):
         result = resolve_dialogue_policy("باید برم فروشگاه دوم؟", {})
-        self.assertIsNone(result)
+        self.assertEqual(result["kind"], "clarify")
+        self.assertNotIn("گرافیک", result["reply"])
+        self.assertNotIn("رم", result["reply"])
+
+    def test_unseen_product_advice_question_does_not_reach_search(self):
+        for query in (
+            "آیا هدفون نویز کنسلینگ لازم دارم؟",
+            "چطور یک دوربین مناسب عروسی انتخاب کنم؟",
+            "برای خرید گوشی چه ویژگی هایی مهمه؟",
+            "نویز کنسلینگ چیه؟",
+            "کدوم هدفون رو بخرم؟",
+        ):
+            with self.subTest(query=query):
+                decision = resolve_dialogue_policy(query, {"search_query": "هدفون"})
+                self.assertEqual(decision["kind"], "clarify")
 
     def test_social_and_comparative_messages_remain_owned_by_existing_routes(self):
         for query in ("ممنون", "این دو تا چه فرقی دارند", "آدرس فروشگاه دوم"):
