@@ -7,6 +7,7 @@ pressure gauges). Specific model/brand queries are left untouched.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 
 from django.db.models import Q
 
@@ -20,6 +21,51 @@ class CategoryScope:
     hint_message: str | None = None
     alternative_label: str | None = None
     alternative_query: str | None = None
+
+
+# Catalog taxonomy, not lexical title overlap, decides whether a query for a
+# laptop refers to a computer, an accessory, or a children's educational toy.
+# The supplied snapshot uses "لپ تاپ و نوت بوک" for actual computers; using an
+# unrestricted OR title search was returning chargers, bags and toy laptops.
+_LAPTOP_QUERY = re.compile(r"(?<!\w)(?:لپ\s*تاپ|لپتاپ|نوت\s*بوک)(?!\w)")
+_LAPTOP_ACCESSORY_SCOPES = (
+    (("آموزشی کودک", "اسباب بازی", "اسباب‌بازی"), "toy_laptop", "لپ‌تاپ آموزشی کودک",
+     ("لپ تاپ اسباب بازی",)),
+    (("شارژر", "آداپتور"), "laptop_charger", "شارژر لپ‌تاپ",
+     ("شارژر لپ تاپ", "آداپتور برق")),
+    (("کیف", "کاور", "کوله"), "laptop_bag", "کیف و کاور لپ‌تاپ",
+     ("کیف و کاور لپ تاپ", "کیف و کوله")),
+    (("باتری",), "laptop_battery", "باتری لپ‌تاپ", ("باتری لپ تاپ",)),
+    (("رم", "ram"), "laptop_ram", "رم لپ‌تاپ", ("رم لپ تاپ",)),
+    (("استند", "پایه", "خنک کننده", "کول پد"), "laptop_stand", "پایه لپ‌تاپ",
+     ("پایه نگهدارنده مانیتور و لپ تاپ", "استند و پایه خنک کننده")),
+    (("برچسب", "استیکر"), "laptop_sticker", "برچسب لپ‌تاپ",
+     ("برچسب و استیکر موبایل و لپ تاپ",)),
+    (("فن",), "laptop_fan", "فن لپ‌تاپ", ("فن لپ تاپ",)),
+)
+
+
+def _resolve_laptop_scope(query: str) -> CategoryScope | None:
+    if _LAPTOP_QUERY.search(query) is None:
+        return None
+    for cues, key, label, categories in _LAPTOP_ACCESSORY_SCOPES:
+        if any(cue in query for cue in cues):
+            category_query = Q()
+            for category in categories:
+                category_query |= Q(category_name__icontains=category)
+            return CategoryScope(key=key, label=label, query=category_query)
+    # A laptop request must never become a bag/charger search solely because
+    # an accessory's title contains the words "لپ تاپ".
+    return CategoryScope(
+        key="laptop_computer",
+        label="لپ‌تاپ و نوت‌بوک",
+        query=(
+            Q(category_name__icontains="لپ تاپ و نوت بوک")
+            | Q(category_name__iexact="لپ تاپ")
+            | Q(category_name__iexact="لپتاپ")
+            | Q(category_name__iexact="نوت بوک")
+        ),
+    )
 
 
 _PRESSURE_TRIGGERS = ("فشارسنج", "فشار سنج", "بارومتر", "مانومتر")
@@ -48,6 +94,9 @@ def resolve_category_scope(normalized_query: str) -> CategoryScope | None:
     (e.g. a specific brand/model) disable automatic scoping so exact searches stay broad.
     """
     query = " ".join((normalized_query or "").split())
+    laptop_scope = _resolve_laptop_scope(query)
+    if laptop_scope is not None:
+        return laptop_scope
     if not any(trigger in query for trigger in _PRESSURE_TRIGGERS):
         return None
 
