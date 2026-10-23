@@ -113,6 +113,13 @@ def classify_contextual_turn(message: str, state: dict[str, Any] | None) -> dict
             }
         return {"kind": "clarify", "reply": "مدل موردنظرت مشخص است؛ بخش دوم درخواست را کوتاه‌تر توضیح بده."}
 
+    # A reported failed physical visit/contact is a recovery request, not
+    # a new catalogue product name. It is user-reported, not real verification.
+    if re.search(r"(?:جواب نداد|پاسخ نداد|بسته بود|ناموجود بود|موجود نیست|موجود نبود)", normalized):
+        if state.get("selected_offer_id"):
+            return {"kind": "seller_recovery", "offer_id": state["selected_offer_id"]}
+        return {"kind": "clarify", "reply": "کدام فروشگاه پاسخ نداد یا محصول را نداشت؟ از فهرست فروشندگان انتخابش کن تا گزینهٔ جایگزین بیابم."}
+
     if _WHY.match(normalized):
         return {"kind": "explain"} if previous_query else {
             "kind": "clarify", "reply": "هنوز محصولی پیشنهاد نشده که دلیل انتخابش را بررسی کنم."
