@@ -1,14 +1,15 @@
 import { useState } from 'react'
 import { ExternalLink, LocateFixed, MapPin, Store } from 'lucide-react'
 import type { CatalogOffer } from '../search/catalog-api'
-import { osmEmbedUrl } from './shop-map'
+import { isTehranCatalogPoint, osmEmbedUrl } from './shop-map'
 import { formatDistance, openStreetMapUrl } from './ui-formatters'
 
 const numerals = new Intl.NumberFormat('fa-IR', { maximumFractionDigits: 0 })
 
 /** An offer must carry its own valid shop coordinates. Never geocode a synthetic name. */
 export function geographicallyMappedOffers(offers: CatalogOffer[]): CatalogOffer[] {
-  return offers.filter(({ shop }) => osmEmbedUrl(shop.lat, shop.lon) !== null)
+  return offers.filter(({ shop }) => isTehranCatalogPoint(shop.lat, shop.lon)
+    && osmEmbedUrl(shop.lat, shop.lon) !== null)
 }
 
 export function selectedMappedOffer(
@@ -32,6 +33,7 @@ type Props = {
 export function SellerLocationBoard({ offers, selectedOfferId, onSelectOffer, disabled }: Props) {
   const [openMapOfferId, setOpenMapOfferId] = useState<string | null>(null)
   const mapped = geographicallyMappedOffers(offers)
+  const currentOffer = offers.find(offer => offer.id === selectedOfferId)
   const active = selectedMappedOffer(offers, selectedOfferId)
   const iframeUrl = active ? osmEmbedUrl(active.shop.lat, active.shop.lon) : null
   const externalUrl = active ? openStreetMapUrl(active.shop.lat, active.shop.lon) : null
@@ -63,7 +65,7 @@ export function SellerLocationBoard({ offers, selectedOfferId, onSelectOffer, di
                   {numerals.format(index + 1)}. {offer.shop.name || 'فروشگاه بدون نام'}
                 </span>
                 <small>{distance ? `فاصله مستقیم: ${distance}` : 'فاصله از مبدأ مشخص نشده'}
-                  {osmEmbedUrl(offer.shop.lat, offer.shop.lon) ? '' : ' · مختصات نامشخص'}
+                  {isTehranCatalogPoint(offer.shop.lat, offer.shop.lon) ? '' : ' · مختصات معتبر تهران ثبت نشده'}
                 </small>
               </button>
             )
@@ -79,7 +81,7 @@ export function SellerLocationBoard({ offers, selectedOfferId, onSelectOffer, di
                   <p>{active.shop.address || active.shop.location_label || 'نشانی دقیق ثبت نشده'}</p>
                   {!mapVisible
                     ? <button type="button" className="mission-location-load-map"
-                        onClick={() => setOpenMapOfferId(active.id)}>
+                        onClick={() => setOpenMapOfferId(selectedOfferId)}>
                         نمایش نقشه OpenStreetMap
                       </button>
                     : <div className="mission-location-map">
