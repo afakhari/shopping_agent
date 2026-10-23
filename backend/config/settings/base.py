@@ -129,6 +129,8 @@ LLM_TIMEOUT_SECONDS = float(os.environ.get("LLM_TIMEOUT_SECONDS", "6"))
 # Neshan is an OPTIONAL, billable service; disabled until a separately scoped
 # REST key, a verified quota and a safe operational budget are configured.
 NESHAN_ROUTING_ENABLED = os.environ.get("NESHAN_ROUTING_ENABLED", "0") == "1"
+# Direction is separately authorized; having a Matrix key must not spend extra credits.
+NESHAN_DIRECTION_ENABLED = os.environ.get("NESHAN_DIRECTION_ENABLED", "0") == "1"
 NESHAN_ROUTING_API_KEY = os.environ.get("NESHAN_ROUTING_API_KEY", "").strip()
 NESHAN_ROUTING_MAX_CALLS_PER_MISSION = max(
     0, min(10, int(os.environ.get("NESHAN_ROUTING_MAX_CALLS_PER_MISSION", "0")))
