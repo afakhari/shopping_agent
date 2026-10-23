@@ -591,6 +591,9 @@ export function MissionPanel({
   const [contactByOffer, setContactByOffer] = useState<Record<string, ContactAttemptResponse>>({})
   const [offerViews, setOfferViews] = useState<Record<string, ProductOfferView>>({})
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null)
+  const missionIdRef = useRef<string | null>(missionId)
+  const queuedTurnsRef = useRef<Array<{ text: string; constraints: MissionConstraints; displayQuery: string }>>([])
+  const [queuedCount, setQueuedCount] = useState(0)
   const [activeFilterForm, setActiveFilterForm] = useState<GenUIComponent | null>(null)
   const filterDialogRef = useRef<HTMLDialogElement | null>(null)
   const transcriptRef = useRef<HTMLDivElement | null>(null)
@@ -767,7 +770,17 @@ export function MissionPanel({
     const trimmed = turnMessage.trim()
     // The ref is synchronous: two Enter clicks in the same React render cannot
     // launch duplicate POSTs or two paid model requests.
-    if (!trimmed || isRunning || isRestoring || turnInFlightRef.current) return
+    if (!trimmed) return
+    if (isRunning || isRestoring || turnInFlightRef.current) {
+      if (queuedTurnsRef.current.length >= 5) {
+        setError('حداکثر پنج پیام در صف است. پس از پردازش آن‌ها پیام جدید بفرست.')
+        return
+      }
+      queuedTurnsRef.current.push({ text: trimmed, constraints: { ...turnConstraints }, displayQuery })
+      setQueuedCount(queuedTurnsRef.current.length)
+      setMessage('')
+      return
+    }
     shouldAutoScrollRef.current = true
 
     const localIntent = classifyLocalConversation(trimmed)
@@ -792,7 +805,7 @@ export function MissionPanel({
     turnCounter.current += 1
     const turnId = `${Date.now()}-${turnCounter.current}`
     const lastSavedSequence = events.reduce((max, event) => Math.max(max, event.seq), 0)
-    let activeMissionId: string | null = missionId
+    let activeMissionId: string | null = missionIdRef.current
     let startedServerTurn = false
     setChatMessages((current) => [
       ...current,
@@ -805,6 +818,7 @@ export function MissionPanel({
         const created = await createMission(trimmed, turnConstraints)
         activeMissionId = created.mission_id
         setMissionId(activeMissionId)
+        missionIdRef.current = activeMissionId
         storeMissionId(activeMissionId)
       }
       startedServerTurn = true
@@ -859,6 +873,11 @@ export function MissionPanel({
         }
         return next
       })
+      const queued = queuedTurnsRef.current.shift()
+      if (queued) {
+        setQueuedCount(queuedTurnsRef.current.length)
+        Promise.resolve().then(() => { void runTurn(queued.text, queued.constraints, queued.displayQuery) })
+      }
     }
   }
 
@@ -1228,7 +1247,10 @@ export function MissionPanel({
     offerRequestControllers.current.clear()
     setOfferViews({})
     setMissionId(null)
+    missionIdRef.current = null
     storeMissionId(null)
+    queuedTurnsRef.current = []
+    setQueuedCount(0)
     setMessage('')
     setEvents([])
     setChatMessages([])
@@ -1436,6 +1458,7 @@ export function MissionPanel({
         <button type="button" onClick={() => setError(null)}>بستن</button>
       </div>}
       {isRunning && <div className="conversation-running-note" role="status" aria-live="polite"><span className="mission-progress-dot" />{stageLabel ?? 'در حال بررسی درخواست'}<span className="conversation-running-sub">اطلاعات محصول و شروط خرید در حال بررسی است</span></div>}
+      {queuedCount > 0 && <div className="conversation-running-note" role="status" aria-live="polite">{money.format(queuedCount)} پیام در صف پردازش است.</div>}
 
       <form className="conversation-composer" id="conversation-composer" onSubmit={submit}>
         {lastQuery && <button className="composer-tool" type="button" aria-label="تنظیم شرایط خرید" title="تنظیم شرایط خرید" disabled={isRunning || isRestoring} onClick={() => handleGenUIAction({ type: 'open_filter_form' })}><SlidersHorizontal size={18} /></button>}
@@ -1446,7 +1469,7 @@ export function MissionPanel({
           rows={1}
           maxLength={2000}
           value={message}
-          disabled={isRunning || isRestoring}
+          disabled={isRestoring}
           onChange={(event) => setMessage(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === 'Enter' && !event.shiftKey) {
@@ -1456,8 +1479,8 @@ export function MissionPanel({
           }}
           placeholder="مثلاً تا ۳ میلیون تومان یک هدفون مناسب برای رفت‌وآمد پیدا کن…"
         />
-        <button className="composer-send" type="submit" aria-label="ارسال پیام" title="ارسال پیام" disabled={!message.trim() || isRunning || isRestoring}>
-          {isRunning ? <LoaderCircle size={18} className="spin" /> : <Send size={17} />}
+        <button className="composer-send" type="submit" aria-label="ارسال پیام" title="ارسال پیام" disabled={!message.trim() || isRestoring}>
+          <Send size={17} />
         </button>
       </form>
       
