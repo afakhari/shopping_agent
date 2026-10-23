@@ -108,6 +108,41 @@ class CatalogSearchApiTests(TestCase):
             price_toman=Decimal("600000"),
         )
 
+    def test_regular_laptop_search_does_not_surface_children_toy_laptop(self):
+        real_laptop = Product.objects.create(
+            source_id="laptop_real",
+            persian_title="لپ تاپ ایسوس مدل نمونه",
+            normalized_title=normalize_persian_text("لپ تاپ ایسوس مدل نمونه"),
+            category_name="لپ تاپ",
+        )
+        toy_laptop = Product.objects.create(
+            source_id="laptop_toy",
+            persian_title="لپ تاپ آموزشی کودک Cognitive Transportation Vehicles",
+            normalized_title=normalize_persian_text(
+                "لپ تاپ آموزشی کودک Cognitive Transportation Vehicles"
+            ),
+            category_name="اسباب بازی",
+        )
+        for product, price in ((real_laptop, 25_000_000), (toy_laptop, 5_900_000)):
+            Offer.objects.create(
+                source_id=f"offer_{product.source_id}",
+                product=product,
+                shop=self.cash_shop,
+                price_toman=Decimal(price),
+            )
+        normal = self.client.get("/api/v1/catalog/search/", {"q": "لپ تاپ"})
+        self.assertEqual(normal.status_code, 200, normal.content)
+        found = [item["product"]["id"] for item in normal.json()["results"]]
+        self.assertIn(real_laptop.source_id, found)
+        self.assertNotIn(toy_laptop.source_id, found)
+        self.assertEqual(normal.json()["total"], 1)
+        educational = self.client.get(
+            "/api/v1/catalog/search/", {"q": "لپ تاپ آموزشی کودک"}
+        )
+        self.assertEqual(educational.status_code, 200, educational.content)
+        educational_ids = [item["product"]["id"] for item in educational.json()["results"]]
+        self.assertIn(toy_laptop.source_id, educational_ids)
+
     def test_search_returns_only_products_with_matching_offers(self):
         response = self.client.get("/api/v1/catalog/search/", {"q": "هدفون"})
         self.assertEqual(response.status_code, 200, response.content)
