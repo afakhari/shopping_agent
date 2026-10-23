@@ -231,6 +231,8 @@ def create_mission(request):
     serializer = MissionCreateSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     data = serializer.validated_data
+    if getattr(settings, "REQUIRE_REQUEST_IDS", False) and not data.get("client_request_id"):
+        raise ValidationError({"client_request_id": "برای انتشار عمومی، شناسه یکتای درخواست الزامی است."})
     constraints = _validate_full_constraints({}, data.get("constraints", {}))
     if "bazaar_owner_token" not in request.session:
         request.session["bazaar_owner_token"] = secrets.token_hex(24)
@@ -298,6 +300,8 @@ def mission_turn(request, mission_id: str):
     serializer = MissionTurnSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     data = serializer.validated_data
+    if getattr(settings, "REQUIRE_REQUEST_IDS", False) and not data.get("client_request_id"):
+        raise ValidationError({"client_request_id": "شناسه درخواست برای پردازش امن الزامی است."})
     # Repeat response is read before any optional model call or catalog search.
     owned = _owned_mission(request, mission_id)
     previous = _replay_turn_if_completed(owned, data)
