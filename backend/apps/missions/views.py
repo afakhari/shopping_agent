@@ -79,6 +79,8 @@ def _search_filterset(constraints: dict[str, Any]) -> dict[str, Any]:
     return {
         "max_price_toman": Decimal(str(raw_max)) if raw_max not in (None, "") else None,
         "must_have_in_person_credit": bool(constraints.get("must_have_in_person_credit", False)),
+        "brand_name": constraints.get("brand_name"),
+        "model_exact": constraints.get("model_exact"),
         "lat": constraints.get("lat"),
         "lon": constraints.get("lon"),
         "radius_m": constraints.get("radius_m"),
