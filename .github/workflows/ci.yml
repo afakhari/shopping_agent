@@ -51,6 +51,7 @@ jobs:
           python-version: '3.13'
       - run: python -m compileall -q backend scripts
       - run: python scripts/neshan_smoke.py  # must remain offline by default
+      - run: python scripts/neshan_smoke.py --service direction  # still zero paid calls
       - run: python scripts/verify_scaffold.py
       - run: python scripts/verify_blueprint.py
       - run: python -m unittest discover -s tests -p "test_contracts.py" -v
