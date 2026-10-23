@@ -828,6 +828,9 @@ export function MissionPanel({
     try {
       const response = await updateMissionFocus(activeId, { ...input, result_set_id: activeResultId })
       response.events.forEach(handleEvent)
+      // A repeat focus is idempotent and may produce no event; state is still authoritative.
+      setSelectedProductId(typeof response.state.selected_product_id === 'string' ? response.state.selected_product_id : null)
+      setSelectedOfferId(typeof response.state.selected_offer_id === 'string' ? response.state.selected_offer_id : null)
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'انتخاب ثبت نشد؛ وضعیت مأموریت را بررسی کن.')
     }
