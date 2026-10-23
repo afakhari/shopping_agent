@@ -830,12 +830,16 @@ export function MissionPanel({
   }
 
   const applyFocus = (input: Omit<MissionFocusAction, 'result_set_id'>): Promise<void> => {
-    // Serialize explicit UI mutations. An overlapping select/seller/compare click
-    // must not reorder the server's active reference by network completion time.
+    // Admission happens synchronously. Actions queued BEFORE a chat turn must
+    // still commit; actions clicked DURING that turn cannot enter the queue.
+    if (isRunning || isRestoring || turnInFlightRef.current || queuePausedRef.current || resultsStale) {
+      setError('ابتدا پردازش پیام یا بازیابی مأموریت کامل شود.')
+      return Promise.resolve()
+    }
     const execute = async () => {
       const activeId = missionIdRef.current
       const activeResultId = resultSetIdRef.current ?? resultSetId
-      if (isRunning || isRestoring || turnInFlightRef.current || queuePausedRef.current || resultsStale || !activeId || !activeResultId) {
+      if (queuePausedRef.current || resultsStale || !activeId || !activeResultId) {
         setError('نتایج این جست‌وجو آماده یا معتبر نیستند؛ ابتدا وضعیت را به‌روز کن.')
         return
       }
