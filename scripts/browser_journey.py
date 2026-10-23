@@ -67,11 +67,19 @@ def main() -> None:
 
                 if width == 390:
                     composer = page.locator('textarea[aria-label="پیام به دستیار خرید"]')
+                    posted_missions = []
+                    page.on(
+                        "request",
+                        lambda request: posted_missions.append(request.url)
+                        if request.method == "POST" and "/api/v1/missions/" in request.url
+                        else None,
+                    )
                     composer.fill("احوال شما؟")
                     page.get_by_role("button", name="ارسال پیام").click()
                     page.get_by_text("سلام! خوش اومدی.", exact=False).first.wait_for()
                     assert page.locator(".mission-product-card").count() == 0
                     assert page.locator(".genui-empty-state").count() == 0
+                    assert posted_missions == [], "A social greeting must not POST or spend model credit"
                     page.screenshot(path=str(OUTPUT / "greeting-no-products-mobile.png"), full_page=True)
                     composer.fill("چطوری؟")
                     page.get_by_role("button", name="ارسال پیام").click()
@@ -100,11 +108,13 @@ def main() -> None:
                     # products; the previous search remains available.
                     previous_cards = page.locator(".mission-product-card").count()
                     previous_replies = page.get_by_text("سلام! خوش اومدی.", exact=False).count()
+                    prior_post_count = len(posted_missions)
                     composer.fill("احوال شما؟")
                     page.get_by_role("button", name="ارسال پیام").click()
                     page.get_by_text("سلام! خوش اومدی.", exact=False).last.wait_for()
                     assert page.get_by_text("سلام! خوش اومدی.", exact=False).count() == previous_replies + 1
                     assert page.locator(".mission-product-card").count() == previous_cards
+                    assert len(posted_missions) == prior_post_count
                 assert_no_horizontal_overflow(page, width)
                 page.screenshot(path=str(OUTPUT / f"products-{width}.png"), full_page=True)
 
