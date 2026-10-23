@@ -26,6 +26,7 @@ class DialogueDecision(TypedDict, total=False):
     pending_dialogue: dict[str, str] | None
     query_override: str
     constraint_updates: dict[str, Any]
+    usage_profile: str
 
 
 _BARE_LAP = re.compile(r"(?<!\w)لپ(?!\w)")
