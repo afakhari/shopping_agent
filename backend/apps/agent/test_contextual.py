@@ -132,6 +132,18 @@ class ContextualMissionApiTests(TestCase):
         self.mission_id = created.json()["mission_id"]
         self.turn("هدفون")
 
+    def test_future_seller_hours_are_not_misreported_as_current_open_status(self):
+        mission = PurchaseMission.objects.get(pk=self.mission_id)
+        mission.state = {**mission.state, "active_surface": "sellers",
+                         "visible_offer_ids": ["context_offer_0"],
+                         "selected_product_id": self.first.source_id,
+                         "selected_offer_id": "context_offer_0"}
+        mission.save(update_fields=["state"])
+        events = self.turn("فروشنده اول فردا صبح بازه؟")
+        reply = next(event["payload"]["text"] for event in events if event["type"] == "assistant.message")
+        self.assertIn("برنامه هفتگی ثبت‌شده", reply)
+        self.assertNotIn("طبق برنامه ثبت‌شده باز است", reply)
+
     def test_turn_request_id_replays_without_duplicate_events(self):
         payload = {"message": "هدفون", "client_request_id": "turn-idempotent-001"}
         url = f"/api/v1/missions/{self.mission_id}/turns/"

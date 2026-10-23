@@ -28,5 +28,14 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
 X_FRAME_OPTIONS = "DENY"
 
+# Defence in depth for an anonymous public API. An edge/global quota is still
+# essential: Django's default per-process cache is not a distributed rate limiter.
+REST_FRAMEWORK["DEFAULT_THROTTLE_CLASSES"] = [
+    "rest_framework.throttling.AnonRateThrottle",
+]
+REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"] = {
+    "anon": os.environ.get("DJANGO_ANON_RATE", "120/min"),
+}
+
 # A listening web process is not production-ready until the catalog is populated.
 REQUIRE_DATASET_FOR_READINESS = True

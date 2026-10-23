@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 import secrets
 import uuid
 from decimal import Decimal
@@ -101,8 +102,9 @@ def _replay_turn_if_completed(mission: PurchaseMission, data: dict[str, Any]):
     started = MissionEvent.objects.filter(
         mission=mission, event_type="user.message", seq__lt=completed.seq,
     ).order_by("-seq").first()
-    if started is None or started.payload.get("message") != data["message"]:
-        raise ValidationError({"client_request_id": "این شناسه قبلاً برای پیام دیگری استفاده شده است."})
+    if (started is None or started.payload.get("message") != data["message"]
+        or completed.payload.get("request_constraints", {}) != data.get("constraints", {})):
+        raise ValidationError({"client_request_id": "این شناسه قبلاً برای پیام یا شروط متفاوتی استفاده شده است."})
     saved = MissionEvent.objects.filter(
         mission=mission, seq__gte=started.seq, seq__lte=completed.seq,
     ).order_by("seq")
@@ -233,6 +235,7 @@ def mission_turn(request, mission_id: str):
                     "current_stage": mission.current_stage,
                     "intent_parser": "local_conversation",
                     "client_request_id": data.get("client_request_id"),
+                    "request_constraints": data.get("constraints", {}),
                     "agent_runtime": "deterministic_guard",
                     "search_query": (mission.state or {}).get("search_query", ""),
                     "constraints": mission.constraints,
@@ -400,12 +403,21 @@ def mission_turn(request, mission_id: str):
                                      "موجودی و قیمت فعلی به‌صورت واقعی تأیید نشده‌اند.")
                         else:
                             from apps.catalog.services.visit_context import opening_status
-                            hours = opening_status(offer.shop.weekly_hours)
+                            from apps.missions.visit_plan import format_weekly_hours
+                            future_question = bool(re.search(
+                                r"امشب|فردا|پس فردا|هفته بعد|شنبه|یکشنبه|دوشنبه|سه شنبه|چهارشنبه|پنجشنبه|جمعه",
+                                normalize_persian_text(data["message"]),
+                            ))
+                            hours_label = (
+                                "زمان آینده از این پیام محاسبه نشده است؛ برنامه هفتگی ثبت‌شده: "
+                                + format_weekly_hours(offer.shop.weekly_hours)
+                                if future_question else opening_status(offer.shop.weekly_hours)["label"]
+                            )
                             price = f"{offer.price_toman:,.0f} تومان" if offer.price_toman is not None else "نامشخص"
                             reply = (
                                 f"«{offer.shop.name}»؛ نشانی ثبت‌شده: "
                                 f"{offer.shop.address or offer.shop.location_label or 'نامشخص'}. "
-                                f"ساعات طبق داده ثبت‌شده: {hours.get('label', 'نامشخص')}. "
+                                f"ساعات طبق داده ثبت‌شده: {hours_label}. "
                                 f"قیمت ثبت‌شده: {price}. موجودی واقعی مشخص نیست."
                             )
                             extra_ui = ("seller_details", {"offer": serialize_offer(offer)})
@@ -486,6 +498,7 @@ def mission_turn(request, mission_id: str):
                 "current_stage": mission.current_stage,
                 "intent_parser": "contextual",
                 "client_request_id": data.get("client_request_id"),
+                "request_constraints": data.get("constraints", {}),
                 "agent_runtime": "deterministic_guard",
                 "search_query": (mission.state or {}).get("search_query", ""),
                 "selected_product_id": (mission.state or {}).get("selected_product_id"),
@@ -614,6 +627,7 @@ def mission_turn(request, mission_id: str):
                     "agent_runtime": graph_state.get("graph_runtime", "langgraph"),
                     "intent_parser": graph_state.get("intent_parser", "heuristic"),
                     "client_request_id": data.get("client_request_id"),
+                    "request_constraints": data.get("constraints", {}),
                     "search_query": graph_state.get("search_query", ""),
                     "selected_product_id": selected_product,
                     "result_set_id": result_set_id,
