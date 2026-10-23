@@ -368,7 +368,7 @@ class ContextualMissionApiTests(TestCase):
             ("edit_laptop", "لپ تاپ تدوین نمونه", "لپ تاپ و نوت بوک", "تدوین", 155000000),
             ("basic_laptop", "لپ تاپ اداری نمونه", "لپ تاپ و نوت بوک", "اداری", 90000000),
             ("overbudget_laptop", "لپ تاپ حرفه ای تدوین", "لپ تاپ و نوت بوک", "تدوین", 210000000),
-            ("video_bag", "کیف ویدیو پروژکتور ارزان", "کیف و کاور ویدیو پروژکتور", "تدوین", 1000000),
+            ("video_bag", "کیف ویدیو پروژکتور و لپ تاپ ارزان", "کیف و کاور ویدیو پروژکتور", "تدوین", 1000000),
         )
         for pid, title, category, usage, price in records:
             product = Product.objects.create(
