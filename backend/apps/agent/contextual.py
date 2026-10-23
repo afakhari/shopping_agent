@@ -54,10 +54,6 @@ def classify_contextual_turn(message: str, state: dict[str, Any] | None) -> dict
     if not normalized:
         return {"kind": "clarify", "reply": "چه محصولی را برای خرید حضوری بررسی کنیم؟"}
 
-    policy = resolve_dialogue_policy(normalized, state)
-    if policy is not None:
-        return dict(policy)
-
     # "دومی خوبه ولی فروشنده نزدیک تر..." is a structured two-step action.
     combined = re.match(
         r"^(?:مدل |محصول )?(اولی|اول|دومی|دوم|سومی|سوم|چهارمی|چهارم)"
@@ -156,6 +152,12 @@ def classify_contextual_turn(message: str, state: dict[str, Any] | None) -> dict
         x in normalized for x in ("این فروشگاه", "همون فروشگاه", "آدرسش", "ساعتش", "موجودیش")
     ):
         return {"kind": "clarify", "reply": "کدام فروشگاه؟ فروشنده را از فهرست انتخاب کن تا فقط داده‌های ثبت‌شده را توضیح بدهم."}
+
+    # Resolve deterministic product/seller actions first. Only questions
+    # left unresolved by those grounded actions reach the pre-search policy.
+    policy = resolve_dialogue_policy(message, state)
+    if policy is not None:
+        return dict(policy)
 
     value = _budget_value(normalized)
     # A budget-only update has no new product tokens after the amount.
