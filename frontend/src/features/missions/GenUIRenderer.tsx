@@ -436,7 +436,7 @@ function ContactConsent({ component, disabled, onAction }: {
         <p>{productTitle}، {shopName}</p></div>
     </div>
     <p>این اقدام فقط یک شبیه‌سازی مسابقه است. هیچ تماس یا پیام واقعی به فروشگاه ارسال نمی‌شود
-      و نتیجه به معنای موجودی تأییدشده نیست.</p>
+      و نتیجه به معنای موجودی تأییدشده نیست. نام فروشنده و شماره تماس در دیتاست نمونه ممکن است ساختگی باشند.</p>
     <button className="genui-primary-action" type="button" disabled={disabled || !offerId || !shopId}
       onClick={() => onAction({ type: 'verify_selected_offer', offerId, shopId })}>
       <CheckCircle2 size={16} aria-hidden="true" /> تأیید و اجرای شبیه‌سازی
@@ -452,7 +452,7 @@ function SellerEvidence({ component }: { component: GenUIComponent }) {
   const prices = new Intl.NumberFormat('fa-IR')
   return <section className="genui-sellers" aria-label="اطلاعات فروشندگان حضوری">
     <strong>{component.type === 'seller_details' ? 'جزئیات فروشگاه منتخب' : 'فروشگاه‌های دارای آفر این مدل'}</strong>
-    <small>قیمت و ساعات از دیتاست ثبت‌شده‌اند؛ موجودی و تماس واقعی تأیید نشده است.</small>
+    <small>قیمت و ساعات از دیتاست ثبت‌شده‌اند؛ موجودی و تماس واقعی تأیید نشده است. نام بسیاری از فروشگاه‌ها در داده نمونه ساختگی است.</small>
     <div className="genui-sellers-list">{offers.map((offer, index) => {
       const shop = isRecord(offer.shop) ? offer.shop : {}
       const opening = isRecord(shop.opening_status) ? shop.opening_status : {}
