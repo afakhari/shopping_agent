@@ -16,9 +16,9 @@ class MissionConstraintsSerializer(serializers.Serializer):
     # Explicit hard requirements, never inferred from vague preferences.
     brand_name = serializers.CharField(required=False, allow_null=True, max_length=300)
     model_exact = serializers.CharField(required=False, allow_null=True, max_length=500)
-    lat = serializers.FloatField(required=False, min_value=-90, max_value=90)
-    lon = serializers.FloatField(required=False, min_value=-180, max_value=180)
-    radius_m = serializers.IntegerField(required=False, min_value=100, max_value=100_000)
+    lat = serializers.FloatField(required=False, allow_null=True, min_value=-90, max_value=90)
+    lon = serializers.FloatField(required=False, allow_null=True, min_value=-180, max_value=180)
+    radius_m = serializers.IntegerField(required=False, allow_null=True, min_value=100, max_value=100_000)
     sort = serializers.ChoiceField(
         required=False,
         choices=("relevance", "price_asc", "distance_asc", "recent_price_change"),
