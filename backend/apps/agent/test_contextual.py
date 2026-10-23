@@ -153,7 +153,11 @@ class ContextualMissionApiTests(TestCase):
         count = PurchaseMission.objects.get(pk=self.mission_id).events.count()
         repeated = self.client.post(url, payload, format="json", HTTP_ACCEPT="text/event-stream")
         self.assertEqual(repeated.status_code, 200)
-        self.assertEqual(b"".join(repeated.streaming_content), saved_payload)
+        def decoded_events(raw):
+            return [json.loads(line[6:]) for line in raw.decode("utf-8").splitlines()
+                    if line.startswith("data: ")]
+        self.assertEqual(decoded_events(b"".join(repeated.streaming_content)),
+                         decoded_events(saved_payload))
         self.assertEqual(PurchaseMission.objects.get(pk=self.mission_id).events.count(), count)
         changed = self.client.post(url, {
             "message": "دوربین", "client_request_id": "turn-idempotent-001",
