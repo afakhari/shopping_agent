@@ -158,3 +158,25 @@ class MissionFocusSerializer(serializers.Serializer):
             if ids is None or len(ids) != len(set(ids)):
                 raise serializers.ValidationError({"product_ids": "فهرست شناسه‌های مدل باید مشخص و بدون تکرار باشد."})
         return attrs
+
+
+class RouteOriginSerializer(serializers.Serializer):
+    lat = serializers.FloatField(min_value=35.35, max_value=35.95)
+    lon = serializers.FloatField(min_value=50.9, max_value=51.85)
+    source = serializers.ChoiceField(choices=("manual_region", "geolocation_opt_in"))
+
+
+class RouteEstimatesSerializer(serializers.Serializer):
+    """Only explicitly opted-in, bounded, currently visible offer IDs."""
+    result_set_id = serializers.CharField(max_length=40)
+    origin = RouteOriginSerializer()
+    offer_ids = serializers.ListField(
+        child=serializers.CharField(max_length=64),
+        min_length=1, max_length=5,
+    )
+    mode = serializers.ChoiceField(choices=("car", "motorcycle"))
+
+    def validate_offer_ids(self, value):
+        if len(value) != len(set(value)):
+            raise serializers.ValidationError("شناسه آفرها نباید تکراری باشد.")
+        return value
