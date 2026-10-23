@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { ExternalLink, LocateFixed, MapPin, Store } from 'lucide-react'
 import type { CatalogOffer } from '../search/catalog-api'
 import { osmEmbedUrl } from './shop-map'
@@ -30,13 +30,13 @@ type Props = {
  * Opening the third-party embed is explicitly user-triggered.
  */
 export function SellerLocationBoard({ offers, selectedOfferId, onSelectOffer, disabled }: Props) {
-  const [mapVisible, setMapVisible] = useState(false)
+  const [openMapOfferId, setOpenMapOfferId] = useState<string | null>(null)
   const mapped = geographicallyMappedOffers(offers)
   const active = selectedMappedOffer(offers, selectedOfferId)
   const iframeUrl = active ? osmEmbedUrl(active.shop.lat, active.shop.lon) : null
   const externalUrl = active ? openStreetMapUrl(active.shop.lat, active.shop.lon) : null
 
-  useEffect(() => { setMapVisible(false) }, [selectedOfferId])
+  const mapVisible = Boolean(active && openMapOfferId === active.id)
 
   if (offers.length < 2) return null
   return (
@@ -55,7 +55,7 @@ export function SellerLocationBoard({ offers, selectedOfferId, onSelectOffer, di
             const isSelected = offer.id === selectedOfferId
             const distance = formatDistance(offer.shop.distance_m)
             return (
-              <button type="button" key={offer.id} onClick={() => onSelectOffer(offer.id)}
+              <button type="button" key={offer.id} onClick={() => { setOpenMapOfferId(null); onSelectOffer(offer.id) }}
                 className="mission-location-choice" disabled={disabled}
                 aria-pressed={isSelected}>
                 <span className="mission-location-choice-title">
@@ -79,13 +79,13 @@ export function SellerLocationBoard({ offers, selectedOfferId, onSelectOffer, di
                   <p>{active.shop.address || active.shop.location_label || 'نشانی دقیق ثبت نشده'}</p>
                   {!mapVisible
                     ? <button type="button" className="mission-location-load-map"
-                        onClick={() => setMapVisible(true)}>
+                        onClick={() => setOpenMapOfferId(active.id)}>
                         نمایش نقشه OpenStreetMap
                       </button>
                     : <div className="mission-location-map">
                         <iframe src={iframeUrl} loading="lazy" referrerPolicy="no-referrer"
                           title={`موقعیت ثبت‌شده ${active.shop.name}، بدون مسیر و زمان سفر`} />
-                        <button type="button" onClick={() => setMapVisible(false)}>بستن نقشه</button>
+                        <button type="button" onClick={() => setOpenMapOfferId(null)}>بستن نقشه</button>
                       </div>}
                   <small>با نمایش نقشه، مختصات این فروشنده برای OpenStreetMap ارسال می‌شود؛ نام فروشگاه یا موجودی تأیید نمی‌شود.</small>
                   {externalUrl && <a href={externalUrl} target="_blank" rel="noopener noreferrer">
