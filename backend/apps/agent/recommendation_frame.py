@@ -127,9 +127,13 @@ def resolve_recommendation_frame(
     normalized = normalize_persian_text(message).strip(" ؟?!.,؛")
     state = state or {}
     old = state.get("pending_dialogue")
-    pending = old if isinstance(old, dict) and old.get("slot") in (
-        "recommendation_usage", "recommendation_budget"
-    ) and old.get("family") in _CANONICAL else None
+    pending = old if isinstance(old, dict) and (
+        old.get("slot") == "recommendation_family"
+        or (
+            old.get("slot") in ("recommendation_usage", "recommendation_budget")
+            and old.get("family") in _CANONICAL
+        )
+    ) else None
     explicit_family = _family(normalized)
 
     if pending:
@@ -138,6 +142,19 @@ def resolve_recommendation_frame(
                 "kind": "clarify",
                 "reply": "درخواست قبلی کنار گذاشته شد. حالا دنبال چه محصولی هستی؟",
                 "pending_dialogue": None,
+            }
+        if pending["slot"] == "recommendation_family":
+            if explicit_family:
+                return _continue(
+                    explicit_family, _usage(normalized) or pending.get("usage") or None,
+                    _budget(normalized, pending=True) or pending.get("budget"),
+                    "light" if "سبک" in normalized else pending.get("intensity") or "",
+                )
+            return {
+                "kind": "clarify",
+                "reply": "برای این کاربرد دنبال چه نوع کالایی هستی؟ "
+                         "مثلاً لپ‌تاپ، تبلت یا محصول دیگری؟",
+                "pending_dialogue": dict(pending),
             }
         if explicit_family and explicit_family != pending["family"]:
             # The ordinary search router is responsible for the new category.
@@ -170,6 +187,21 @@ def resolve_recommendation_frame(
         return _continue(pending["family"], usage, budget, intensity)
 
     if not explicit_family:
+        # Use-case + budget alone must never become a category-free OR search.
+        # Ask for the missing family, carrying the known constraints as slots.
+        unknown_use = _usage(normalized)
+        known_budget = _budget(normalized)
+        if unknown_use and known_budget:
+            return {
+                "kind": "clarify",
+                "reply": "کاربرد و بودجه را متوجه شدم. می‌خواهی چه کالایی بخری؟ "
+                         "لپ‌تاپ، رایانه رومیزی یا محصول دیگری؟",
+                "pending_dialogue": {
+                    "slot": "recommendation_family", "usage": unknown_use,
+                    "budget": known_budget,
+                    "intensity": "light" if "سبک" in normalized else "",
+                },
+            }
         return None
     # Only guided recommendation questions create a persistent form; a direct
     # explicit product/model request still follows the standard catalog path.
