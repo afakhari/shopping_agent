@@ -74,6 +74,22 @@ class ContextualRouterTests(TestCase):
         self.assertEqual(result["product_id"], "p2")
         self.assertTrue(result["explore_sellers"])
 
+    def test_contact_inquiry_requires_explicit_consent(self):
+        state = {"search_query": "هدفون", "selected_offer_id": "o1"}
+        self.assertEqual(classify_contextual_turn("موجودی رو بررسی کن", state), {
+            "kind": "contact_prompt", "offer_id": "o1",
+        })
+        self.assertEqual(classify_contextual_turn("موجودی رو بررسی کن", {
+            "search_query": "هدفون",
+        })["kind"], "clarify")
+
+    def test_compare_uses_persisted_selection_not_guessed_models(self):
+        context = {"search_query": "هدفون", "compared_product_ids": ["p1", "p2"]}
+        self.assertEqual(classify_contextual_turn("این دو تا چه فرقی دارند", context)["kind"], "compare")
+        self.assertEqual(classify_contextual_turn("این دو تا چه فرقی دارند", {
+            "search_query": "هدفون",
+        })["kind"], "clarify")
+
     def test_why_does_not_start_unrelated_search(self):
         self.assertEqual(classify_contextual_turn("چرا اینو پیشنهاد دادی", {"search_query": "هدفون"})["kind"], "explain")
 
@@ -154,6 +170,81 @@ class ContextualMissionApiTests(TestCase):
         self.assertEqual(mission.state["selected_product_id"], visible[1])
         self.assertEqual(mission.state["visible_product_ids"], visible)
         self.assertEqual(events[-1]["payload"]["intent_parser"], "contextual")
+
+    def test_sellers_for_explicitly_selected_product_outside_ordinal_cards(self):
+        mission = PurchaseMission.objects.get(pk=self.mission_id)
+        product_id = mission.state["candidate_product_ids"][0]
+        mission.state = {
+            **mission.state, "selected_product_id": product_id,
+            "visible_product_ids": [],
+        }
+        mission.save(update_fields=["state"])
+        events = self.turn("فروشنده ها")
+        cards = [e["payload"] for e in events if e["type"] == "ui.component"]
+        self.assertEqual(len(cards), 1)
+        self.assertEqual(cards[0]["component"], "seller_options")
+        self.assertTrue(cards[0]["data"]["offers"])
+        self.assertEqual(cards[0]["data"]["product_id"], product_id)
+
+    def test_chat_contact_consent_does_not_run_simulator_or_search(self):
+        mission = PurchaseMission.objects.get(pk=self.mission_id)
+        product_id = mission.state["visible_product_ids"][0]
+        offer = Offer.objects.filter(product_id=product_id).first()
+        token = mission.state["result_set_id"]
+        endpoint = f"/api/v1/missions/{self.mission_id}/focus/"
+        focused = self.client.post(endpoint, {
+            "action": "view_sellers", "result_set_id": token, "product_id": product_id,
+            "offer_ids": [offer.source_id],
+        }, format="json")
+        self.assertEqual(focused.status_code, 200)
+        selected = self.client.post(endpoint, {
+            "action": "select_offer", "result_set_id": token,
+            "offer_id": offer.source_id,
+        }, format="json")
+        self.assertEqual(selected.status_code, 200)
+        with patch("apps.missions.views.simulate_contact") as simulate, patch(
+            "apps.missions.views.run_purchase_graph"
+        ) as graph:
+            events = self.turn("موجودی رو بررسی کن")
+            simulate.assert_not_called()
+            graph.assert_not_called()
+        prompts = [e["payload"] for e in events if e["type"] == "ui.component"]
+        self.assertEqual(len(prompts), 1)
+        self.assertEqual(prompts[0]["component"], "contact_prompt")
+        self.assertEqual(prompts[0]["data"]["offer_id"], offer.source_id)
+        self.assertEqual(prompts[0]["data"]["source_type"], "demo_simulation")
+
+    def test_compare_from_confirmed_offer_data_and_restore_snapshot(self):
+        mission = PurchaseMission.objects.get(pk=self.mission_id)
+        ids = mission.state["visible_product_ids"][:2]
+        self.assertEqual(len(ids), 2)
+        self.first.specs = [{"key": "رنگ", "value": "مشکی"}]
+        self.second.specs = [{"key": "رنگ", "value": "سفید"}]
+        self.first.save(update_fields=["specs"])
+        self.second.save(update_fields=["specs"])
+        focus = self.client.post(
+            f"/api/v1/missions/{self.mission_id}/focus/",
+            {"action": "set_compare", "product_ids": ids,
+             "result_set_id": mission.state["result_set_id"]}, format="json",
+        )
+        self.assertEqual(focus.status_code, 200, focus.content)
+        with patch("apps.missions.views.run_purchase_graph") as graph:
+            events = self.turn("این دو تا چه فرقی دارند")
+            graph.assert_not_called()
+        components = [e["payload"] for e in events if e["type"] == "ui.component"]
+        self.assertEqual(len(components), 1)
+        self.assertEqual(components[0]["component"], "comparison_table")
+        self.assertEqual(len(components[0]["data"]["rows"]), 2)
+        self.assertEqual(components[0]["data"]["availability_verified"], False)
+        snapshot = self.client.get(f"/api/v1/missions/{self.mission_id}/")
+        self.assertEqual(snapshot.status_code, 200)
+        self.assertEqual(snapshot.json()["state"]["compared_product_ids"], ids)
+        old = self.client.post(
+            f"/api/v1/missions/{self.mission_id}/focus/",
+            {"action": "set_compare", "product_ids": ids,
+             "result_set_id": "not-current"}, format="json",
+        )
+        self.assertEqual(old.status_code, 400)
 
     def test_budget_only_followup_preserves_query_and_limits_offers(self):
         events = self.turn("بودجه‌م شد ۵۰۰ هزار")
@@ -264,6 +355,10 @@ class ContextualMissionApiTests(TestCase):
         events = self.turn("نزدیک ترین")
         self.assertEqual(events[-1]["payload"]["intent_parser"], "contextual")
         self.assertIn("محدوده", events[1]["payload"]["text"])
+        location_components = [e["payload"] for e in events if e["type"] == "ui.component"]
+        self.assertEqual(len(location_components), 1)
+        self.assertEqual(location_components[0]["component"], "location_choice")
+        self.assertEqual(location_components[0]["data"]["city"], "tehran")
 
     def test_credit_followup_keeps_prior_product_query(self):
         self.turn("فقط قسطی")

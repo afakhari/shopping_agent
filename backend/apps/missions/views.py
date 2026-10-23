@@ -19,6 +19,7 @@ from apps.agent.graph import _query_from_message, run_purchase_graph
 from apps.agent.llm import extract_intent
 from apps.agent.conversation import classify_conversation_intent, conversation_reply
 from apps.agent.contextual import classify_contextual_turn
+from apps.agent.comparison import build_evidence_comparison
 from apps.agent.simulator import serialize_contact_attempt, simulate_contact
 from apps.agent.contact_evidence import build_contact_evidence
 from apps.catalog.models import Offer, Product
@@ -205,17 +206,17 @@ def mission_turn(request, mission_id: str):
         and preflight_constraints.get("lat") is None
     ):
         decision = {
-            "kind": "clarify",
+            "kind": "location_clarify",
             "reply": "برای مرتب‌سازی فروشگاه‌ها بر اساس نزدیکی، ابتدا موقعیت یا محدوده تهران را انتخاب کن.",
         }
-    if decision["kind"] in {"select_product", "select_offer", "seller_details", "seller_recovery", "explain", "clarify"}:
+    if decision["kind"] in {"select_product", "explore_sellers", "contact_prompt", "compare", "select_offer", "seller_details", "seller_recovery", "explain", "clarify", "location_clarify"}:
         # No extra LLM call for a grounded contextual turn. Re-evaluate every
         # selection with the *effective* constraints inside the row lock.
         with transaction.atomic():
             mission = _owned_mission(request, mission_id, lock=True)
             decision = classify_contextual_turn(data["message"], mission.state)
             if decision["kind"] == "refine" and decision["constraint_updates"].get("sort") == "distance_asc" and preflight_constraints.get("lat") is None:
-                decision = {"kind": "clarify", "reply": "برای نزدیکی، ابتدا محدوده تهران را انتخاب کن."}
+                decision = {"kind": "location_clarify", "reply": "برای نزدیکی، ابتدا محدوده تهران را انتخاب کن."}
             submitted = data.get("constraints", {})
             if submitted:
                 updated = _validate_full_constraints(mission.constraints, submitted)
@@ -232,10 +233,16 @@ def mission_turn(request, mission_id: str):
                     mission.save(update_fields=["constraints", "state", "updated_at"])
             selected_id = None
             extra_ui = None
-            if decision["kind"] == "select_product":
+            if decision["kind"] in {"select_product", "explore_sellers"}:
                 selected_id = decision["product_id"]
                 state = mission.state or {}
-                allowed = selected_id in state.get("visible_product_ids", [])
+                # A product picked from "more results" is still an explicit,
+                # valid server focus even if not in the first four ordinal IDs.
+                allowed = (
+                    selected_id == state.get("selected_product_id")
+                    if decision["kind"] == "explore_sellers"
+                    else selected_id in state.get("visible_product_ids", [])
+                )
                 allowed = allowed and selected_id in state.get("candidate_product_ids", [])
                 allowed = allowed and not state.get("results_stale", False)
                 if allowed:
@@ -249,7 +256,7 @@ def mission_turn(request, mission_id: str):
                         mission.current_stage = "product_selected"
                         reply = (f"«{product.persian_title or selected_id}» انتخاب شد. "
                                  "آفر ثبت‌شده به معنی موجودی تأییدشده نیست.")
-                        if decision.get("explore_sellers"):
+                        if decision.get("explore_sellers") or decision["kind"] == "explore_sellers":
                             from apps.search.services import offer_ordering
                             filters = _search_filterset(mission.constraints or {})
                             if decision.get("prefer_distance") and filters.get("lat") is not None:
@@ -276,6 +283,44 @@ def mission_turn(request, mission_id: str):
                 else:
                     selected_id = None
                     reply = "این نتیجه یا فیلترهای آن تغییر کرده‌اند؛ قبل از انتخاب، جست‌وجو را به‌روز کن."
+            elif decision["kind"] == "compare":
+                state = mission.state or {}
+                ids = state.get("compared_product_ids", [])
+                if state.get("results_stale"):
+                    reply = "نتایج مقایسه قدیمی‌اند؛ ابتدا جست‌وجو را به‌روز کن."
+                else:
+                    payload = build_evidence_comparison(ids, _search_filterset(mission.constraints or {}))
+                    if payload is None:
+                        reply = "دو یا سه مدل دارای آفر معتبر را انتخاب کن؛ بدون شواهد مقایسه نمی‌سازم."
+                    else:
+                        reply = "مقایسهٔ داده‌های ثبت‌شده آماده است. مشخصات ثبت‌نشده نشان‌دهنده یکسانی مدل‌ها نیست."
+                        extra_ui = ("comparison_table", payload)
+            elif decision["kind"] == "contact_prompt":
+                state = mission.state or {}
+                offer_id = decision["offer_id"]
+                if state.get("results_stale") or offer_id != state.get("selected_offer_id"):
+                    reply = "این فروشنده دیگر انتخاب معتبر جاری نیست؛ از فهرست فروشنده‌های همین محصول انتخاب کن."
+                else:
+                    offer = eligible_offer_list(
+                        _search_filterset(mission.constraints or {})
+                    ).filter(source_id=offer_id).select_related("shop", "product").first()
+                    if offer is None:
+                        reply = "آفر فروشنده با شروط فعلی خرید مطابق نیست؛ نتایج را تازه کن."
+                    else:
+                        reply = (
+                            f"برای «{offer.product.persian_title}» از «{offer.shop.name}» "
+                            "می‌توانم فقط یک بررسی شبیه‌سازی‌شده اجرا کنم. "
+                            "هیچ تماس واقعی با فروشگاه انجام نمی‌شود و موجودی حضوری تأیید نمی‌شود. "
+                            "فقط با انتخاب دکمهٔ تأیید، شبیه‌ساز اجرا خواهد شد."
+                        )
+                        extra_ui = ("contact_prompt", {
+                            "offer_id": offer.source_id,
+                            "shop_id": offer.shop_id,
+                            "shop_name": offer.shop.name,
+                            "product_id": offer.product_id,
+                            "product_title": offer.product.persian_title,
+                            "source_type": "demo_simulation",
+                        })
             elif decision["kind"] in {"select_offer", "seller_details"}:
                 offer_id = decision["offer_id"]
                 state = mission.state or {}
@@ -361,6 +406,11 @@ def mission_turn(request, mission_id: str):
                             facts.append("شرط اعتبار حضوری همین آفر رعایت شده است")
                         reply = f"«{product.persian_title}»: " + "؛ ".join(facts[:4]) + ". برتری قطعی یا موجودی زنده از این داده نتیجه نمی‌شود."
             else:
+                if decision["kind"] == "location_clarify":
+                    extra_ui = ("location_choice", {
+                        "city": "tehran",
+                        "source_type": "approximate_region",
+                    })
                 pending = decision.get("pending_constraints")
                 if isinstance(pending, dict) and pending:
                     mission.constraints = _validate_full_constraints(mission.constraints, pending)
@@ -470,6 +520,7 @@ def mission_turn(request, mission_id: str):
             "visible_offer_ids": [],
             "selected_offer_id": None,
             "selected_shop_id": None,
+            "compared_product_ids": [],
             "selected_product_id": selected_product,
             "visible_product_ids": visible_products,
             "candidate_product_ids": graph_state.get("candidate_product_ids", []),
@@ -536,7 +587,14 @@ def mission_focus(request, mission_id: str):
             raise ValidationError({"result_set_id": "این نتایج دیگر معتبر نیستند؛ جست‌وجو را به‌روز کن."})
         action = data["action"]
         filters = _search_filterset(mission.constraints or {})
-        if action in {"select_product", "view_sellers"}:
+        if action == "set_compare":
+            compared = data["product_ids"]
+            if any(pid not in state.get("candidate_product_ids", []) for pid in compared):
+                raise ValidationError({"product_ids": "یکی از مدل‌ها در نتایج معتبر جاری نیست."})
+            if any(not eligible_offer_list(filters, product_id=pid).exists() for pid in compared):
+                raise ValidationError({"product_ids": "یکی از مدل‌ها دیگر آفر مطابق شروط ندارد."})
+            state["compared_product_ids"] = compared
+        elif action in {"select_product", "view_sellers"}:
             product_id = data["product_id"]
             if product_id not in state.get("candidate_product_ids", []):
                 raise ValidationError({"product_id": "محصول در نتایج فعلی مأموریت وجود ندارد."})
@@ -580,6 +638,7 @@ def mission_focus(request, mission_id: str):
             "active_surface": state.get("active_surface", "products"),
             "selected_product_id": state.get("selected_product_id"),
             "selected_offer_id": state.get("selected_offer_id"),
+            "compared_product_ids": state.get("compared_product_ids", []),
             "result_set_id": state["result_set_id"],
         })])
     return Response({"state": mission.state, "last_event_seq": mission.last_event_seq,

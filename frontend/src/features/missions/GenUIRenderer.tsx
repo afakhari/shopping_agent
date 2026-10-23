@@ -420,6 +420,45 @@ function ContactStatus({ component }: { component: GenUIComponent }) {
   )
 }
 
+function RegionChoice({ disabled, onAction }: {
+  disabled: boolean
+  onAction: (action: GenUIAction) => void
+}) {
+  return <section className="genui-region-choice" aria-label="انتخاب محدوده تهران">
+    <strong>برای نزدیک‌ترین فروشنده، مبدأ را انتخاب کن</strong>
+    <p>فهرست فروشگاه‌های دیتاست محدود است. انتخاب منطقه، مختصات تقریبی ثبت‌شده را اعمال می‌کند؛
+      فاصله‌ها مستقیم‌اند و زمان سفر محاسبه نمی‌شود.</p>
+    <button type="button" disabled={disabled} className="genui-secondary-action"
+      onClick={() => onAction({ type: 'open_region_picker' })}>
+      <MapPin size={16} aria-hidden="true"/> انتخاب دستی محدوده تهران
+    </button>
+  </section>
+}
+
+function ContactConsent({ component, disabled, onAction }: {
+  component: GenUIComponent
+  disabled: boolean
+  onAction: (action: GenUIAction) => void
+}) {
+  const offerId = text(component.data.offer_id)
+  const shopId = text(component.data.shop_id)
+  const shopName = text(component.data.shop_name, 'فروشگاه انتخاب‌شده')
+  const productTitle = text(component.data.product_title, 'محصول انتخاب‌شده')
+  return <section className="genui-contact-consent" aria-label="رضایت برای شبیه‌سازی استعلام">
+    <div className="genui-card-heading">
+      <span className="genui-icon"><HelpCircle size={17} aria-hidden="true" /></span>
+      <div><h4>بررسی آزمایشی موجودی</h4>
+        <p>{productTitle}، {shopName}</p></div>
+    </div>
+    <p>این اقدام فقط یک شبیه‌سازی مسابقه است. هیچ تماس یا پیام واقعی به فروشگاه ارسال نمی‌شود
+      و نتیجه به معنای موجودی تأییدشده نیست. نام فروشنده و شماره تماس در دیتاست نمونه ممکن است ساختگی باشند.</p>
+    <button className="genui-primary-action" type="button" disabled={disabled || !offerId || !shopId}
+      onClick={() => onAction({ type: 'verify_selected_offer', offerId, shopId })}>
+      <CheckCircle2 size={16} aria-hidden="true" /> تأیید و اجرای شبیه‌سازی
+    </button>
+  </section>
+}
+
 function SellerEvidence({ component }: { component: GenUIComponent }) {
   const raw = component.type === 'seller_details'
     ? [component.data.offer]
@@ -428,7 +467,7 @@ function SellerEvidence({ component }: { component: GenUIComponent }) {
   const prices = new Intl.NumberFormat('fa-IR')
   return <section className="genui-sellers" aria-label="اطلاعات فروشندگان حضوری">
     <strong>{component.type === 'seller_details' ? 'جزئیات فروشگاه منتخب' : 'فروشگاه‌های دارای آفر این مدل'}</strong>
-    <small>قیمت و ساعات از دیتاست ثبت‌شده‌اند؛ موجودی و تماس واقعی تأیید نشده است.</small>
+    <small>قیمت و ساعات از دیتاست ثبت‌شده‌اند؛ موجودی و تماس واقعی تأیید نشده است. نام بسیاری از فروشگاه‌ها در داده نمونه ساختگی است.</small>
     <div className="genui-sellers-list">{offers.map((offer, index) => {
       const shop = isRecord(offer.shop) ? offer.shop : {}
       const opening = isRecord(shop.opening_status) ? shop.opening_status : {}
@@ -483,6 +522,11 @@ function renderComponent(component: GenUIComponent, defaults: GenUIDefaults, onA
       return <ContactStatus key={component.id ?? component.type} component={component} />
     case 'notice':
       return <section className="genui-notice"><ClipboardList size={17} /><span>{text(component.data.message, text(component.data.title))}</span></section>
+    case 'location_choice':
+      return <RegionChoice disabled={disabled} onAction={onAction} />
+    case 'contact_prompt':
+      return <ContactConsent key={component.id ?? component.type} component={component}
+        disabled={disabled} onAction={onAction} />
     case 'seller_options':
     case 'seller_details':
       return <SellerEvidence key={component.id ?? component.type} component={component} />

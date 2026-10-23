@@ -117,10 +117,41 @@ def classify_contextual_turn(message: str, state: dict[str, Any] | None) -> dict
             return {"kind": "seller_recovery", "offer_id": state["selected_offer_id"]}
         return {"kind": "clarify", "reply": "کدام فروشگاه پاسخ نداد یا محصول را نداشت؟ از فهرست فروشندگان انتخابش کن تا گزینهٔ جایگزین بیابم."}
 
+    if re.search(r"(?:مقایسه|چه فرقی|فرق(?:ش|شان|شون)?|تفاوت)", normalized):
+        compared = state.get("compared_product_ids")
+        if isinstance(compared, list) and 2 <= len(compared) <= 3:
+            return {"kind": "compare"}
+        return {
+            "kind": "clarify",
+            "reply": "برای مقایسه، دو یا سه محصول از کارت‌ها انتخاب کن؛ سپس تفاوت قیمت و مشخصات ثبت‌شده را نشان می‌دهم.",
+        }
+
     if _WHY.match(normalized):
         return {"kind": "explain"} if previous_query else {
             "kind": "clarify", "reply": "هنوز محصولی پیشنهاد نشده که دلیل انتخابش را بررسی کنم."
         }
+
+    # In-person stock is NEVER verified by a free-form chat message.
+    # Ask for explicit consent to run the DEMO simulator for the selected offer.
+    # Do not route such a question into an unrelated catalogue search.
+    contact_request = (
+        ("موجودی" in normalized or "موجوده" in normalized or "موجود هست" in normalized)
+        and bool(re.search(r"(?:بررسی|چک|بپرس|استعلام|کن|می خوام|مطمئن|؟|$)", normalized))
+    ) or bool(re.search(
+        r"(?:استعلام|تماس با فروشنده|از فروشنده بپرس)", normalized
+    ))
+    if contact_request:
+        if state.get("selected_offer_id"):
+            return {"kind": "contact_prompt", "offer_id": state["selected_offer_id"]}
+        return {
+            "kind": "clarify",
+            "reply": "برای بررسی آزمایشی موجودی، اول فروشندهٔ همان محصول را انتخاب کن. تماس واقعی انجام نمی‌شود.",
+        }
+
+    if normalized in {"فروشنده ها", "فروشنده‌ها", "فروشگاه ها", "فروشگاه‌ها", "فروشنده هاش", "فروشنده هاش رو نشون بده"}:
+        if state.get("selected_product_id"):
+            return {"kind": "explore_sellers", "product_id": state["selected_product_id"]}
+        return {"kind": "clarify", "reply": "کدام مدل؟ ابتدا محصول را از نتیجه‌ها انتخاب کن تا فروشندگان همان مدل را نشان بدهم."}
 
     # Specific store questions can be answered if the user has explicitly
     # selected an offer. The store coordinates and hours are not live signals.

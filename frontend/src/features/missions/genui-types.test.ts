@@ -52,6 +52,47 @@ describe('controlled Generative UI protocol', () => {
     }))).toEqual([])
   })
 
+  it('requires server-issued source IDs and demo provenance for contact consent', () => {
+    const valid = event('contact_prompt', {
+      offer_id: 'offer1', shop_id: 'shop1', product_id: 'product1',
+      source_type: 'demo_simulation',
+    })
+    expect(getUIComponents(valid)).toHaveLength(1)
+    expect(getUIComponents(event('contact_prompt', {
+      offer_id: 'offer1', shop_id: 'shop1', product_id: 'product1',
+      source_type: 'live_verified',
+    }))).toEqual([])
+    expect(getUIComponents(event('contact_prompt', {
+      shop_id: 'shop1', source_type: 'demo_simulation',
+    }))).toEqual([])
+  })
+
+  it('rejects malformed or unsourced comparison rows', () => {
+    const valid = { source_type: 'registered_catalog', availability_verified: false,
+      columns: [{ key: 'product', label: 'محصول' }, { key: 'price', label: 'قیمت' }],
+      rows: [
+        { id: 'p1', product: 'اول', price: 'ثبت‌شده' },
+        { id: 'p2', product: 'دوم', price: 'ثبت‌شده' },
+      ],
+    }
+    expect(getUIComponents(event('comparison_table', valid))).toHaveLength(1)
+    expect(getUIComponents(event('comparison_table', {
+      ...valid, source_type: 'model_generated',
+    }))).toEqual([])
+    expect(getUIComponents(event('comparison_table', {
+      ...valid, rows: [{ id: 'p1', product: 'اول' }],
+    }))).toEqual([])
+  })
+
+  it('requires explicit approximate-Tehran provenance for location UI', () => {
+    expect(getUIComponents(event('location_choice', {
+      city: 'tehran', source_type: 'approximate_region',
+    }))).toHaveLength(1)
+    expect(getUIComponents(event('location_choice', {
+      city: 'berlin', source_type: 'precise_live_gps',
+    }))).toEqual([])
+  })
+
   it('limits one incoming component stack to twelve entries', () => {
     const components = getUIComponents(event('component_stack', {
       components: Array.from({ length: 30 }, () => ({ type: 'notice', data: { message: 'notice' } })),
