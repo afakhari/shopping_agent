@@ -207,6 +207,8 @@ function ProductResults({
   contactByOffer,
   selectedCompareProductIds,
   onToggleCompare,
+  onSelectProduct,
+  selectedProductId,
   offerViews,
   onToggleOffers,
   onLoadMoreOffers,
@@ -219,6 +221,8 @@ function ProductResults({
   contactByOffer: Record<string, ContactAttemptResponse>
   selectedCompareProductIds: string[]
   onToggleCompare: (result: CatalogSearchResult) => void
+  onSelectProduct: (index: number) => void
+  selectedProductId: string | null
   offerViews: Record<string, ProductOfferView>
   onToggleOffers: (result: CatalogSearchResult) => void
   onLoadMoreOffers: (result: CatalogSearchResult) => void
@@ -230,7 +234,7 @@ function ProductResults({
   const visibleResults = showAllResults ? results : results.slice(0, 4)
   return (
     <div className="mission-product-results" aria-label="نتایج محصولات">
-      {visibleResults.map((result) => {
+      {visibleResults.map((result, productIndex) => {
         const offer = result.best_offer
         const contact = contactByOffer[offer.id]
         const offerView = offerViews[result.product.id]
@@ -243,6 +247,7 @@ function ProductResults({
         const distanceLabel = formatDistance(offer.shop.distance_m)
         const mapUrl = openStreetMapUrl(offer.shop.lat, offer.shop.lon)
         const isCompared = selectedCompareProductIds.includes(result.product.id)
+        const isSelected = selectedProductId === result.product.id
         const highlights = chooseProductHighlights(result.product)
         return (
           <article className={`mission-product-card ${isCompared ? 'is-compared' : ''} ${allowActions && offerView?.expanded ? 'is-offers-expanded' : ''}`} key={result.product.id}>
@@ -251,8 +256,10 @@ function ProductResults({
             </div>
             <div className="mission-product-main">
               <div className="mission-product-heading-row">
+                {productIndex < 4 && <span className="mission-product-rank" aria-label={`مدل شماره ${productIndex + 1}`}>{money.format(productIndex + 1)}</span>}
                 <strong title={result.product.title}>{result.product.title}</strong>
-                {isCompared && <span className="mission-compared-badge"><CheckCircle2 size={13} /> انتخاب‌شده</span>}
+                {isSelected && <span className="mission-compared-badge"><CheckCircle2 size={13} /> مدل منتخب</span>}
+                {isCompared && !isSelected && <span className="mission-compared-badge"><CheckCircle2 size={13} /> برای مقایسه</span>}
               </div>
               <div className="mission-product-price-line">
                 <strong className="mission-product-price">{formatPrice(offer.price_toman)}</strong>
@@ -302,6 +309,12 @@ function ProductResults({
                 </div>
               </details>
               <div className="mission-product-actions">
+                {allowActions && productIndex < 4 && (
+                  <button type="button" className="mission-compare-button" aria-pressed={isSelected}
+                    onClick={() => onSelectProduct(productIndex)}>
+                    <CheckCircle2 size={15} /> {isSelected ? 'مدل منتخب' : 'انتخاب مدل'}
+                  </button>
+                )}
                 {allowActions ? (
                   <button
                     type="button"
@@ -577,6 +590,7 @@ export function MissionPanel({
   const [contactingOfferId, setContactingOfferId] = useState<string | null>(null)
   const [contactByOffer, setContactByOffer] = useState<Record<string, ContactAttemptResponse>>({})
   const [offerViews, setOfferViews] = useState<Record<string, ProductOfferView>>({})
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null)
   const [activeFilterForm, setActiveFilterForm] = useState<GenUIComponent | null>(null)
   const filterDialogRef = useRef<HTMLDialogElement | null>(null)
   const transcriptRef = useRef<HTMLDivElement | null>(null)
@@ -617,6 +631,7 @@ export function MissionPanel({
       .then((snapshot) => {
         const history = snapshot.events ?? []
         setEvents(history)
+        setSelectedProductId(typeof snapshot.state?.selected_product_id === 'string' ? snapshot.state.selected_product_id : null)
         setContactByOffer(restoreContactResponses(history))
         const restoredMessages = rebuildChatFromEvents(history)
         setChatMessages(restoredMessages)
@@ -692,6 +707,9 @@ export function MissionPanel({
       ? current
       : [...current, event].sort((left, right) => left.seq - right.seq))
 
+    if (event.type === 'turn.completed' && Object.prototype.hasOwnProperty.call(event.payload, 'selected_product_id')) {
+      setSelectedProductId(typeof event.payload.selected_product_id === 'string' ? event.payload.selected_product_id : null)
+    }
     if (event.type === 'turn.completed' && isRecord(event.payload.constraints)) {
       // Reconcile inferred natural-language constraints with the visible filters.
       // The server decides eligibility; the client must not silently present stale filters.
@@ -729,6 +747,7 @@ export function MissionPanel({
       setChatMessages((current) => mergeUIEventIntoMessages(current, event))
       if (incoming.some((component) => PRIMARY_SEARCH_COMPONENTS.has(component.type))) {
         setSelectedCompareProductIds([])
+        setSelectedProductId(null)
         setComparisonOpen(false)
         offerRequestControllers.current.forEach((controller) => controller.abort())
         offerRequestControllers.current.clear()
@@ -850,6 +869,7 @@ export function MissionPanel({
       const snapshot = await getMission(missionId)
       const history = snapshot.events ?? []
       setEvents(history)
+      setSelectedProductId(typeof snapshot.state?.selected_product_id === 'string' ? snapshot.state.selected_product_id : null)
       setChatMessages(rebuildChatFromEvents(history))
       setContactByOffer(restoreContactResponses(history))
       const rawQuery = typeof snapshot.state?.search_query === 'string'
@@ -1214,6 +1234,7 @@ export function MissionPanel({
     setChatMessages([])
     setLastQuery('')
     setSelectedCompareProductIds([])
+    setSelectedProductId(null)
     setComparisonOpen(false)
     setContactByOffer({})
     pendingContactIdsRef.current.clear()
@@ -1362,6 +1383,11 @@ export function MissionPanel({
                     contactByOffer={contactByOffer}
                     selectedCompareProductIds={isCurrentResult ? selectedCompareProductIds : []}
                     onToggleCompare={toggleComparedProduct}
+                    selectedProductId={isCurrentResult ? selectedProductId : null}
+                    onSelectProduct={(index) => {
+                      const labels = ['اول', 'دوم', 'سوم', 'چهارم']
+                      void runTurn(`مدل ${labels[index]} رو انتخاب کن`)
+                    }}
                     offerViews={offerViews}
                     onToggleOffers={toggleProductOffers}
                     onLoadMoreOffers={loadMoreProductOffers}
