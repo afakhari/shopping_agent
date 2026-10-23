@@ -21,7 +21,7 @@ class ReadinessTests(TestCase):
         self.assertIn(response.json()["agent_mode"], {"model_configured", "deterministic_fallback"})
         self.assertIn(response.json()["llm"]["status"], {
             "disabled", "unsupported_provider", "missing_api_key", "missing_model",
-            "invalid_base_url", "configured",
+            "invalid_base_url", "configured", "daily_quota_disabled",
         })
 
     @override_settings(
