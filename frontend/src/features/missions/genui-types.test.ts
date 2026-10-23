@@ -67,6 +67,23 @@ describe('controlled Generative UI protocol', () => {
     }))).toEqual([])
   })
 
+  it('rejects malformed or unsourced comparison rows', () => {
+    const valid = { source_type: 'registered_catalog', availability_verified: false,
+      columns: [{ key: 'product', label: 'محصول' }, { key: 'price', label: 'قیمت' }],
+      rows: [
+        { id: 'p1', product: 'اول', price: 'ثبت‌شده' },
+        { id: 'p2', product: 'دوم', price: 'ثبت‌شده' },
+      ],
+    }
+    expect(getUIComponents(event('comparison_table', valid))).toHaveLength(1)
+    expect(getUIComponents(event('comparison_table', {
+      ...valid, source_type: 'model_generated',
+    }))).toEqual([])
+    expect(getUIComponents(event('comparison_table', {
+      ...valid, rows: [{ id: 'p1', product: 'اول' }],
+    }))).toEqual([])
+  })
+
   it('limits one incoming component stack to twelve entries', () => {
     const components = getUIComponents(event('component_stack', {
       components: Array.from({ length: 30 }, () => ({ type: 'notice', data: { message: 'notice' } })),
