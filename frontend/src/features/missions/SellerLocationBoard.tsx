@@ -33,6 +33,7 @@ type Props = {
 export function SellerLocationBoard({ offers, selectedOfferId, onSelectOffer, disabled }: Props) {
   const [openMapOfferId, setOpenMapOfferId] = useState<string | null>(null)
   const mapped = geographicallyMappedOffers(offers)
+  const distinctMappedShopCount = new Set(mapped.map(offer => offer.shop.id)).size
   const currentOffer = offers.find(offer => offer.id === selectedOfferId)
   const active = selectedMappedOffer(offers, selectedOfferId)
   const iframeUrl = active ? osmEmbedUrl(active.shop.lat, active.shop.lon) : null
@@ -44,7 +45,7 @@ export function SellerLocationBoard({ offers, selectedOfferId, onSelectOffer, di
   return (
     <details className="mission-seller-location-board">
       <summary><MapPin size={16} aria-hidden="true" /> مقایسهٔ مکان فروشگاه‌ها
-        <span className="mission-location-count">{numerals.format(mapped.length)} موقعیت ثبت‌شده از {numerals.format(offers.length)} آفرِ بارگذاری‌شده</span>
+        <span className="mission-location-count">{numerals.format(distinctMappedShopCount)} فروشگاه دارای مختصات ثبت‌شده از {numerals.format(offers.length)} آفرِ بارگذاری‌شده</span>
       </summary>
       <div className="mission-location-content">
         <p className="mission-location-disclaimer">
@@ -74,9 +75,11 @@ export function SellerLocationBoard({ offers, selectedOfferId, onSelectOffer, di
         </div>
         <div className="mission-location-preview" role="region" aria-label="موقعیت فروشندهٔ منتخب">
           {!selectedOfferId
-            ? <p>برای مشاهدهٔ موقعیت، ابتدا یکی از فروشنده‌ها را انتخاب کن.</p>
+            ? <p>برای مشاهدهٔ موقعیت، ابتدا یکی از فروشنده‌های همین مدل را انتخاب کن.</p>
+            : !currentOffer
+              ? <p>فروشندهٔ انتخابی متعلق به فهرست دیگری است؛ از همین فهرست انتخاب کن.</p>
             : !active || !iframeUrl
-              ? <p>برای این فروشنده مختصات معتبر ثبت نشده است. نشانی نوشته‌شده را بررسی کن.</p>
+              ? <p>برای این فروشنده مختصات معتبر در محدودهٔ پوشش تهران ثبت نشده است. نشانی نوشته‌شده را بررسی کن.</p>
               : <>
                   <strong><MapPin size={15} aria-hidden="true" /> مکان ثبت‌شده: {active.shop.name}</strong>
                   <p>{active.shop.address || active.shop.location_label || 'نشانی دقیق ثبت نشده'}</p>
