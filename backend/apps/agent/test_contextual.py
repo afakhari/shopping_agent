@@ -41,6 +41,11 @@ class ContextualRouterTests(TestCase):
     def test_why_does_not_start_unrelated_search(self):
         self.assertEqual(classify_contextual_turn("چرا اینو پیشنهاد دادی", {"search_query": "هدفون"})["kind"], "explain")
 
+    def test_filters_before_product_are_remembered(self):
+        decision = classify_contextual_turn("بودجه‌م شد ۳ میلیون", {})
+        self.assertEqual(decision["kind"], "clarify")
+        self.assertEqual(decision["pending_constraints"]["max_price_toman"], "3000000")
+
 
 @override_settings(LLM_ENABLED=False)
 class ContextualMissionApiTests(TestCase):
@@ -108,3 +113,28 @@ class ContextualMissionApiTests(TestCase):
             graph.assert_not_called()
         self.assertEqual(events[-1]["payload"]["intent_parser"], "contextual")
         self.assertNotIn("ui.component", [x["type"] for x in events])
+
+    def test_nearest_without_location_asks_not_bad_request(self):
+        events = self.turn("نزدیک ترین")
+        self.assertEqual(events[-1]["payload"]["intent_parser"], "contextual")
+        self.assertIn("محدوده", events[1]["payload"]["text"])
+
+    def test_credit_followup_keeps_prior_product_query(self):
+        self.turn("فقط قسطی")
+        mission = PurchaseMission.objects.get(pk=self.mission_id)
+        self.assertTrue(mission.constraints["must_have_in_person_credit"])
+        self.assertEqual(mission.state["search_query"], "هدفون")
+
+    def test_pre_product_budget_remains_for_next_search(self):
+        new = self.client.post(
+            "/api/v1/missions/",
+            {"initial_message": "بودجه سه میلیون", "constraints": {}}, format="json",
+        )
+        self.mission_id = new.json()["mission_id"]
+        events = self.turn("بودجه‌م شد ۳ میلیون")
+        self.assertEqual(events[-1]["payload"]["intent_parser"], "contextual")
+        mission = PurchaseMission.objects.get(pk=self.mission_id)
+        self.assertEqual(mission.constraints["max_price_toman"], "3000000")
+        self.turn("هدفون")
+        mission.refresh_from_db()
+        self.assertEqual(mission.constraints["max_price_toman"], "3000000")
