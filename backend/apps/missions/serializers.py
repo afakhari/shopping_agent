@@ -13,6 +13,9 @@ class MissionConstraintsSerializer(serializers.Serializer):
     city = serializers.CharField(required=False, max_length=40)
     max_price_toman = serializers.CharField(required=False, allow_null=True, trim_whitespace=True, max_length=32)
     must_have_in_person_credit = serializers.BooleanField(required=False)
+    # Explicit hard requirements, never inferred from vague preferences.
+    brand_name = serializers.CharField(required=False, allow_null=True, max_length=300)
+    model_exact = serializers.CharField(required=False, allow_null=True, max_length=500)
     lat = serializers.FloatField(required=False, min_value=-90, max_value=90)
     lon = serializers.FloatField(required=False, min_value=-180, max_value=180)
     radius_m = serializers.IntegerField(required=False, min_value=100, max_value=100_000)
