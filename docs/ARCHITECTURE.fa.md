@@ -31,3 +31,11 @@ ADR-005: API و UI مستقل از LLM در فیلترهای عادی.
 
 ## ریسک‌های عملیاتی
 واردکردن دیتاست، سازگاری schema واقعی، کلید Maps، نرخ API، build روی Node/Python واقعی، لیارا، latency LLM، درستی migration، توان recovery after restart. بدون اجرای تست نباید status «آماده production» گزارش شود.
+
+
+## تفاوت انتخاب هدف و استک فعلی (۲۳ اکتبر ۲۰۲۶)
+- `React + Vite + Django/DRF + PostgreSQL + LangGraph` و GenUI با allowlist در main اجرا می‌شوند؛ **TanStack Query، سرویس نشان، Matrix ETA، Liara production و native LangGraph checkpointer** را صرفاً از ذکرشدن در طرح نمی‌توان اجراشده دانست.
+- UI فعلی برای نقشه از نمای اختیاری OpenStreetMap و انتخاب دستی تهران استفاده می‌کند. فاصله مستقیم، ETA نیست.
+- داده و state خرید در PostgreSQL persisted است، ولی agent graph کنونی فقط parse/search/render را اجرا می‌کند؛ استعلام و visit-plan در endpointهای Django/دامنه اجرا می‌شوند.
+- `LLM_PROVIDER=boxapi` با آزمون واقعی کاربر برای intent فعال شده، از `/chat/completions` استفاده می‌کند و به backend محدود است؛ به کد frontend یا CI کلید داده نشده.
+- برای status عملی و backlog [CURRENT-STATUS-2026-10-23.fa.md](CURRENT-STATUS-2026-10-23.fa.md) و Issues #5/#6/#8 مرجع‌اند.

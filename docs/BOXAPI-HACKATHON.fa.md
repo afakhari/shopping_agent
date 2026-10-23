@@ -7,6 +7,9 @@
 **مهم:** مقدار `LLM_PROVIDER=boxapi` مخصوص آداپتر امن همین پروژه است و نام یک SDK جداگانه نیست.
 این حالت فقط `model` و `messages` را به `https://ai.boxapi.ir/ai/v1/chat/completions` می‌فرستد، زیرا پارامترهای دیگر (temperature / response_format / max_tokens) برای همه مدل‌های BoxAPI در اطلاعیه ضمانت نشده‌اند.
 
+## وضعیت واقعی تأییدشده (۲۳ اکتبر ۲۰۲۶)
+کاربر در Windows/Docker با `LLM_PROVIDER=boxapi`، `LLM_MODEL=gpt-5.4-mini` و `https://ai.boxapi.ir/ai/v1`، پاسخ `BOXAPI_OK` دریافت کرد. آزمون `--skip-contact --require-llm` و آزمون `--full-journey --require-llm` نیز هر دو `LLM_RUNTIME=ACTIVE`، `intent_parser=llm`، `llm_used=yes` و `SMOKE_RESULT=PASS` داشتند. **این شواهد اتصال واقعی intent parser را ثابت می‌کنند، نه هوشمندی تمام اجزای ایجنت و نه تماس واقعی با فروشنده.** کلید خصوصی و مانده اعتبار منتشر نشده‌اند؛ برای CI از mock و داده مصنوعی استفاده می‌شود. [وضعیت کلی](CURRENT-STATUS-2026-10-23.fa.md).
+
 ## ۱. کارهایی که فقط صاحب حساب می‌تواند انجام دهد
 1. در اطلاعیه رسمی هکاتون روی «فعال‌سازی اعتبار و دریافت API Key» کلیک کند.
 2. URL و HTTPS پنل BoxAPI را بررسی کرده، رمز عبور را فقط در همان سایت وارد کند؛ نه در مخزن، نه در چت و نه در ابزار توسعه.
@@ -73,3 +76,6 @@ docker compose exec -T backend python /tmp/smoke-golden-path.py --base-url http:
 - کلید صرفاً روی backend ذخیره شود. فایل `.env` را در GitHub commit نکن، `docker compose config` را بدون حذف secrets در جایی منتشر نکن.
 - اتصال موفق LLM به‌معنای خرید کامل یا تماس واقعی فروشندگان نیست. دیتاست مسابقه برای برخی فروشندگان/شماره‌ها ساختگی است.
 - در استقرار عمومی، متغیرها را در secret manager سرور تنظیم کن، نه داخل image یا فایل frontend.
+
+
+**باقی‌مانده پیش از public deploy:** محدودسازی نرخ/سقف هزینه BoxAPI، جلوگیری از abuse، مدیریت امن credential روی سرور، و مشاهده مصرف در پنل ارائه‌دهنده. آزمون مکرر پولی ضرورتی ندارد. ارجاع: [Issue #8](https://github.com/afakhari/shopping_agent/issues/8).

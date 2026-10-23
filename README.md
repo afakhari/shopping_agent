@@ -2,7 +2,7 @@
 
 **دستیار هوشمند خرید حضوری تهران** | Tehran in-person shopping copilot.
 
-> **وضعیت تأییدشده ۲۳ اکتبر ۲۰۲۶:** نسخه React/Django با دیتاست واقعی در محیط محلی آزمایش شده، مسیر شبیه‌سازی‌شده خرید تا برنامه مراجعه در سطح API موفق بوده و PRهای [#15](https://github.com/afakhari/shopping_agent/pull/15) تا [#19](https://github.com/afakhari/shopping_agent/pull/19) اصلاحات خرید اعتباری، داده فروشندگان، ساعات تهران، استعلام و مرورگر Chromium را به `main` اضافه کرده‌اند. **تست مرورگر اخیر با داده مصنوعی است؛ LLM واقعی، ETA نقشه، تست جامع دیتاست روی نسخه جدید، deployment عمومی و ویدئوی نهایی هنوز تأیید نشده‌اند.**
+> **وضعیت تأییدشده ۲۳ اکتبر ۲۰۲۶:** PostgreSQL با دیتاست کامل (۲۲۵٬۹۰۳ محصول، ۶٬۴۷۶ فروشگاه، ۳۳۱٬۵۰۶ آفر)، اتصال واقعی BoxAPI برای **استخراج نیت خرید** (`LLM_RUNTIME=ACTIVE`)، مسیر کامل HTTP تا بازیابی شکست فروشنده و برنامه مراجعه **شبیه‌سازی‌شده** در Windows/Docker کاربر موفق شدند. جست‌وجوی «هدفون» در یک اندازه‌گیری محلی HTTP حدود ۰٫۲۹ ثانیه بود. PRهای #21 تا #25 نیز GenUI، UX، ایندکس‌های PostgreSQL، بازیابی SSE و محافظت در برابر جست‌وجوی اشتباه «احوال شما؟» را ادغام کردند؛ آخرین CI این کد [۵/۵ موفق](https://github.com/afakhari/shopping_agent/actions/runs/39875797715) است. **هنوز استقرار عمومی HTTPS، تأیید دستی اصلاح نهایی روی مرورگر کاربر، بنچمارک جامع، ۱۲ E2E مستقل و ویدئوی نهایی تأیید نشده‌اند.**
 
 ## مسئله
 کاربر می‌خواهد از «نمی‌دانم چه بخرم» به «کدام کالا، از کدام فروشنده، با چه شرایطی و چه زمانی مراجعه کنم» برسد. پنج تجربه متصل: کشف محصول، مقایسه محصول، کشف و مقایسه فروشگاه، استعلام کنترل‌شده فروشنده، برنامه مراجعه و بازیابی شکست.
@@ -24,11 +24,12 @@
 - [قرارداد API پیشنهادی](docs/API.fa.md)
 - [کیفیت و تست](docs/QUALITY.fa.md)
 - [Backlog و مراحل تحویل](docs/ROADMAP.fa.md)
+- [وضعیت کنونی پروژه و مرز شواهد](docs/CURRENT-STATUS-2026-10-23.fa.md)
 - [مراجع و الگوهای متن‌باز](docs/REFERENCES.md)
 - [راهنمای مشارکت](CONTRIBUTING.md)
 
 ## انتخاب فنی
-React + TypeScript + Vite، Django + DRF، PostgreSQL، LangGraph، controlled generative UI، MapLibre/سرویس نقشه سازگار با ایران. این‌ها **تصمیم معماری پیشنهادی** هستند؛ وضعیت اجرا در کد و خروجی تست تعیین می‌شود.
+React + TypeScript + Vite، Django + DRF، PostgreSQL، LangGraph، controlled generative UI، MapLibre/سرویس نقشه سازگار با ایران. بخش‌هایی از این انتخاب‌ها اکنون اجرا شده‌اند؛ برای تمایز **پیاده‌شده / آزمایش‌شده / برنامه آینده** به [گزارش وضعیت](docs/CURRENT-STATUS-2026-10-23.fa.md) مراجعه کنید. تأیید deploy، ETA یا مدل عمومی از انتخاب معماری نتیجه نمی‌شود.
 
 ## کد نسخه پایه
 پروژه شامل پوشه‌های `backend/`، `frontend/`، تنظیمات Docker و تست‌های اولیه است. [PR #9](https://github.com/afakhari/shopping_agent/pull/9) پس از اجرای موفق quality-gates روی شاخه وارداتی ادغام شد. برای وضعیت دقیق پیاده‌سازی و گام‌های بعدی، [گزارش تحویل](docs/DELIVERY-STATUS.fa.md) را ببینید.
@@ -39,11 +40,12 @@ Scoring: Product 75, UX 75, Intelligence 50, Deployment 40, Engineering 40, Data
 
 ## Current GitHub delivery status
 
-- [Delivery status and outstanding steps](docs/DELIVERY-STATUS.fa.md)
+- [آخرین وضعیت تأییدشده و اقدامات باقی‌مانده (۲۳ اکتبر)](docs/CURRENT-STATUS-2026-10-23.fa.md)
+- [تاریخچه تحویل و تصمیم‌های پیشین](docs/DELIVERY-STATUS.fa.md)
 - [Implementation issues and acceptance criteria](https://github.com/afakhari/shopping_agent/issues)
 - [Workflow verification](https://github.com/afakhari/shopping_agent/actions/workflows/ci.yml)
 
-**Important:** Full CI runs only on a PR becoming ready for review, manual dispatch, or version tags; it does not run on every development push. It still does not prove real dataset import, UX quality, browser journeys or production deployment. See [development policy](docs/DEVELOPMENT-POLICY.fa.md).
+**Important:** Full CI runs only on a PR becoming ready for review, manual dispatch, or version tags. مرورگر CI با داده مصنوعی اجرا می‌شود؛ آزمون دیتاست و LLM واقعی **مستقل و در محیط Windows/Docker کاربر موفق شده‌اند**، ولی CI جای آزمون نسخه عمومی، کیفیت UX واقعی و امنیت استقرار نیست. See [development policy](docs/DEVELOPMENT-POLICY.fa.md).
 
 ## Fast development and efficient CI
 
@@ -72,4 +74,4 @@ Development can be temporarily broken on feature branches. Run narrow local chec
 
 [راهنمای فارسی دریافت اعتبار، تنظیم کلید خصوصی و آزمون واقعی BoxAPI](docs/BOXAPI-HACKATHON.fa.md).
 هنگام انتخاب `LLM_PROVIDER=boxapi`، درخواست چت تنها از فیلدهای مستند `model` و `messages` استفاده می‌کند و توکن فقط به نشانی رسمی HTTPS BoxAPI ارسال می‌شود.
-این اتصال در حال حاضر برای **استخراج نیت خرید** است؛ اطلاعات محصول، قیمت، موجودی و فروشگاه صرفاً از دیتابیس و ابزارهای معتبر ارائه می‌شوند.
+این اتصال با خروجی واقعی `LLM_RUNTIME=ACTIVE` و `SMOKE_RESULT=PASS` روی دیتاست محلی تأیید شده و در حال حاضر فقط برای **استخراج نیت خرید** است. اطلاعات محصول، قیمت، موجودی و فروشگاه از دیتابیس و ابزارهای معتبر می‌آیند؛ استعلام موجودی فروشنده **شبیه‌سازی** است.

@@ -1,37 +1,23 @@
-# نقشه راه اجرایی و اولویت‌ها
+# نقشه راه اجرای پروژه | به‌روزرسانی ۲۳ اکتبر ۲۰۲۶
 
-وضعیت ۲۲ اکتبر ۲۰۲۶: نسخه پایه با PR #9 به main منتقل شد و CI نسخه وارداتی شامل تست‌های Django، lint/typecheck/build/test فرانت‌اند موفق بود. تست روی دیتاست واقعی، اجرای مرورگر، استقرار، و تکمیل UX و ایجنت هنوز انجام نشده‌اند. معیار تکمیل هر بخش شواهد تست واقعی است.
+مرجع رسمی شواهد: [وضعیت کنونی](CURRENT-STATUS-2026-10-23.fa.md)؛ بک‌لاگ زنده: [GitHub Issues](https://github.com/afakhari/shopping_agent/issues). وضعیت هر مورد از اجرای واقعی و CI ناشی می‌شود، نه صرفاً ایجاد کد.
 
-## P0 - Repo baseline / Green CI
-- انتشار امن کد پاک‌سازی‌شده در PR مجزا، بدون secret/dataset.
-- نصب وابستگی‌ها در GitHub Actions و اجرای backend/frontend check.
-- import dry-run و یکپارچگی واقعی دیتاست در محیط مجاز.
-- smoke تست health، جست‌وجو و مأموریت.
+| حوزه | تکمیل‌شده / شواهد | کار باز و ملاک خروج | Issue |
+|---|---|---|---|
+| زیرساخت و دیتاست | Django/React/Docker/PG، سبزشدن پنج گیت CI، verify_dataset روی 225903/6476/331506 و تست HTTP | تضمین امن بودن استقرار عمومی ذیل Release | [#2](https://github.com/afakhari/shopping_agent/issues/2) (گیت محلی تکمیل) و [#8](https://github.com/afakhari/shopping_agent/issues/8) |
+| مکالمه و UX | RTL mobile-first، فرم‌ها و کارت‌های GenUI allowlist، برخورد با خطای SSE/502، «احوال شما؟» و تاریخچه غلط (#21/#24/#25)؛ Chromium fixture | بازآزمایی دستی آخرین build، ۳۶۰px و دستگاه واقعی، axe/accessibility، UX چند سناریو | [#3](https://github.com/afakhari/shopping_agent/issues/3) |
+| کشف و مقایسه | تطبیق فارسی، hard filters، مقایسه تا ۳، PostgreSQL trigram، HTTP «هدفون» 0.29s در یک اجرا | golden 50 query، MRR@10/Recall@10، p95، کنترل برندی/مدلی و حاشیه‌های سخت | [#4](https://github.com/afakhari/shopping_agent/issues/4) |
+| فروشگاه و نقشه | آفر معتبر، داده ساعت و نشانی، انتخاب دستی منطقه، OpenStreetMap اختیاری و fallback بدون ETA | لیست/نقشه هماهنگ، دسترسی و سهمیه سرویس معتبر، matrix/ETA واقعی و fallback شبکه | [#5](https://github.com/afakhari/shopping_agent/issues/5) |
+| ایجنت و استعلام | LangGraph برای parse/search/render، state/event persisted، simulation، idempotency، recovery و BoxAPI واقعی برای intent | تضمین restart، نقاط approval، failure matrix و checkpoint/branching سطح PRD | [#6](https://github.com/afakhari/shopping_agent/issues/6) |
+| برنامه مراجعه | داده اصلی، آفر جایگزین، استعلام no_answer→confirmed_available دمو و plan API + snapshot؛ browser fixture | تأیید دستی تجربه برنامه مراجعه/بازشدن نقشه و زمان حرکت واقعی | [#7](https://github.com/afakhari/shopping_agent/issues/7) |
+| انتشار | تست واقعی محلی و [CI ۵/۵](https://github.com/afakhari/shopping_agent/actions/runs/39875797715) | **P0:** HTTPS public deploy، امنیت/rate limits BoxAPI، 20 edge cases، 12 E2E مستقل، video ~5min | [#8](https://github.com/afakhari/shopping_agent/issues/8) |
 
-## P1 - Discovery & compare
-- بازآرایی React به feature boundaries، design tokens یکپارچه.
-- parser intent + نرمال‌سازی فارسی؛ ranking قابل ارزیابی.
-- product cards، مقایسه مشخصات و state قابل ویرایش.
+## ترتیب اجرایی بعدی
+1. P0: تأیید UI نسخه جدید روی Windows بعد از #25، مخصوصاً «احوال شما؟» و قیود اعتبار؛ ثبت تصاویر و مسئله‌های واقعی.
+2. P0: آماده‌سازی دامنه/هاست HTTPS و حفاظت از کلید و اعتبار BoxAPI پیش از استفاده عمومی؛ health و golden path از URL عمومی.
+3. P0: آزمون ۲۰ مورد لبه‌ای و ۱۲ journey مستقل با داده مجاز، screenshot و accessibility، کنترل hard constraints.
+4. P0: ضبط ویدئوی پنج‌دقیقه‌ای از **همان نسخه منتشرشده**؛ نه demo فرضی و نه تماس واقعی.
+5. P1: بهبود کیفیت retrieval و نقشه/برنامه مراجعه بر اساس benchmark به‌جای افزودن vector DB یا multiagent بدون شاهد.
 
-## P2 - Shop explorer
-- offer eligibility در سطح shop/offer و پرداخت اعتباری.
-- list/map یکپارچه، geofence، ساعات کار، نشانه‌های پاساژ.
-- آزمایش Neshan SDK/route matrix با مدیریت cache و fallback.
-
-## P3 - Agent mission
-- LangGraph persisted checkpoint + typed event contracts.
-- SimulationContactProvider برای stock/price/hours.
-- سناریوهای failure/backup، approval، idempotency.
-- کارت Visit Plan.
-
-## P4 - Polish and release
-- E2E و accessibility، performance benchmark و visual regression.
-- دیپلوی و smoke test روی public URL.
-- سناریوی دموی ۵ دقیقه‌ای با fixture شبیه‌سازی پایدار.
-
-## ضدالگوها
-بازنویسی فوری بدون baseline benchmark، multiagent غیرضروری، vector DB قبل از ارزیابی، live price بدون evidence، ساخت HTML توسط LLM، تکیه بر UI پر از پیام‌های ابزار.
-
-## مدل اجرای سریع و مدیریت ریسک
-
-در فاز توسعه، برش‌های قابل‌نمایش را جلو ببرید حتی اگر بخش‌های خارج از برش موقتاً خراب باشند. ثبت نقص‌ها در Issue و اصلاح پیش از freeze کافی است؛ گیت CI برای هر push لازم نیست. قبل از release، full regression و آزمون محیط عملیاتی الزامی است. مرجع: [سیاست توسعه](DEVELOPMENT-POLICY.fa.md).
+## سیاست PR و CI
+برای هر milestone یک PR تجمیعی با تست روی آخرین commit؛ CI فقط در Ready-for-review، اجرای دستی milestone یا release tag. **اصلاح صرفاً مستندات/Issueها نیازی به PR و CI جدید ندارد.** اگر محصول در یکی از مسیرهای اصلی خطای بحرانی دارد، release متوقف بماند.

@@ -1,6 +1,18 @@
-# قرارداد پیشنهادی API v1
+# قرارداد API v1: پیاده‌شده در برابر پیشنهادی | ۲۳ اکتبر ۲۰۲۶
 
-این سند هدف است و تضمین نمی‌کند در نسخه فعلی backend تمام endpointها موجود باشند. اجرای contract test الزامی است.
+**وضعیت پیاده‌سازی از `backend/config/urls.py` و routeهای Django روی main #25 بررسی شده است.** بخش «API هدف» پایین، *طرح آتی* است، نه نشانی تضمین‌شده.
+
+## Endpointهای موجود در کد فعلی
+- `GET /api/v1/health/live/` و `GET /api/v1/health/ready/`؛ readiness شامل وضعیت پیکربندی LLM است، نه تضمین اتصال real-time.
+- `GET /api/v1/catalog/search/?q=...&page_size=...` برای جست‌وجوی فیلترشده با Offer معتبر؛ `GET /api/v1/products/{id}/`، `GET /api/v1/products/{id}/offers/`، `GET /api/v1/shops/{id}/`.
+- `POST /api/v1/missions/` با `initial_message` و `constraints`، `GET /api/v1/missions/{uuid}/` با نشست مالک.
+- `POST /api/v1/missions/{uuid}/turns/` با `message` و `constraints` و پاسخ SSE شامل `user.message`، `assistant.message`، رویداد UI برای خرید واقعی و `turn.completed`. احوال‌پرسی خالص رویداد UI و فراخوانی LLM ندارد.
+- `POST /api/v1/missions/{uuid}/contact-attempts/` با `shop_id`، `offer_id`، `client_request_id` (اختیاری در serializer ولی مهم برای تکرار ایمن)، `purpose=verify_availability` و `questions`؛ نتیجه **شبیه‌سازی‌شده**.
+- `GET /api/v1/missions/{uuid}/visit-plan/`، بازیابی state برنامه مراجعه بدون ساخت داده جدید.
+
+**موجود نیست یا تضمین نشده:** `POST /api/v1/products/compare/`، `POST /api/v1/route-estimates/`، `GET /api/v1/missions/{id}/events?after_seq=` و cursor pagination/ETag. در نسخه فعلی client داده رویدادها را از snapshot مأموریت بازیابی می‌کند. مقایسه کالا در UI اجرا می‌شود. برای status واقعی [گزارش مرجع](CURRENT-STATUS-2026-10-23.fa.md).
+
+## API هدف/پیشنهادی (الزاماً پیاده نشده)
 
 ## Catalog
 GET /api/v1/products?q=&category=&brand=&max_price_toman=&limit=&cursor=

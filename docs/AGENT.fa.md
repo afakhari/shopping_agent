@@ -29,3 +29,12 @@ confirmed, unavailable, no_answer, price_changed, shop_closed, unknown/error. ا
 
 ## محدودیت مدل زبانی
 LLM فقط intent و توضیح پیشنهاد را پیشنهاد می‌کند. tool layer محاسبه قیمت، آفر واقعی، فروشنده و اعتبار خرید را تأیید می‌کند. خروجی JSON Schema + validation + allowlisted UI components. از اجرای کد تولیدی مدل جلوگیری کن.
+
+
+## تفاوت معماری هدف با پیاده‌سازی فعلی (۲۳ اکتبر ۲۰۲۶)
+- Graph فعال در `backend/apps/agent/graph.py` در حال حاضر **سه گره parse_request → search_catalog → render_results** دارد؛ تمام گره‌های PRD در ابتدای سند را نباید به‌عنوان زیرگراف مستقلِ اجراشده گزارش کرد.
+- BoxAPI واقعی برای **استخراج نیت** با `LLM_RUNTIME=ACTIVE` روی محیط کاربر تأیید شد؛ کاتالوگ و hard filters قطعی‌اند و قیمت/موجودی را مدل اختراع نمی‌کند.
+- مأموریت، event sequence و snapshot در PostgreSQL پایدارند؛ `client_request_id` برای استعلام دمو idempotent است. این با **checkpoint بومی کامل LangGraph** یکی نیست.
+- احوال‌پرسی در UI و API سرور قبل از جست‌وجو از کاتالوگ و LLM جدا می‌شود (#25). پاسخ‌های backend social persisted و بدون کارت خرید ساختگی‌اند؛ replay نسخه‌های قبلی کارت‌های نامرتبط را فقط در نمایش پنهان می‌کند.
+- سه‌گانه شکست فروشنده، جایگزینی واقعیِ واجد شرط و plan در آزمون `--full-journey --require-llm` با دیتاست مسابقه **در سطح HTTP محلی** موفق است؛ فروشنده حقیقی تماس نگرفته است.
+- موارد باز: branch/restart پیشرفته، تعریف approval برای عملیات خارجی احتمالی آینده و error matrix کامل. [Issue #6](https://github.com/afakhari/shopping_agent/issues/6) / [گزارش وضعیت](CURRENT-STATUS-2026-10-23.fa.md).

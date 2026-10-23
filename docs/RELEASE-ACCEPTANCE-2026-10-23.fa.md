@@ -6,8 +6,8 @@
 |---|---|---|---|
 | 01 | درخواست مدل دقیق | تست‌های search pressure model و اطلاعات مدل | **جزئی**؛ golden query واقعی |
 | 02 | درخواست بر اساس کاربرد | parser heuristic و LLM mock | **باز**؛ نیازمند ارزیابی مشاوره واقعی LLM |
-| 03 | درخواست مبهم و clarification | `test_vague_request_returns_a_clarification_form_not_a_fake_search` | **تست واحد**؛ مرورگر تکمیلی لازم |
-| 04 | صفر نتیجه و توضیح علت | `test_unmatched_query_is_empty...` و empty state | **تست API/واحد** |
+| 03 | درخواست مبهم و clarification | `test_vague_request_returns_a_clarification_form_not_a_fake_search` و guard مکالمه #25 | **تست واحد/API**؛ سناریوی مبهم تجاری در مرورگر واقعی باز |
+| 04 | صفر نتیجه و توضیح علت | `test_unmatched_query_is_empty...`، اصلاح فرم تکراری #24، مرورگر fixture | **API/واحد/Chromium مصنوعی**؛ UX دیتای واقعی باز |
 | 05 | سقف بودجه سخت | `test_budget_hard_filter_accepts_persian_digits` | **تست API** |
 | 06 | خرید اعتباری همراه قیمت/دسته | `test_provider_price_and_category_rules_restrict_offers` (#15) | **تست API** |
 | 07 | قیمت ثبت‌نشده | `test_price_without_timestamp...` و null checks | **جزئی**؛ UI واقعی با قیمت NULL |
@@ -19,14 +19,22 @@
 | 13 | پایان موجودی | سناریوی شبیه‌ساز unavailable در کد | **جزئی**؛ تست E2E مستقل لازم |
 | 14 | آفرها با گارانتی متفاوت | `test_seller_warranty_and_registered_title_are_returned` | **جزئی**؛ UI مقایسه واقعی لازم |
 | 15 | تغییر فیلتر وسط درخواست طولانی | abort/reload در React | **باز**؛ تست race در مرورگر |
-| 16 | قطع شبکه و snapshot recovery | `test_mission_snapshot_includes_sequenced_events` | **جزئی**؛ تست قطع شبکه/refresh مرورگر |
-| 17 | رد مجوز موقعیت | انتخاب دستی منطقه (#18)، تست نقشه | **جزئی**؛ تست permission denied |
+| 16 | قطع شبکه و snapshot recovery | API+Vitest بازیابی SSE ناقص و تست Chromium خطای 502 در #24 | **تست خودکار**؛ قطع واقعی شبکه production باز |
+| 17 | رد مجوز موقعیت | انتخاب دستی تهران و سناریوی Chromium با permissions=[] | **تست مصنوعی مرورگر**؛ دستگاه واقعی باز |
 | 18 | نقشه ناموفق و fallback | iframe اختیاری و لینک/آدرس | **جزئی**؛ آزمون failure شبکه |
 | 19 | پاساژ بدون طبقه/واحد | `test_no_floor_is_not_invented` | **تست واحد** |
-| 20 | refresh حین استعلام بدون تکرار | `test_contact_retry_is_idempotent...` و changed questions (#17) | **تست API**؛ browser refresh هنوز باز |
+| 20 | refresh حین استعلام بدون تکرار | API واقعی Windows `--full-journey --require-llm`: idempotency تأیید شد؛ تست‌های snapshot و مرورگر مصنوعی #24 | **تست API/خودکار**؛ refresh وسط درخواست در محیط واقعی باز |
+
+
+## آخرین شواهد پس از PRهای #21 تا #25 (۲۳ اکتبر)
+- کاربر Windows/Docker: `BOXAPI_OK`، `LLM_RUNTIME=ACTIVE`، `intent_parser=llm`، `SMOKE_RESULT=PASS` برای `--skip-contact --require-llm` و `--full-journey --require-llm` روی دیتاست 225903/6476/331506.
+- مسیر کامل شامل no_answer شبیه‌سازی‌شده، ۵ آفر و ۵ محصول جایگزین، retry بدون side effect و visit-plan مستقل با `confirmed_available` **صرفاً دمو** بود.
+- سرچ «هدفون» پس از چهار index جدید با HTTP 200 و ۰٫۲۹ ثانیه در یک نمونه واقعی انجام شد؛ benchmark جامع نیست.
+- رفع خطای «احوال شما؟» با نگهداشت شروط و نمایش نکردن ۱۲۰ محصول نامربوط پیشین در #25 پیاده شد؛ [۵ گیت CI](https://github.com/afakhari/shopping_agent/actions/runs/39875797715) از جمله مرورگر مصنوعی موفق. تأیید دستی این رفع روی سیستم کاربر هنوز گزارش نشده است.
+- **وضعیت این ماتریس همچنان کمتر از ۲۰/۲۰ و ۱۲/۱۲ است**؛ checkboxهایی که در بالا باز مانده‌اند نباید بسته فرض شوند. برای جزئیات [وضعیت مرجع](CURRENT-STATUS-2026-10-23.fa.md).
 
 ## دوازده مسیر کامل
-تا این checkpoint **تنها مسیر طلایی Chromium با fixture مصنوعی** و مسیر HTTP محلی ثبت‌شده روی ZIP اصلی شواهد مستند دارند. سنجش اجباری ۱۲ مسیر مستقل کامل هنوز آماده نیست؛ نباید ۱۲/۱۲ گزارش شود.
+تا این checkpoint **مسیر طلایی Chromium با fixture مصنوعی** و **دو مسیر HTTP محلی با BoxAPI واقعی روی ZIP اصلی** شواهد مستند دارند. سنجش اجباری ۱۲ مسیر مستقل کامل هنوز آماده نیست؛ نباید ۱۲/۱۲ گزارش شود.
 
 ## آزمون بازیابی و کیفیت جست‌وجو
 - مجموعه ۵۰ پرس‌وجوی فارسی دارای برچسب انسانی و سنجه‌های Recall@10/MRR@10 هنوز باید ایجاد و benchmark شود. فعلاً الگوریتم SQL lexical مبناست، نه semantic benchmark اثبات‌شده.
@@ -36,7 +44,7 @@
 ## نهایی کردن تحویل
 - [ ] تأیید اجرای تمام ۲۰ سناریو با دیتاست کامل و امضای گزارش
 - [ ] تأیید ۱۲ E2E مستقل و screenshot regression
-- [ ] کلید LLM واقعی و اثبات `LLM_RUNTIME=ACTIVE`
+- [x] کلید LLM واقعی در محیط خصوصی کاربر و اثبات `LLM_RUNTIME=ACTIVE` با دو smoke محلی `--require-llm` (اتصال فقط برای intent)
 - [ ] تصمیم سرویس نقشه و تست سهمیه/مسیریابی معتبر
 - [ ] استقرار عمومی امن با دیتاست و HTTPS
 - [ ] فیلم دموی پنج‌دقیقه‌ای بر پایه همان نسخه منتشرشده

@@ -1,3 +1,14 @@
+# وضعیت تحویل | مرجع به‌روز ۲۳ اکتبر ۲۰۲۶
+
+**آخرین وضعیت و فهرست کارهای باقی‌مانده: [CURRENT-STATUS-2026-10-23.fa.md](CURRENT-STATUS-2026-10-23.fa.md).**
+این سند در ادامه **تاریخچه checkpointهای قبلی** را حفظ می‌کند. عبارت‌های «LLM غیرفعال»، «تست مرورگر موجود نیست» یا «دیتاست روی نسخه جدید آزمایش نشده» در بخش‌های تاریخی، وضعیت **آن اجرای خاص** هستند و با موفقیت تست‌های بعدی جایگزین شده‌اند.
+
+**checkpoint نهایی کد تا این تاریخ:** PRهای [#21](https://github.com/afakhari/shopping_agent/pull/21)، [#22](https://github.com/afakhari/shopping_agent/pull/22)، [#23](https://github.com/afakhari/shopping_agent/pull/23)، [#24](https://github.com/afakhari/shopping_agent/pull/24) و [#25](https://github.com/afakhari/shopping_agent/pull/25) در `main` ادغام شدند؛ CI اخیر [۵ گیت سبز](https://github.com/afakhari/shopping_agent/actions/runs/39875797715). کاربر `LLM_RUNTIME=ACTIVE` و `SMOKE_RESULT=PASS` برای دو آزمون واقعی BoxAPI، از جمله full journey با `no_answer` و `confirmed_available` دمو، گزارش کرد. چهار ایندکس جدید جست‌وجو معتبر بودند و HTTP «هدفون» در یک اجرای محلی ۰٫۲۹ ثانیه پاسخ داد. خطای UX احوال‌پرسی نامرتبط PR #25 اصلاح شد، ولی پس از آن نسخه در مرورگر محلی کاربر هنوز بازآزمایی نشده است.
+
+---
+
+## آرشیو شواهد و وضعیت‌های پیشین (۲۲ تا ۲۳ اکتبر ۲۰۲۶)
+
 # وضعیت تحویل و محدودیت‌های تأییدشده | 2026-10-22
 
 ## منتشر و ادغام شد

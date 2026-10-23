@@ -1,5 +1,7 @@
 # استاندارد آزمون، پذیرش و ارزیابی
 
+> **وضعیت اجرایی:** آخرین CI کد #25 [۵/۵ سبز](https://github.com/afakhari/shopping_agent/actions/runs/39875797715)؛ مرورگر CI از fixture مصنوعی استفاده می‌کند. کاربر روی دیتاست واقعی دو مسیر LLM+HTTP را با PASS گزارش کرده است، اما هنوز ماتریس ۲۰ سناریو، ۱۲ مسیر مستقل، p95، axe و استقرار HTTPS تکمیل نشده‌اند. [گزارش مرجع](CURRENT-STATUS-2026-10-23.fa.md).
+
 ## Quality gates
 Backend: Django check, migrations check, pytest, Ruff, import dry-run. Frontend: npm ci, typecheck, ESLint, unit tests, build. Integration: DB populated and 12 end-to-end journeys. Visual: screenshots width 360/390/768/1440، RTL، کنتراست، focus، keyboard، reduced-motion.
 
