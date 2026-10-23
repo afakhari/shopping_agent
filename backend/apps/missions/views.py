@@ -218,7 +218,13 @@ def create_mission(request):
 @api_view(["GET"])
 def get_mission(request, mission_id: str):
     mission = _owned_mission(request, mission_id)
-    return Response(serialize_mission(mission, include_events=True))
+    raw_cursor = request.query_params.get("before_seq")
+    before_seq = None
+    if raw_cursor is not None:
+        if not raw_cursor.isdecimal() or int(raw_cursor) < 1:
+            raise ValidationError({"before_seq": "شناسه صفحه رویدادها معتبر نیست."})
+        before_seq = int(raw_cursor)
+    return Response(serialize_mission(mission, include_events=True, before_seq=before_seq))
 
 
 @api_view(["POST"])

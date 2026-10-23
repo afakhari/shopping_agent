@@ -386,6 +386,24 @@ class MissionApiTests(TestCase):
         self.assertEqual(events, sorted(events, key=lambda item: item["seq"]))
         self.assertEqual(events[-1]["payload"]["index"], 104)
 
+    def test_pagination_can_restore_events_older_than_the_latest_hundred(self):
+        mission_id = self._create_mission_and_search()
+        from django.db import transaction
+        from apps.missions.services import append_events_locked
+
+        with transaction.atomic():
+            mission = PurchaseMission.objects.select_for_update().get(pk=mission_id)
+            append_events_locked(mission, [("test.marker", {"index": n}) for n in range(105)])
+        first = self.client.get(f"/api/v1/missions/{mission_id}/").json()["events"]
+        older_response = self.client.get(
+            f"/api/v1/missions/{mission_id}/", {"before_seq": first[0]["seq"]})
+        self.assertEqual(older_response.status_code, 200)
+        older = older_response.json()["events"]
+        self.assertTrue(older)
+        self.assertEqual(older[-1]["seq"], first[0]["seq"] - 1)
+        self.assertEqual(self.client.get(
+            f"/api/v1/missions/{mission_id}/", {"before_seq": "bad"}).status_code, 400)
+
     def test_non_tehran_city_is_rejected_instead_of_returning_tehran_results(self):
         response = self.client.post(
             "/api/v1/missions/",
