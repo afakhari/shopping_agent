@@ -5,6 +5,7 @@ import json
 import re
 import secrets
 import uuid
+from datetime import timedelta
 from decimal import Decimal
 from typing import Any, Iterator
 
@@ -13,7 +14,7 @@ from django.utils import timezone
 from django.http import StreamingHttpResponse
 from django.shortcuts import get_object_or_404
 from rest_framework.decorators import api_view, renderer_classes
-from rest_framework.exceptions import NotFound, ValidationError
+from rest_framework.exceptions import APIException, NotFound, ValidationError
 from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 
@@ -25,7 +26,7 @@ from apps.agent.comparison import build_evidence_comparison
 from apps.agent.simulator import serialize_contact_attempt, simulate_contact
 from apps.agent.contact_evidence import build_contact_evidence
 from apps.catalog.models import Offer, Product
-from apps.missions.models import ContactAttempt, MissionEvent, PurchaseMission, RoutingDailyUsage
+from apps.missions.models import ContactAttempt, MissionEvent, PurchaseMission, RoutingDailyUsage, TurnLease
 from apps.missions.renderers import ServerSentEventRenderer
 from apps.missions.serializers import (
     ContactAttemptCreateSerializer,
@@ -122,6 +123,57 @@ def _replay_turn_if_completed(mission: PurchaseMission, data: dict[str, Any]):
     return response
 
 
+class TurnAlreadyRunning(APIException):
+    status_code = 409
+    default_detail = "درخواست قبلی این مأموریت هنوز در حال پردازش است؛ وضعیت را بازیابی کن."
+    default_code = "TURN_IN_PROGRESS"
+
+
+def _reserve_turn_request(mission: PurchaseMission, data: dict[str, Any]):
+    """Allow one in-flight turn per mission, across workers and API processes.
+
+    No external LLM call may start before this reservation. A committed result
+    is always replayed. A crashed worker's pending lease expires after 90 seconds.
+    """
+    request_id = data.get("client_request_id")
+    if not request_id:
+        return None  # Legacy clients: do not claim single-flight protection.
+    now = timezone.now()
+    cutoff = now - timedelta(seconds=90)
+    with transaction.atomic():
+        locked = PurchaseMission.objects.select_for_update().get(pk=mission.pk)
+        replay = _replay_turn_if_completed(locked, data)
+        if replay is not None:
+            return replay
+        existing = TurnLease.objects.filter(
+            mission=locked, client_request_id=request_id
+        ).first()
+        if existing and (
+            existing.message != data["message"]
+            or existing.request_constraints != data.get("constraints", {})
+        ):
+            raise ValidationError({
+                "client_request_id": "این شناسه قبلاً برای پیام یا شروط متفاوتی استفاده شده است."
+            })
+        another_active = TurnLease.objects.filter(
+            mission=locked, finished_at__isnull=True, issued_at__gte=cutoff,
+        ).exclude(client_request_id=request_id).exists()
+        if another_active or (existing and existing.finished_at is None and existing.issued_at >= cutoff):
+            raise TurnAlreadyRunning()
+        if existing:
+            existing.issued_at = now
+            existing.finished_at = None
+            existing.save(update_fields=["issued_at", "finished_at"])
+        else:
+            TurnLease.objects.create(
+                mission=locked, client_request_id=request_id,
+                message=data["message"],
+                request_constraints=data.get("constraints", {}),
+                issued_at=now,
+            )
+    return None
+
+
 def _search_filterset(constraints: dict[str, Any]) -> dict[str, Any]:
     raw_max = constraints.get("max_price_toman")
     return {
@@ -182,35 +234,48 @@ def create_mission(request):
     constraints = _validate_full_constraints({}, data.get("constraints", {}))
     if "bazaar_owner_token" not in request.session:
         request.session["bazaar_owner_token"] = secrets.token_hex(24)
+    request_id = data.get("client_request_id")
     with transaction.atomic():
-        request_id = data.get("client_request_id")
         if request_id:
-            existing = PurchaseMission.objects.filter(
+            mission, created = PurchaseMission.objects.get_or_create(
                 owner_token=request.session["bazaar_owner_token"],
                 client_request_id=request_id,
-            ).order_by("created_at").first()
-            if existing is not None:
-                if existing.initial_message != data["initial_message"] or existing.constraints != constraints:
+                defaults={
+                    "initial_message": data["initial_message"],
+                    "constraints": constraints,
+                    "status": PurchaseMission.Status.CREATED,
+                    "current_stage": "created",
+                },
+            )
+            if not created:
+                original = mission.events.filter(event_type="mission.created").first()
+                initial_constraints = (
+                    original.payload.get("initial_constraints", mission.constraints)
+                    if original else mission.constraints
+                )
+                if mission.initial_message != data["initial_message"] or initial_constraints != constraints:
                     raise ValidationError({
                         "client_request_id": "این شناسه قبلاً برای مأموریت یا شروط متفاوتی استفاده شده است."
                     })
                 initial_events = [
-                    {"schema_version": 1, "mission_id": str(existing.pk), "seq": event.seq,
+                    {"schema_version": 1, "mission_id": str(mission.pk), "seq": event.seq,
                      "type": event.event_type, "payload": event.payload}
-                    for event in existing.events.filter(event_type="mission.created").order_by("seq")[:1]
+                    for event in mission.events.filter(event_type="mission.created").order_by("seq")[:1]
                 ]
-                return Response({**serialize_mission(existing), "initial_events": initial_events})
-        mission = PurchaseMission.objects.create(
-            initial_message=data["initial_message"],
-            owner_token=request.session["bazaar_owner_token"],
-            constraints=constraints,
-            client_request_id=data.get("client_request_id"),
-            status=PurchaseMission.Status.CREATED,
-            current_stage="created",
-        )
+                return Response({**serialize_mission(mission), "initial_events": initial_events})
+        else:
+            mission = PurchaseMission.objects.create(
+                initial_message=data["initial_message"],
+                owner_token=request.session["bazaar_owner_token"],
+                constraints=constraints,
+                status=PurchaseMission.Status.CREATED,
+                current_stage="created",
+            )
         events = append_events_locked(
-            mission,
-            [("mission.created", {"status": mission.status, "city": constraints.get("city", "tehran")})],
+            mission, [("mission.created", {
+                "status": mission.status, "city": constraints.get("city", "tehran"),
+                "initial_constraints": constraints,
+            })],
         )
     return Response({**serialize_mission(mission), "initial_events": events}, status=201)
 
@@ -234,9 +299,13 @@ def mission_turn(request, mission_id: str):
     serializer.is_valid(raise_exception=True)
     data = serializer.validated_data
     # Repeat response is read before any optional model call or catalog search.
-    previous = _replay_turn_if_completed(_owned_mission(request, mission_id), data)
+    owned = _owned_mission(request, mission_id)
+    previous = _replay_turn_if_completed(owned, data)
     if previous is not None:
         return previous
+    reserved = _reserve_turn_request(owned, data)
+    if reserved is not None:
+        return reserved
     created_events: list[dict[str, Any]] = []
     local_intent = classify_conversation_intent(data["message"])
     if local_intent is not None:

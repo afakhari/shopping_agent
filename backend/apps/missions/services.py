@@ -5,7 +5,7 @@ from typing import Any
 
 from django.utils import timezone
 
-from apps.missions.models import MissionEvent, PurchaseMission
+from apps.missions.models import MissionEvent, PurchaseMission, TurnLease
 
 
 def public_event(mission_id: str, seq: int, event_type: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -40,6 +40,12 @@ def append_events_locked(
         envelopes.append(public_event(str(mission.pk), seq, event_type, payload))
     if rows:
         MissionEvent.objects.bulk_create(rows)
+        # Complete the single-flight lease atomically with the persisted event log.
+        for event_type, payload in events:
+            if event_type == "turn.completed" and payload.get("client_request_id"):
+                TurnLease.objects.filter(
+                    mission=mission, client_request_id=payload["client_request_id"]
+                ).update(finished_at=now)
         mission.last_event_seq = seq
         mission.save(update_fields=["last_event_seq", "updated_at"])
     return envelopes

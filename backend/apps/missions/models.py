@@ -35,9 +35,41 @@ class PurchaseMission(models.Model):
         indexes = [
             models.Index(fields=["status", "updated_at"], name="mission_status_updated_idx"),
         ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["owner_token", "client_request_id"],
+                name="mission_create_request_uniq",
+            ),
+        ]
 
     def __str__(self) -> str:
         return f"Mission {self.pk} ({self.status})"
+
+
+
+class TurnLease(models.Model):
+    """Database-backed single-flight lease for one in-flight mission turn.
+
+    The committed turn.completed event remains the replay source of truth.
+    An expired lease may be reclaimed after a crashed process.
+    """
+    mission = models.ForeignKey(
+        PurchaseMission, on_delete=models.CASCADE, related_name="turn_leases"
+    )
+    client_request_id = models.CharField(max_length=100)
+    message = models.TextField(max_length=2000)
+    request_constraints = models.JSONField(default=dict)
+    issued_at = models.DateTimeField()
+    finished_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "purchase_turn_lease"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["mission", "client_request_id"],
+                name="turn_lease_request_uniq",
+            )
+        ]
 
 
 class MissionEvent(models.Model):
