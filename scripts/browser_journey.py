@@ -130,6 +130,12 @@ def main() -> None:
                     page.locator(".mission-compare-button").nth(1).click()
                     page.locator(".genui-comparison-table").first.wait_for()
                     assert page.locator(".genui-comparison-table tbody tr").count() >= 2
+                    # Dialogue comparison must use the same selected models,
+                    # persisted via the focus endpoint before the turn is sent.
+                    composer.fill("این دو تا چه فرقی دارند؟")
+                    page.get_by_role("button", name="ارسال پیام").click()
+                    page.locator(".genui-comparison-table").last.wait_for()
+                    assert page.locator(".genui-comparison-table").count() >= 2
                     page.get_by_role("button", name="نمایش همه ویژگی‌ها").click()
                     page.get_by_role("button", name="نمایش فقط تفاوت‌ها").click()
                     page.locator(".mission-compare-clear").first.click()
@@ -148,6 +154,12 @@ def main() -> None:
                     page.get_by_role("button", name="ارسال پیام").click()
                     page.locator(".genui-sellers").last.wait_for()
                     assert "ثبت‌شده" in page.locator(".genui-sellers").last.inner_text()
+                    # A stock question must show approval, never silently
+                    # run the simulator or search for a product called 'موجودی'.
+                    composer.fill("موجودی رو بررسی کن")
+                    page.get_by_role("button", name="ارسال پیام").click()
+                    page.locator(".genui-contact-consent").last.wait_for()
+                    assert "تماس یا پیام واقعی" in page.locator(".genui-contact-consent").last.inner_text()
                     page.locator(".mission-seller-details summary").first.click()
                     page.locator(".mission-inline-map-toggle").first.click()
                     page.locator(".mission-inline-map iframe").first.wait_for()
