@@ -633,6 +633,7 @@ def mission_turn(request, mission_id: str):
         )
         intent_result = {
             "search_query": decision["query_override"],
+            "usage_profile": decision.get("usage_profile"),
             "max_price_toman": preflight_constraints.get("max_price_toman"),
             "must_have_in_person_credit": preflight_constraints.get("must_have_in_person_credit", False),
             "sort": preflight_constraints.get("sort", "relevance"),
@@ -646,6 +647,7 @@ def mission_turn(request, mission_id: str):
         prior_query = decision["query"]
         intent_result = {
             "search_query": prior_query,
+            "usage_profile": (initial_mission.state or {}).get("usage_profile"),
             "max_price_toman": preflight_constraints.get("max_price_toman"),
             "must_have_in_person_credit": preflight_constraints.get("must_have_in_person_credit", False),
             "sort": preflight_constraints.get("sort", "relevance"),
@@ -734,6 +736,7 @@ def mission_turn(request, mission_id: str):
             "candidate_product_ids": graph_state.get("candidate_product_ids", []),
             "eligible_offer_ids": graph_state.get("eligible_offer_ids", []),
             "search_query": graph_state.get("search_query", ""),
+            "usage_profile": graph_state.get("search_filters", {}).get("usage_profile"),
             "agent_runtime": graph_state.get("graph_runtime", "langgraph"),
             "intent_parser": graph_state.get("intent_parser", "heuristic"),
             "last_turn_message": data["message"],
