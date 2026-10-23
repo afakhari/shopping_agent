@@ -177,6 +177,10 @@ def parse_request_node(state: MissionGraphState) -> dict[str, Any]:
             llm_intent.get("usage_profile") if llm_intent
             and llm_intent.get("usage_profile") == "video_editing" else None
         ),
+        "usage_intensity": (
+            llm_intent.get("usage_intensity") if llm_intent
+            and llm_intent.get("usage_intensity") in {"light", "heavy"} else None
+        ),
     }
     return {
         "constraints": constraints,
