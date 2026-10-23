@@ -101,12 +101,13 @@ export async function createMission(
   initialMessage: string,
   constraints: MissionConstraints,
   signal?: AbortSignal,
+  clientRequestId?: string,
 ): Promise<MissionSnapshot> {
   const response = await fetch('/api/v1/missions/', {
     method: 'POST',
     signal,
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ initial_message: initialMessage, constraints }),
+    body: JSON.stringify({ initial_message: initialMessage, constraints, client_request_id: clientRequestId }),
   })
   return readJson<MissionSnapshot>(response)
 }

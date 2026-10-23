@@ -947,7 +947,7 @@ export function MissionPanel({
       // tapping two compare controls. Commit those focus actions first.
       await focusChainRef.current
       if (!activeMissionId) {
-        const created = await createMission(trimmed, turnConstraints)
+        const created = await createMission(trimmed, turnConstraints, undefined, requestId)
         activeMissionId = created.mission_id
         setMissionId(activeMissionId)
         missionIdRef.current = activeMissionId

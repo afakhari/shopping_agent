@@ -434,6 +434,23 @@ class MissionApiTests(TestCase):
         mission = PurchaseMission.objects.create(initial_message="legacy", constraints={})
         self.assertEqual(APIClient().get(f"/api/v1/missions/{mission.id}/").status_code, 404)
 
+    def test_mission_creation_retry_returns_same_mission_and_rejects_mismatched_body(self):
+        payload = {
+            "initial_message": "هدفون",
+            "constraints": {"max_price_toman": "3000000"},
+            "client_request_id": "create-idempotent-1",
+        }
+        first = self.client.post("/api/v1/missions/", payload, format="json")
+        self.assertEqual(first.status_code, 201)
+        second = self.client.post("/api/v1/missions/", payload, format="json")
+        self.assertEqual(second.status_code, 200)
+        self.assertEqual(first.json()["mission_id"], second.json()["mission_id"])
+        self.assertEqual(first.json()["initial_events"], second.json()["initial_events"])
+        mismatch = self.client.post("/api/v1/missions/", {
+            **payload, "initial_message": "لپ تاپ",
+        }, format="json")
+        self.assertEqual(mismatch.status_code, 400)
+
     def test_contact_retry_is_idempotent_and_cannot_change_offer(self):
         mission_id = self._create_mission_and_search()
         url = f"/api/v1/missions/{mission_id}/contact-attempts/"

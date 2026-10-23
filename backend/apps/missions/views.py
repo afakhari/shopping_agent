@@ -183,6 +183,23 @@ def create_mission(request):
     if "bazaar_owner_token" not in request.session:
         request.session["bazaar_owner_token"] = secrets.token_hex(24)
     with transaction.atomic():
+        request_id = data.get("client_request_id")
+        if request_id:
+            existing = PurchaseMission.objects.filter(
+                owner_token=request.session["bazaar_owner_token"],
+                client_request_id=request_id,
+            ).order_by("created_at").first()
+            if existing is not None:
+                if existing.initial_message != data["initial_message"] or existing.constraints != constraints:
+                    raise ValidationError({
+                        "client_request_id": "این شناسه قبلاً برای مأموریت یا شروط متفاوتی استفاده شده است."
+                    })
+                initial_events = [
+                    {"schema_version": 1, "mission_id": str(existing.pk), "seq": event.seq,
+                     "type": event.event_type, "payload": event.payload}
+                    for event in existing.events.filter(event_type="mission.created").order_by("seq")[:1]
+                ]
+                return Response({**serialize_mission(existing), "initial_events": initial_events})
         mission = PurchaseMission.objects.create(
             initial_message=data["initial_message"],
             owner_token=request.session["bazaar_owner_token"],
@@ -311,7 +328,7 @@ def mission_turn(request, mission_id: str):
                 if allowed:
                     product = Product.objects.filter(source_id=selected_id).first()
                     if product:
-                        mission.state = {**state, "selected_product_id": selected_id}
+                        mission.state = {**state, "selected_product_id": selected_id, "visit_plan": None}
                         mission.current_stage = "product_selected"
                         reply = (f"«{product.persian_title or selected_id}» انتخاب شد. "
                                  "آفر ثبت‌شده به معنی موجودی تأییدشده نیست.")
@@ -396,7 +413,8 @@ def mission_turn(request, mission_id: str):
                         reply = "آفر فروشنده دیگر با شروط خرید مطابقت ندارد."
                     else:
                         mission.state = {**state, "selected_offer_id": offer_id,
-                                         "selected_shop_id": offer.shop_id, "active_surface": "sellers"}
+                                         "selected_shop_id": offer.shop_id, "active_surface": "sellers",
+                                         "visit_plan": None}
                         mission.save(update_fields=["state", "updated_at"])
                         if decision["kind"] == "select_offer":
                             reply = (f"فروشگاه «{offer.shop.name}» برای «{offer.product.persian_title}» انتخاب شد. "
