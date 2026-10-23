@@ -37,7 +37,7 @@ describe('minimal Persian shopping experience v3', () => {
     expect(mission).toContain('className="assistant-explanation"')
     expect(mission).toContain('className="mission-product-details"')
     expect(mission).toContain('className="conversation-disclosure"')
-    expect(mission).toContain('نام فروشگاه‌ها')
+    expect(mission).toContain('نام بیشتر فروشگاه‌ها')
   })
 
   it('supports tablet, mobile, narrow devices, reduced motion and high contrast', () => {
