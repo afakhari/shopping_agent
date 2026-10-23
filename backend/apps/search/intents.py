@@ -48,8 +48,18 @@ _LAPTOP_ACCESSORY_SCOPES = (
 def _resolve_laptop_scope(query: str) -> CategoryScope | None:
     if _LAPTOP_QUERY.search(query) is None:
         return None
+    tokens = query.split()
     for cues, key, label, categories in _LAPTOP_ACCESSORY_SCOPES:
-        if any(cue in query for cue in cues):
+        # "لپ تاپ با رم زیاد" is a COMPUTER request, not a RAM stick.
+        # Accessory intent must begin with that accessory noun. Exception:
+        # educational toy laptops, whose noun starts with laptop.
+        accessory_first = bool(tokens) and any(
+            query.startswith(cue + " ") or query == cue for cue in cues
+        )
+        toy_explicit = key == "toy_laptop" and (
+            "آموزشی کودک" in query or "اسباب بازی" in query
+        )
+        if accessory_first or toy_explicit:
             category_query = Q()
             for category in categories:
                 category_query |= Q(category_name__icontains=category)
