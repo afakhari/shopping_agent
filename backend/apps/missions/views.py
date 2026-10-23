@@ -236,7 +236,13 @@ def mission_turn(request, mission_id: str):
             if decision["kind"] in {"select_product", "explore_sellers"}:
                 selected_id = decision["product_id"]
                 state = mission.state or {}
-                allowed = selected_id in state.get("visible_product_ids", [])
+                # A product picked from "more results" is still an explicit,
+                # valid server focus even if not in the first four ordinal IDs.
+                allowed = (
+                    selected_id == state.get("selected_product_id")
+                    if decision["kind"] == "explore_sellers"
+                    else selected_id in state.get("visible_product_ids", [])
+                )
                 allowed = allowed and selected_id in state.get("candidate_product_ids", [])
                 allowed = allowed and not state.get("results_stale", False)
                 if allowed:
