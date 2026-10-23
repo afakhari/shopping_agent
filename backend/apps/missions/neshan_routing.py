@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 import math
 from datetime import datetime, timezone
-from urllib.error import HTTPError, URLError
+from urllib.error import HTTPError
 from urllib.parse import urlencode
 from urllib.request import HTTPRedirectHandler, HTTPSHandler, Request, build_opener
 
@@ -79,7 +79,7 @@ def read_matrix(
         if exc.code in {480, 481, 482, 483, 484, 485}:
             raise RoutingUnavailable("quota_or_key_unavailable") from None
         raise RoutingUnavailable("provider_unavailable") from None
-    except (URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError):
+    except (OSError, ValueError):
         raise RoutingUnavailable("provider_unavailable") from None
     if not isinstance(payload, dict) or payload.get("status") != "Ok":
         raise RoutingUnavailable("invalid_response")
