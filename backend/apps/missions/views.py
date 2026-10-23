@@ -592,7 +592,8 @@ def mission_turn(request, mission_id: str):
                         updated_state["pending_dialogue"] = pending_slot
                     mission.state = updated_state
                     mission.status = PurchaseMission.Status.WAITING_FOR_USER
-                    mission.current_stage = "awaiting_clarification" if pending_slot else "created"
+                    if pending_slot:
+                        mission.current_stage = "awaiting_clarification"
                     mission.save(update_fields=["state", "status", "current_stage", "updated_at"])
                 reply = decision.get("reply", "لطفاً منظورت را دقیق‌تر مشخص کن.")
             scoped_events = [
