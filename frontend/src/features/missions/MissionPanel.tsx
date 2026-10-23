@@ -4,6 +4,7 @@ import { getProductOffers, type CatalogOffer, type CatalogSearchResult, type Pro
 import { buildComparisonSpecColumns } from './comparison-specs'
 import { classifyLocalConversation, localConversationReply } from './greeting-intent'
 import { completedTurnWasPersisted } from './recovery-state'
+import { canDrainQueuedTurn } from './queue-policy'
 import { findCurrentSearchMessage, shouldFollowConversation } from './conversation-behavior'
 import { GenUIRenderer } from './GenUIRenderer'
 import { formatDistance, formatLastPriceChange, getPriceQualityLabel, openStreetMapUrl } from './ui-formatters'
@@ -971,7 +972,7 @@ export function MissionPanel({
         }
         return next
       })
-      if (confirmed && !queuePausedRef.current) {
+      if (canDrainQueuedTurn(confirmed, queuePausedRef.current)) {
         const queued = queuedTurnsRef.current.shift()
         if (queued) {
           setQueuedCount(queuedTurnsRef.current.length)
