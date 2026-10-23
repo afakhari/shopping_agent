@@ -126,14 +126,20 @@ export async function getMission(
   // Backfill older event pages so long-lived missions can rebuild their last
   // shopping surface instead of silently discarding it after 100 events.
   for (let page = 0; page < 10 && history.length > 0 && history[0]!.seq > 1; page += 1) {
-    const olderResponse = await fetch(
-      `/api/v1/missions/${encodeURIComponent(missionId)}/?before_seq=${history[0]!.seq}`,
-      { method: 'GET', signal, headers: { Accept: 'application/json' } },
-    )
-    const older = await readJson<MissionSnapshot>(olderResponse)
-    const previous = older.events ?? []
-    if (!previous.length || previous[0]!.seq >= history[0]!.seq) break
-    history = [...previous, ...history]
+    try {
+      const olderResponse = await fetch(
+        `/api/v1/missions/${encodeURIComponent(missionId)}/?before_seq=${history[0]!.seq}`,
+        { method: 'GET', signal, headers: { Accept: 'application/json' } },
+      )
+      const older = await readJson<MissionSnapshot>(olderResponse)
+      const previous = older.events ?? []
+      if (!previous.length || previous[0]!.seq >= history[0]!.seq) break
+      history = [...previous, ...history]
+    } catch {
+      // Preserve the current snapshot if loading historical pages fails.
+      if (signal?.aborted) throw new Error('بازیابی تاریخچه لغو شد.')
+      break
+    }
   }
   return { ...snapshot, events: history }
 }
