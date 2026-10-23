@@ -3,6 +3,7 @@ import { ExternalLink, LocateFixed, MapPin, Store } from 'lucide-react'
 import type { CatalogOffer } from '../search/catalog-api'
 import { isTehranCatalogPoint, osmEmbedUrl } from './shop-map'
 import { formatDistance, openStreetMapUrl } from './ui-formatters'
+import { currentRouteEvidence, routeEvidenceScope } from './routing-evidence'
 import {
   getRoutingCapability, requestRouteEstimates,
   type RouteEstimateResponse, type RoutingCapability,
@@ -62,11 +63,11 @@ export function SellerLocationBoard({
   const activeCapability = routingCapability?.missionId === missionId ? routingCapability.data : null
   // A late answer for an old mission, result set, origin, mode or seller list
   // is kept out of sight, even if the provider response arrives successfully.
-  const routeScope = [missionId, resultSetId ?? '', origin?.lat ?? '', origin?.lon ?? '',
-    routeMode, ...uniqueDestinations.map(offer =>
-      [offer.id, offer.shop.lat, offer.shop.lon].join('/'))].join(':')
-  const visibleRouteResult = !disabled && routeResult?.scope === routeScope ? routeResult.data : null
-  const visibleRouteError = routeError?.scope === routeScope ? routeError.message : null
+  const routeScope = routeEvidenceScope({
+    missionId, resultSetId, origin, mode: routeMode, destinations: uniqueDestinations,
+  })
+  const visibleRouteResult = currentRouteEvidence(routeResult, routeScope, disabled)?.data ?? null
+  const visibleRouteError = currentRouteEvidence(routeError, routeScope, disabled)?.message ?? null
 
   const checkRouting = (opened: boolean) => {
     if (!opened || disabled || !resultSetId || routingChecked || !missionId) return
