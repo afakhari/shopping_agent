@@ -195,6 +195,15 @@ def mission_turn(request, mission_id: str):
         initial_mission.constraints, data.get("constraints", {})
     )
     decision = classify_contextual_turn(data["message"], initial_mission.state)
+    if (
+        decision["kind"] == "refine"
+        and decision["constraint_updates"].get("sort") == "distance_asc"
+        and preflight_constraints.get("lat") is None
+    ):
+        decision = {
+            "kind": "clarify",
+            "reply": "برای مرتب‌سازی فروشگاه‌ها بر اساس نزدیکی، ابتدا موقعیت یا محدوده تهران را انتخاب کن.",
+        }
     if decision["kind"] in {"select_product", "explain", "clarify"}:
         # Text-only follow-ups must not trigger paid inference or an unrelated
         # catalogue search. Validate the reference again under the mission lock.
@@ -241,6 +250,10 @@ def mission_turn(request, mission_id: str):
                         "برای توضیح یک مدل مشخص، آن را انتخاب کن. موجودی واقعی تأیید نشده است."
                     )
             else:
+                pending = decision.get("pending_constraints")
+                if isinstance(pending, dict) and pending:
+                    mission.constraints = _validate_full_constraints(mission.constraints, pending)
+                    mission.save(update_fields=["constraints", "updated_at"])
                 reply = decision.get("reply", "لطفاً منظورت را دقیق‌تر مشخص کن.")
             created_events = append_events_locked(mission, [
                 ("user.message", {"message": data["message"]}),
