@@ -71,6 +71,7 @@ class RouteEstimateTests(TestCase):
         NESHAN_ROUTING_ENABLED=True,
         NESHAN_ROUTING_API_KEY="fake-unit-test-key",
         NESHAN_ROUTING_MAX_CALLS_PER_MISSION=1,
+        NESHAN_ROUTING_DAILY_MAX_CALLS=2,
     )
     def test_mocked_provider_and_paid_request_cap(self):
         status = self.client.get(self.url).json()
@@ -96,7 +97,24 @@ class RouteEstimateTests(TestCase):
     @override_settings(
         NESHAN_ROUTING_ENABLED=True,
         NESHAN_ROUTING_API_KEY="fake-unit-test-key",
+        NESHAN_ROUTING_MAX_CALLS_PER_MISSION=5,
+        NESHAN_ROUTING_DAILY_MAX_CALLS=1,
+    )
+    def test_shared_daily_budget_blocks_further_paid_requests(self):
+        with patch("apps.missions.views.read_matrix", return_value=[
+            {"status": "no_route"}, {"status": "no_route"},
+        ]) as provider:
+            first = self.client.post(self.url, self.payload, format="json")
+            second = self.client.post(self.url, self.payload, format="json")
+        self.assertEqual(first.json()["status"], "ok")
+        self.assertEqual(second.json()["reason"], "daily_budget_exhausted")
+        provider.assert_called_once()
+
+    @override_settings(
+        NESHAN_ROUTING_ENABLED=True,
+        NESHAN_ROUTING_API_KEY="fake-unit-test-key",
         NESHAN_ROUTING_MAX_CALLS_PER_MISSION=2,
+        NESHAN_ROUTING_DAILY_MAX_CALLS=2,
     )
     def test_provider_failure_gives_no_fabricated_eta(self):
         from apps.missions.neshan_routing import RoutingUnavailable
@@ -117,6 +135,7 @@ class MatrixParserTests(TestCase):
         NESHAN_ROUTING_ENABLED=True,
         NESHAN_ROUTING_API_KEY="fake-test",
         NESHAN_ROUTING_MAX_CALLS_PER_MISSION=2,
+        NESHAN_ROUTING_DAILY_MAX_CALLS=2,
     )
     def test_normalizes_provider_status_without_guessing_unknown_numbers(self):
         from unittest.mock import MagicMock
