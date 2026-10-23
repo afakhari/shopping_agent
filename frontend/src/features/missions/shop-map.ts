@@ -5,6 +5,33 @@ export function isTehranCatalogPoint(lat: number | null, lon: number | null): bo
     && lat >= 35.35 && lat <= 35.95 && lon >= 50.9 && lon <= 51.85
 }
 
+/** Official Neshan deeplink to a *registered point*, not a verified shop identity.
+ * The URL is generated only from bounded Tehran coordinates. Nothing is sent
+ * until the user clicks the external link.
+ */
+export function neshanPointUrl(lat: number | null, lon: number | null): string | null {
+  if (!isTehranCatalogPoint(lat, lon)) return null
+  const params = new URLSearchParams({ lat: String(lat), lng: String(lon) })
+  return `https://nshn.ir/?${params.toString()}`
+}
+
+/** Official public Neshan navigation deeplink; NOT a provider ETA API.
+ * Both endpoints are coordinates, never merchant names (which may be synthetic).
+ */
+export function neshanDrivingUrl(
+  origin: { lat: number; lon: number } | null | undefined,
+  destination: { lat: number | null; lon: number | null },
+): string | null {
+  if (!origin || !isTehranCatalogPoint(origin.lat, origin.lon)
+    || !isTehranCatalogPoint(destination.lat, destination.lon)) return null
+  const params = new URLSearchParams({
+    origin: `${origin.lat},${origin.lon}`,
+    destination: `${destination.lat},${destination.lon}`,
+    vehicle: 'd',
+  })
+  return `https://nshn.ir/?${params.toString()}`
+}
+
 /** Map-only fallback: opening this optional iframe sends its location to OpenStreetMap.
  * No ETA, indoor navigation or real-time shop availability is implied.
  */
