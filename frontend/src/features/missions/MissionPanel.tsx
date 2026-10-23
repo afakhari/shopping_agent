@@ -1580,6 +1580,9 @@ export function MissionPanel({
                   </div>}
                 </section>
               )}
+              {!isCurrentResult && currentResultsMessage && item.results !== undefined
+                && postComponents.some(component => component.type === 'visit_plan')
+                && <p className="mission-stale-warning" role="note">این برنامه مراجعه متعلق به جست‌وجوی قبلی است؛ برای مراجعه جدید، فروشنده‌ها و شرایط فعلی را دوباره بررسی کن.</p>}
               {postComponents.length > 0 && <GenUIRenderer components={postComponents} defaults={{ query: lastQuery, max_price_toman: budget, must_have_in_person_credit: mustHaveCredit, sort: constraints.sort ?? 'relevance' }} disabled={isRunning || isRestoring || !isCurrent} onAction={handleGenUIAction} />}
             </article>
           )
