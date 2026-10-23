@@ -118,3 +118,32 @@ class ContactAttemptCreateSerializer(serializers.Serializer):
                 {key: "نتیجه استعلام را سرور تعیین می‌کند." for key in sorted(present)}
             )
         return attrs
+
+
+class MissionFocusSerializer(serializers.Serializer):
+    """Explicit, model-free UX actions, scoped to a particular result set."""
+    action = serializers.ChoiceField(choices=(
+        "select_product", "view_sellers", "view_products", "select_offer",
+    ))
+    result_set_id = serializers.CharField(max_length=40)
+    product_id = serializers.CharField(max_length=64, required=False)
+    offer_id = serializers.CharField(max_length=64, required=False)
+    offer_ids = serializers.ListField(
+        child=serializers.CharField(max_length=64),
+        required=False, max_length=24,
+    )
+
+    def validate_offer_ids(self, value):
+        if len(value) != len(set(value)):
+            raise serializers.ValidationError("شناسه آفر تکراری است.")
+        return value
+
+    def validate(self, attrs):
+        action = attrs["action"]
+        if action in ("select_product", "view_sellers") and not attrs.get("product_id"):
+            raise serializers.ValidationError({"product_id": "شناسه محصول ضروری است."})
+        if action == "select_offer" and not attrs.get("offer_id"):
+            raise serializers.ValidationError({"offer_id": "شناسه آفر ضروری است."})
+        if action == "view_sellers" and not attrs.get("offer_ids"):
+            raise serializers.ValidationError({"offer_ids": "فهرست فروشندگان باید مشخص باشد."})
+        return attrs
