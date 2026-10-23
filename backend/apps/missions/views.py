@@ -19,6 +19,7 @@ from apps.agent.graph import _query_from_message, run_purchase_graph
 from apps.agent.llm import extract_intent
 from apps.agent.conversation import classify_conversation_intent, conversation_reply
 from apps.agent.contextual import classify_contextual_turn
+from apps.agent.comparison import build_evidence_comparison
 from apps.agent.simulator import serialize_contact_attempt, simulate_contact
 from apps.agent.contact_evidence import build_contact_evidence
 from apps.catalog.models import Offer, Product
@@ -208,7 +209,7 @@ def mission_turn(request, mission_id: str):
             "kind": "clarify",
             "reply": "برای مرتب‌سازی فروشگاه‌ها بر اساس نزدیکی، ابتدا موقعیت یا محدوده تهران را انتخاب کن.",
         }
-    if decision["kind"] in {"select_product", "explore_sellers", "contact_prompt", "select_offer", "seller_details", "seller_recovery", "explain", "clarify"}:
+    if decision["kind"] in {"select_product", "explore_sellers", "contact_prompt", "compare", "select_offer", "seller_details", "seller_recovery", "explain", "clarify"}:
         # No extra LLM call for a grounded contextual turn. Re-evaluate every
         # selection with the *effective* constraints inside the row lock.
         with transaction.atomic():
@@ -276,6 +277,18 @@ def mission_turn(request, mission_id: str):
                 else:
                     selected_id = None
                     reply = "این نتیجه یا فیلترهای آن تغییر کرده‌اند؛ قبل از انتخاب، جست‌وجو را به‌روز کن."
+            elif decision["kind"] == "compare":
+                state = mission.state or {}
+                ids = state.get("compared_product_ids", [])
+                if state.get("results_stale"):
+                    reply = "نتایج مقایسه قدیمی‌اند؛ ابتدا جست‌وجو را به‌روز کن."
+                else:
+                    payload = build_evidence_comparison(ids, _search_filterset(mission.constraints or {}))
+                    if payload is None:
+                        reply = "دو یا سه مدل دارای آفر معتبر را انتخاب کن؛ بدون شواهد مقایسه نمی‌سازم."
+                    else:
+                        reply = "مقایسهٔ داده‌های ثبت‌شده آماده است. مشخصات ثبت‌نشده نشان‌دهنده یکسانی مدل‌ها نیست."
+                        extra_ui = ("comparison_table", payload)
             elif decision["kind"] == "contact_prompt":
                 state = mission.state or {}
                 offer_id = decision["offer_id"]
@@ -496,6 +509,7 @@ def mission_turn(request, mission_id: str):
             "visible_offer_ids": [],
             "selected_offer_id": None,
             "selected_shop_id": None,
+            "compared_product_ids": [],
             "selected_product_id": selected_product,
             "visible_product_ids": visible_products,
             "candidate_product_ids": graph_state.get("candidate_product_ids", []),
@@ -562,7 +576,14 @@ def mission_focus(request, mission_id: str):
             raise ValidationError({"result_set_id": "این نتایج دیگر معتبر نیستند؛ جست‌وجو را به‌روز کن."})
         action = data["action"]
         filters = _search_filterset(mission.constraints or {})
-        if action in {"select_product", "view_sellers"}:
+        if action == "set_compare":
+            compared = data["product_ids"]
+            if any(pid not in state.get("candidate_product_ids", []) for pid in compared):
+                raise ValidationError({"product_ids": "یکی از مدل‌ها در نتایج معتبر جاری نیست."})
+            if any(not eligible_offer_list(filters, product_id=pid).exists() for pid in compared):
+                raise ValidationError({"product_ids": "یکی از مدل‌ها دیگر آفر مطابق شروط ندارد."})
+            state["compared_product_ids"] = compared
+        elif action in {"select_product", "view_sellers"}:
             product_id = data["product_id"]
             if product_id not in state.get("candidate_product_ids", []):
                 raise ValidationError({"product_id": "محصول در نتایج فعلی مأموریت وجود ندارد."})
@@ -606,6 +627,7 @@ def mission_focus(request, mission_id: str):
             "active_surface": state.get("active_surface", "products"),
             "selected_product_id": state.get("selected_product_id"),
             "selected_offer_id": state.get("selected_offer_id"),
+            "compared_product_ids": state.get("compared_product_ids", []),
             "result_set_id": state["result_set_id"],
         })])
     return Response({"state": mission.state, "last_event_seq": mission.last_event_seq,
