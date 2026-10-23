@@ -139,6 +139,8 @@ def parse_request_node(state: MissionGraphState) -> dict[str, Any]:
             if constraints.get("max_price_toman") not in (None, "") else None
         ),
         "must_have_in_person_credit": bool(constraints.get("must_have_in_person_credit", False)),
+        "brand_name": constraints.get("brand_name"),
+        "model_exact": constraints.get("model_exact"),
         "lat": constraints.get("lat"),
         "lon": constraints.get("lon"),
         "radius_m": constraints.get("radius_m"),
