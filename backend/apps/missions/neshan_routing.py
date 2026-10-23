@@ -219,3 +219,13 @@ def successful_response(*, mode: str, offers: list, matrix: list[dict]) -> dict:
                       for offer, result in zip(offers, matrix, strict=True)],
         "availability_verified": False, "source": "provider_route_estimate",
     }
+
+
+def successful_direction_response(*, mode: str, offer_id: str, route: dict) -> dict:
+    return {
+        "provider": "neshan", "service": "direction", "mode": mode, "status": "ok",
+        "measured_at": datetime.now(timezone.utc).isoformat(),
+        "route": {"offer_id": offer_id, **route},
+        "estimates": [], "availability_verified": False,
+        "source": "provider_route_estimate",
+    }
