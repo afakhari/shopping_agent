@@ -37,14 +37,13 @@ _SPEC = re.compile(
 )
 _QUESTION = re.compile(
     r"(?:\?|؟|چطور|چجوری|آیا|ایا|باید|لازم|نیاز|ضروری|"
-    r"نمیدونم|نمی دونم|نمی دانم|کافیه|کافیه|مناسبه|بهتره|"
+    r"نمیدونم|نمی دونم|نمی دانم|کافیه|مناسبه|بهتره|"
     r"کدوم|کدام|چقدر|چه فرقی|فرق|تفاوت|توضیح بده|راهنمایی)"
 )
 _REQUEST = re.compile(r"(?:می ?خوام|می ?خواهم|بخرم|بخر|پیدا کن|نشون بده|پیشنهاد بده|معرفی کن)")
 _GPU_MODEL = re.compile(r"(?<!\w)(?:rtx|gtx|rx)\s*\d{3,4}(?!\w)")
 _USAGE_PRESENT = re.compile(r"(?:پخش|نمایش|اسلاید|موزیک|موسیقی|آهنگ|عکس|فیلم دیدن)")
 _USAGE_EDIT = re.compile(r"(?:تدوین|ادیت|رندر|افکت|ساخت فیلم|پریمیر|افترافکت|after effects|premiere)")
-_CLEAR_LAPTOP = re.compile(r"(?:منظورم|یعنی|منظور|بله|آره|اره|همون)?\s*لپ\s*تاپ")
 _OTHER_PRODUCT = re.compile(r"(?:گوشی|هدفون|تلویزیون|دوربین|فشارسنج|شارژر|کیف|مانیتور)")
 _BUDGET = re.compile(
     rf"(?:بودجه(?: م| من)?|تا(?: سقف)?|حداکثر(?: بودجه)?|سقف(?: بودجه)?)"
@@ -80,6 +79,7 @@ def resolve_dialogue_policy(
     normalized = normalize_persian_text(message).strip(" ؟?!.,؛")
     if not normalized:
         return {"kind": "clarify", "reply": "دنبال چه محصولی هستی؟"}
+    asking = bool(_QUESTION.search(normalized) or "؟" in message or "?" in message)
 
     state = state or {}
     old = state.get("pending_dialogue")
@@ -100,7 +100,10 @@ def resolve_dialogue_policy(
                 "منظورت از «لپ» لپ‌تاپ است یا محصول آرایشی مربوط به صورت؟ "
                 "برای عروسی قرار است دقیقاً چه کاری انجام بدهی؟"
             ),
-            "pending_dialogue": {"slot": "product_kind"},
+            "pending_dialogue": {
+                "slot": "product_kind",
+                **({"budget": _budget(normalized)} if _budget(normalized) else {}),
+            },
         }
 
     if pending and pending["slot"] == "product_kind":
@@ -111,7 +114,10 @@ def resolve_dialogue_policy(
                     "متوجه شدم منظورت لپ‌تاپ است. برای عروسی قرار است عکس و "
                     "موسیقی پخش کنی یا فیلم را تدوین و ویرایش کنی؟"
                 ),
-                "pending_dialogue": {"slot": "laptop_usage"},
+                "pending_dialogue": {
+                    "slot": "laptop_usage",
+                    **({"budget": pending["budget"]} if pending.get("budget") else {}),
+                },
             }
         if "آرایش" in normalized or "صورت" in normalized or "زیبایی" in normalized:
             return {
@@ -122,7 +128,7 @@ def resolve_dialogue_policy(
         return {
             "kind": "clarify",
             "reply": "هنوز مشخص نیست منظورت لپ‌تاپ است یا لوازم آرایشی؛ لطفاً یکی را مشخص کن.",
-            "pending_dialogue": {"slot": "product_kind"},
+            "pending_dialogue": pending,
         }
 
     # A wedding event alone does not specify a computing workload.
@@ -132,13 +138,16 @@ def resolve_dialogue_policy(
         return {
             "kind": "clarify",
             "reply": "برای عروسی لپ‌تاپ را برای پخش عکس و موسیقی می‌خواهی، یا تدوین فیلم و کارهای سنگین؟",
-            "pending_dialogue": {"slot": "laptop_usage"},
+            "pending_dialogue": {
+                "slot": "laptop_usage",
+                **({"budget": _budget(normalized)} if _budget(normalized) else {}),
+            },
         }
 
     if pending and pending["slot"] == "laptop_usage":
         if _USAGE_EDIT.search(normalized) or _USAGE_PRESENT.search(normalized):
             usage = "editing" if _USAGE_EDIT.search(normalized) else "presentation"
-            amount = _budget(normalized)
+            amount = _budget(normalized) or pending.get("budget")
             if amount:
                 return {
                     "kind": "search", "query_override": "لپ تاپ",
@@ -177,7 +186,7 @@ def resolve_dialogue_policy(
     about_laptop = bool(_LAPTOP.search(normalized) or _LAPTOP.search(previous)
                         or pending and pending.get("slot") in {"laptop_usage", "laptop_budget"})
 
-    if _GPU.search(normalized) and _QUESTION.search(normalized) and not (
+    if _GPU.search(normalized) and asking and not (
         _GPU_MODEL.search(normalized) and _REQUEST.search(normalized)
     ):
         if about_laptop:
@@ -189,7 +198,7 @@ def resolve_dialogue_policy(
 
     # An unsupported technical advice question must not be interpreted as a
     # product query. We need information, not a noisy OR catalogue query.
-    if _SPEC.search(normalized) and _QUESTION.search(normalized) and not (
+    if _SPEC.search(normalized) and asking and not (
         _GPU_MODEL.search(normalized) and _REQUEST.search(normalized)
     ):
         return {
@@ -198,7 +207,7 @@ def resolve_dialogue_policy(
                      "بدون این اطلاعات، مدل یا مشخصاتی را از خودم حدس نمی‌زنم.",
         }
 
-    if _QUESTION.search(normalized) and _LAPTOP.search(normalized) and (
+    if asking and _LAPTOP.search(normalized) and (
         "چه لپ" in normalized or "کدام لپ" in normalized or "چه مدل" in normalized
     ):
         return {
