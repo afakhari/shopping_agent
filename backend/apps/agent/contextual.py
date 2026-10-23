@@ -17,7 +17,7 @@ _ORDINALS = {"اولی": 0, "اول": 0, "دومی": 1, "دوم": 1,
 _PRODUCT_REF = re.compile(
     r"^(?:(?:این |اون )?(?:مدل|محصول|گزینه) )?"
     r"(?P<ordinal>اولی|اول|دومی|دوم|سومی|سوم|چهارمی|چهارم)"
-    r"(?: (?:رو |را )?(?:انتخاب(?: کن| کردم| می کنم)?|می خوام|می پسندم|خوبه|ببین))?$"
+    r"(?: (?:رو |را )?(?:انتخاب(?: کن| کردم| می کنم)?|می خوام|می پسندم|خوبه|ببین|بیشتر دوست دارم|بهتره))?$"
 )
 _BUDGET = re.compile(
     r"(?:بودجه(?: م| من)?|سقف(?: بودجه)?|حداکثر(?: بودجه)?|تا(?: سقف)?)"
@@ -113,6 +113,17 @@ def classify_contextual_turn(message: str, state: dict[str, Any] | None) -> dict
             "kind": "clarify",
             "reply": "شرایط خرید ثبت شد. دنبال چه کالایی در تهران هستی؟",
             "pending_constraints": pending,
+        }
+
+    # If the ordinal comes with a second task, do not accidentally send it
+    # to generic OR text search, and do not silently discard the second task.
+    if previous_query and (
+        normalized.startswith(("اولی ", "دومی ", "سومی ", "چهارمی ", "مدل اول ", "مدل دوم ", "مدل سوم "))
+        or normalized in {"همون", "همین", "این", "اون"}
+    ):
+        return {
+            "kind": "clarify",
+            "reply": "منظورت یکی از مدل‌های قبلی است؟ مدل را از کارت انتخاب کن و بعد بگو چه چیزی را درباره آن بررسی کنم.",
         }
 
     # No product is implied merely because a user mentions "this" or "the second".
