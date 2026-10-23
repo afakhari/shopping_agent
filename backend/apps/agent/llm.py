@@ -55,6 +55,8 @@ def configuration_diagnostics() -> dict[str, Any]:
         status = "missing_model"
     elif not base_url_valid:
         status = "invalid_base_url"
+    elif getattr(settings, "LLM_DAILY_MAX_CALLS", None) == 0:
+        status = "daily_quota_disabled"
     else:
         # This is configuration readiness, not proof that the provider accepted a real request.
         status = "configured"
