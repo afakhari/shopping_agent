@@ -205,6 +205,34 @@ export async function sendMissionTurn(
   }
 }
 
+export interface MissionFocusAction {
+  action: 'select_product' | 'view_sellers' | 'view_products' | 'select_offer'
+  result_set_id: string
+  product_id?: string
+  offer_id?: string
+  offer_ids?: string[]
+}
+
+export interface MissionFocusResponse {
+  state: Record<string, unknown>
+  last_event_seq: number
+  events: MissionEvent[]
+}
+
+export async function updateMissionFocus(
+  missionId: string,
+  action: MissionFocusAction,
+  signal?: AbortSignal,
+): Promise<MissionFocusResponse> {
+  const response = await fetch(`/api/v1/missions/${encodeURIComponent(missionId)}/focus/`, {
+    method: 'POST',
+    signal,
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(action),
+  })
+  return readJson<MissionFocusResponse>(response)
+}
+
 export async function createContactAttempt(
   missionId: string,
   input: { shopId: string; offerId: string; purpose?: 'verify_availability' | 'verify_price' | 'verify_hours'; questions?: Array<'stock' | 'price' | 'hours'>; clientRequestId?: string },
