@@ -8,7 +8,8 @@ import { canDrainQueuedTurn } from './queue-policy'
 import { findCurrentSearchMessage, shouldFollowConversation } from './conversation-behavior'
 import { GenUIRenderer } from './GenUIRenderer'
 import { formatDistance, formatLastPriceChange, getPriceQualityLabel, openStreetMapUrl } from './ui-formatters'
-import { osmEmbedUrl, TEHRAN_REGION_SAMPLES } from './shop-map'
+import { TEHRAN_REGION_SAMPLES } from './shop-map'
+import { SellerLocationBoard } from './SellerLocationBoard'
 import { getResultPayload, getUIComponents, type GenUIAction, type GenUIComponent } from './genui-types'
 import { resolveRecoveryOffer } from './recovery-options'
 import { chooseProductHighlights } from './product-highlights'
@@ -236,7 +237,6 @@ function ProductResults({
   allowActions?: boolean
 }) {
   const [showAllResults, setShowAllResults] = useState(false)
-  const [openMapOfferId, setOpenMapOfferId] = useState<string | null>(null)
   if (results.length === 0) return <p className="mission-empty-results">با این عبارت و شرایط، محصول واجد شرایطی پیدا نشد. می‌توانی عبارت یا شروط خرید را تغییر بدهی.</p>
   const visibleResults = showAllResults ? results : results.slice(0, 4)
   return (
@@ -354,12 +354,20 @@ function ProductResults({
               {allowActions && offerView?.expanded && (
                 <section id={offersPanelId} className="mission-offer-list" aria-label={`فروشگاه‌های ${result.product.title}`} aria-busy={offerView.loading}>
                   <div className="mission-offer-list-heading">
-                    <div><strong>فروشگاه‌ها و قیمت‌ها</strong><span>قیمت‌های ثبت‌شده برای همین مدل</span></div>
+                    <div><strong>آفرهای ثبت‌شدهٔ همین مدل</strong><span>وجود آفر به معنای موجودی واقعی نیست؛ نام بسیاری از فروشگاه‌ها در دیتاست آزمایشی ساختگی است.</span></div>
                     <span className="mission-offer-total">{money.format(offerView.total || result.eligible_offers_count)} مورد</span>
                   </div>
                   {offerView.loading && offerView.offers.length === 0 && <div className="mission-offer-state"><LoaderCircle size={17} className="spin" /> در حال دریافت فروشگاه‌های واجد شرایط…</div>}
                   {offerView.error && <div className="mission-offer-error" role="alert"><span>{offerView.error}</span><button type="button" onClick={() => onToggleOffers(result)}>تلاش دوباره</button></div>}
                   {!offerView.loading && !offerView.error && offerView.offers.length === 0 && <p className="mission-offer-state">فروشگاهی با این شروط برای این مدل پیدا نشد.</p>}
+                  {offerView.offers.length > 1 && (
+                    <SellerLocationBoard
+                      offers={offerView.offers}
+                      selectedOfferId={selectedOfferId}
+                      onSelectOffer={onSelectOffer}
+                      disabled={!allowActions || offerView.loading}
+                    />
+                  )}
                   {offerView.offers.length > 1 && (
                     <p className="mission-offer-shortlist-note">برچسب‌های مقایسه فقط بین فروشگاه‌های بارگذاری‌شده هستند؛ فاصله‌ها مستقیم و ساعت کار طبق داده ثبت‌شده است.</p>
                   )}
@@ -368,7 +376,6 @@ function ProductResults({
                     const sellerDistance = formatDistance(sellerOffer.shop.distance_m)
                     const sellerUpdatedAt = formatPersianDateTime(sellerOffer.last_price_changed_at)
                     const sellerMapUrl = openStreetMapUrl(sellerOffer.shop.lat, sellerOffer.shop.lon)
-                    const inlineMapUrl = osmEmbedUrl(sellerOffer.shop.lat, sellerOffer.shop.lon)
                     return (
                       <article className="mission-offer-row" key={sellerOffer.id}>
                         <div className="mission-offer-copy">
@@ -379,7 +386,7 @@ function ProductResults({
                           </button>
                           <div className="mission-seller-heading">
                             <strong>{sellerOffer.shop.name}</strong>
-                            <span className="mission-offer-price">{formatPrice(sellerOffer.price_toman)}</span>
+                            <span className="mission-offer-price" title="قیمت ثبت‌شده، نه قیمت زنده">{formatPrice(sellerOffer.price_toman)}</span>
                           </div>
                           <div className="mission-seller-quick-facts">
                             {sellerOffer.id === relativeTags.cheapestOfferId && <span className="mission-seller-tag">ارزان‌ترین در فهرست</span>}
@@ -389,7 +396,7 @@ function ProductResults({
                           </div>
                           <div className="mission-offer-badges">
                             <span className={`mission-price-quality ${sellerOffer.price_quality}`}><i />{getPriceQualityLabel(sellerOffer.price_quality)}</span>
-                            {sellerOffer.shop.opening_status && <span>{sellerOffer.shop.opening_status.label}</span>}
+                            {sellerOffer.shop.opening_status && <span title="بر اساس برنامه ثبت‌شده؛ باز بودن واقعی مشخص نیست">ساعات ثبت‌شده: {sellerOffer.shop.opening_status.label}</span>}
                           </div>
                           <details className="mission-seller-details">
                             <summary>آدرس، گارانتی و اطلاعات تکمیلی</summary>
@@ -403,33 +410,26 @@ function ProductResults({
                               <small>اعتبار حضوری: {sellerOffer.in_person_credit_eligible ? 'برای این آفر ثبت‌شده' : 'برای این آفر ثبت نشده'}</small>
                               {sellerUpdatedAt && <small><Clock3 size={12} aria-hidden="true" />آخرین تغییر قیمت ثبت‌شده: {sellerUpdatedAt}</small>}
                               {sellerMapUrl && <a className="mission-offer-map" href={sellerMapUrl} target="_blank" rel="noopener noreferrer"><MapPin size={12} /> موقعیت روی نقشه <ExternalLink size={11} /></a>}
-                              {inlineMapUrl && <button className="mission-inline-map-toggle" type="button" aria-expanded={openMapOfferId === sellerOffer.id} onClick={() => setOpenMapOfferId(current => current === sellerOffer.id ? null : sellerOffer.id)}>
-                                <MapPin size={12} />{openMapOfferId === sellerOffer.id ? 'بستن نقشه' : 'نقشه در همین صفحه'}
-                              </button>}
+                              <small>برای بررسی موقعیت‌ها در یک جا، «مقایسهٔ مکان فروشگاه‌ها» را در ابتدای فهرست باز کن.</small>
                             </div>
                           </details>
                         </div>
-                        {inlineMapUrl && openMapOfferId === sellerOffer.id && (
-                          <div className="mission-inline-map" role="region" aria-label={`پیش‌نمایش نقشه فروشگاه ${sellerOffer.shop.name}`}>
-                            <iframe src={inlineMapUrl} title={`موقعیت ثبت‌شده ${sellerOffer.shop.name} روی OpenStreetMap`} loading="lazy" referrerPolicy="no-referrer" />
-                            <small>مختصات ثبت‌شده فروشگاه؛ زمان سفر و مسیر داخل پاساژ تأیید نشده‌اند.</small>
-                          </div>
-                        )}
+
                         <button
                           type="button"
                           className="mission-offer-verify"
                           onClick={() => onContact({ ...result, best_offer: sellerOffer })}
-                          disabled={contactingOfferId === sellerOffer.id || !missionId}
+                          disabled={!allowActions || contactingOfferId === sellerOffer.id || !missionId}
                         >
                           {contactingOfferId === sellerOffer.id ? <LoaderCircle size={15} className="spin" /> : <ShieldCheck size={15} />}
                           {contactingOfferId === sellerOffer.id ? 'در حال بررسی…' : 'استعلام آزمایشی فروشنده'}
                         </button>
-                        {attempt && sellerOffer.id !== offer.id && <div className={`mission-offer-attempt ${attempt.attempt.outcome === 'confirmed_available' ? 'success' : 'warning'}`} aria-live="polite"><strong>{OUTCOME_LABELS[attempt.attempt.outcome]}</strong><span>{attempt.attempt.response_text}</span></div>}
+                        {attempt && sellerOffer.id !== offer.id && <div className="mission-offer-attempt warning" aria-live="polite"><strong>{OUTCOME_LABELS[attempt.attempt.outcome]}</strong><span>{attempt.attempt.response_text}</span></div>}
                       </article>
                     )
                   })}
                   {offerView.offers.length < offerView.total && (
-                    <button type="button" className="mission-offer-load-more" onClick={() => onLoadMoreOffers(result)} disabled={offerView.loading}>
+                    <button type="button" className="mission-offer-load-more" onClick={() => onLoadMoreOffers(result)} disabled={!allowActions || offerView.loading}>
                       {offerView.loading ? <LoaderCircle size={15} className="spin" /> : null}
                       {offerView.loading ? 'در حال دریافت…' : `نمایش فروشگاه‌های بیشتر (${money.format(offerView.offers.length)} از ${money.format(offerView.total)})`}
                     </button>
@@ -437,7 +437,7 @@ function ProductResults({
                 </section>
               )}
               {contact && (
-                <div className={`mission-contact-result ${contact.attempt.outcome === 'confirmed_available' ? 'success' : 'warning'}`} aria-live="polite">
+                <div className="mission-contact-result warning" aria-live="polite">
                   <strong>{OUTCOME_LABELS[contact.attempt.outcome]}</strong>
                   <span>{contact.attempt.response_text}</span>
                 </div>
@@ -1577,7 +1577,10 @@ export function MissionPanel({
               {item.results && item.results.length > 0 && (
                 <div className="mission-results-block conversation-results-block">
                   <div className="mission-results-header">
-                    <div><h3>مدل‌هایی که می‌توانی بررسی کنی</h3>{isCurrentResult && <p className="mission-results-guidance">مدل را مقایسه کن یا فروشگاه‌هایش را ببین.</p>}</div>
+                    <div><h3>مدل‌هایی که می‌توانی بررسی کنی</h3>
+                      {isCurrentResult && <p className="mission-results-guidance">مدل را مقایسه کن یا فروشگاه‌هایش را ببین.</p>}
+                      <p className="mission-results-data-warning">قیمت‌ها ثبت‌شده و ممکن است قدیمی باشند؛ موجودی حضوری تأیید نشده است. نام بیشتر فروشگاه‌ها در دادهٔ مسابقه ساختگی است. برای مراجعه واقعی به نام یا شماره تماس این داده تکیه نکن.</p>
+                    </div>
                     <div className="mission-results-header-actions">
                       <span>{money.format(item.resultCount ?? item.results.length)} محصول</span>
                       {isCurrentResult && <button type="button" className="mission-edit-filters" onClick={() => handleGenUIAction({ type: 'open_filter_form' })} disabled={isRunning || isRestoring}><SlidersHorizontal size={15} /> تغییر شرایط</button>}

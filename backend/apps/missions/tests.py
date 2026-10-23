@@ -242,6 +242,10 @@ class MissionApiTests(TestCase):
         ]
         self.assertTrue(visit_plan_events)
         self.assertIn("شبیه‌سازی", visit_plan_events[0]["payload"]["data"]["source_label"])
+        plan = visit_plan_events[0]["payload"]["data"]
+        self.assertIn("دمو", plan["title"])
+        self.assertIn("ساختگی", plan["source_label"])
+        self.assertIn("تأیید نشده‌اند", plan["source_label"])
         self.assertEqual(ContactAttempt.objects.count(), 2)
 
     def test_constraints_inferred_from_message_are_persisted_for_later_actions(self):

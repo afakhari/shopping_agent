@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { osmEmbedUrl, TEHRAN_REGION_SAMPLES } from './shop-map'
+import { isTehranCatalogPoint, osmEmbedUrl, TEHRAN_REGION_SAMPLES } from './shop-map'
 
 describe('map fallback and manual area anchors', () => {
   it('accepts a real Tehran point and encodes a marker', () => {
@@ -15,6 +15,13 @@ describe('map fallback and manual area anchors', () => {
     expect(osmEmbedUrl(Number.NaN, 51.4)).toBeNull()
     expect(osmEmbedUrl(95, 51.4)).toBeNull()
     expect(osmEmbedUrl(35.7, 190)).toBeNull()
+  })
+
+  it('rejects off-dataset world positions without calling a geocoder', () => {
+    expect(isTehranCatalogPoint(35.7, 51.4)).toBe(true)
+    expect(isTehranCatalogPoint(52.52, 13.405)).toBe(false)
+    expect(isTehranCatalogPoint(null, 51.4)).toBe(false)
+    expect(isTehranCatalogPoint(35.7, Number.POSITIVE_INFINITY)).toBe(false)
   })
 
   it('keeps manual catalog samples within supported Tehran coordinates', () => {
