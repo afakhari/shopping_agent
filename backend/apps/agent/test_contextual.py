@@ -174,6 +174,12 @@ class ContextualMissionApiTests(TestCase):
         }, format="json")
         self.assertEqual(selected.status_code, 200, selected.content)
         self.assertEqual(selected.json()["state"]["selected_product_id"], first_id)
+        repeated = self.client.post(endpoint, {
+            "action": "select_product", "product_id": first_id,
+            "result_set_id": result_set_id,
+        }, format="json")
+        self.assertEqual(repeated.status_code, 200)
+        self.assertEqual(repeated.json()["events"], [])
         matching = Offer.objects.filter(product_id=first_id).first()
         self.assertIsNotNone(matching)
         focused = self.client.post(endpoint, {
