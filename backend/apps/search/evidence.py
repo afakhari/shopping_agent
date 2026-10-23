@@ -15,10 +15,10 @@ from apps.catalog.services.normalization import normalize_persian_text
 # These guidelines are advisory: the buyer did not necessarily select Premiere.
 _ADOBE_HD_RAM_RECOMMENDED_GB = 16
 _ADOBE_4K_RAM_RECOMMENDED_GB = 32
-_RAM_KEYS = frozenset({
+_RAM_KEYS = (
     "مقدار حافظه رم", "ظرفیت حافظه رم", "ظرفیت رم",
     "حجم رم", "حافظه رم", "مقدار رم",
-})
+)
 _RAM_VALUE = re.compile(r"^(?P<value>\d{1,3})\s*(?:gb|گیگابایت)$")
 _RAM_TITLE = re.compile(
     r"(?:\b(?P<before>\d{1,3})\s*gb\s*ram\b|"
@@ -80,6 +80,7 @@ def editing_laptop_evidence(
         _ADOBE_4K_RAM_RECOMMENDED_GB if intensity == "heavy"
         else _ADOBE_HD_RAM_RECOMMENDED_GB
     )
+    adobe_example = "4K" if intensity == "heavy" else "HD"
     notes: list[str] = []
     if editing_declared:
         notes.append("کاربری تدوین در مشخصات ثبت شده است")
@@ -88,12 +89,12 @@ def editing_laptop_evidence(
     elif ram_gb < preferred_ram:
         notes.append(
             f"RAM ثبت‌شده {ram_gb} گیگابایت است؛ کمتر از مقدار پیشنهادی "
-            "Adobe Premiere برای این سطح تدوین"
+            "Adobe Premiere برای ویدیوی {adobe_example}"
         )
     else:
         notes.append(
             f"RAM ثبت‌شده {ram_gb} گیگابایت است؛ از مقدار پیشنهادی "
-            "Adobe Premiere برای این سطح تدوین کمتر نیست"
+            "Adobe Premiere برای ویدیوی {adobe_example} کمتر نیست"
         )
     if ssd_stated:
         notes.append("ذخیره‌سازی SSD در دادهٔ این مدل ذکر شده است")
