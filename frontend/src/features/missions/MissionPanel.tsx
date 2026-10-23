@@ -289,6 +289,15 @@ function ProductResults({
                   <div key={item.key}><dt>{item.key}</dt><dd>{item.value}</dd></div>
                 ))}
               </dl>}
+              {result.recommendation_evidence && (
+                <details className="mission-product-evidence">
+                  <summary>شواهد ثبت‌شده برای تدوین ویدیو <ChevronDown size={14} aria-hidden="true" /></summary>
+                  <ul>{result.recommendation_evidence.notes.map((note) =>
+                    <li key={note}>{note}</li>
+                  )}</ul>
+                  <p>{result.recommendation_evidence.caveat}</p>
+                </details>
+              )}
               <details className="mission-product-details">
                 <summary>
                   جزئیات
