@@ -366,7 +366,7 @@ function ProductResults({
                   {offerView.loading && offerView.offers.length === 0 && <div className="mission-offer-state"><LoaderCircle size={17} className="spin" /> در حال دریافت فروشگاه‌های واجد شرایط…</div>}
                   {offerView.error && <div className="mission-offer-error" role="alert"><span>{offerView.error}</span><button type="button" onClick={() => onToggleOffers(result)}>تلاش دوباره</button></div>}
                   {!offerView.loading && !offerView.error && offerView.offers.length === 0 && <p className="mission-offer-state">فروشگاهی با این شروط برای این مدل پیدا نشد.</p>}
-                  {offerView.offers.length > 1 && (
+                  {offerView.offers.length > 0 && (
                     <SellerLocationBoard
                       offers={offerView.offers}
                       selectedOfferId={selectedOfferId}
