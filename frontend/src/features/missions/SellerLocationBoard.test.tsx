@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import type { CatalogOffer } from '../search/catalog-api'
-import { SellerLocationBoard, geographicallyMappedOffers, selectedMappedOffer } from './SellerLocationBoard'
+import {
+  SellerLocationBoard, geographicallyMappedOffers, paidNeshanRoutingUiEnabled, selectedMappedOffer,
+} from './SellerLocationBoard'
 
 function offer(id: string, lat: number | null, lon: number | null): CatalogOffer {
   return {
@@ -68,13 +70,25 @@ describe('seller location trust and coordinated selection', () => {
     expect(markup).not.toContain('<iframe')
   })
 
-  it('does not render ETA or contact Neshan before user action', () => {
+  it('hides paid routing and provider-capability prompts in the default free experience', () => {
+    expect(paidNeshanRoutingUiEnabled).toBe(false)
     const markup = renderToStaticMarkup(<SellerLocationBoard
       offers={shops} selectedOfferId="second" onSelectOffer={() => {}} disabled={false}
       missionId="mission1" resultSetId="set1" origin={{ lat: 35.7, lon: 51.4 }} />)
-    expect(markup).toContain('مقایسه زمان سفر با نشان')
-    expect(markup).toContain('وضعیت سرویس پس از بازکردن')
+    expect(markup).not.toContain('mission-neshan-routing')
+    expect(markup).not.toContain('اتصال مسیریابی نشان هنوز فعال نشده است')
+    expect(markup).not.toContain('مقایسه زمان سفر با نشان')
     expect(markup).not.toContain('دقیقه</strong>')
+    expect(markup).toContain('فاصله مستقیم، زمان سفر نیست')
+  })
+
+  it('renders map access even if only one seller is eligible', () => {
+    const markup = renderToStaticMarkup(<SellerLocationBoard
+      offers={[shops[0]]} selectedOfferId="first" onSelectOffer={() => {}} disabled={false}
+      missionId="mission1" resultSetId="set1" origin={null} />)
+    expect(markup).toContain('موقعیت فروشنده')
+    expect(markup).toContain('نمایش نقشه OpenStreetMap')
+    expect(markup).not.toContain('mission-neshan-routing')
   })
 
   it('asks for a seller from this product when focus belongs to another product', () => {
