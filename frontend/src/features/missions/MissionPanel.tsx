@@ -820,7 +820,7 @@ export function MissionPanel({
   const applyFocus = async (input: Omit<MissionFocusAction, 'result_set_id'>) => {
     const activeId = missionIdRef.current
     const activeResultId = resultSetIdRef.current ?? resultSetId
-    if (isRunning || isRestoring || turnInFlightRef.current || resultsStale || !activeId || !activeResultId) {
+    if (isRunning || isRestoring || turnInFlightRef.current || queuePausedRef.current || resultsStale || !activeId || !activeResultId) {
       setError('نتایج این جست‌وجو آماده یا معتبر نیستند؛ ابتدا وضعیت را به‌روز کن.')
       return
     }
@@ -1567,7 +1567,7 @@ export function MissionPanel({
                     offerViews={offerViews}
                     onToggleOffers={toggleProductOffers}
                     onLoadMoreOffers={loadMoreProductOffers}
-                    allowActions={isCurrentResult && !resultsStale && !isRunning && !isRestoring}
+                    allowActions={isCurrentResult && !resultsStale && !queuePaused && !isRunning && !isRestoring}
                   />
                 </div>
               )}
