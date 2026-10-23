@@ -433,7 +433,7 @@ function ProductResults({
                           {contactingOfferId === sellerOffer.id ? <LoaderCircle size={15} className="spin" /> : <ShieldCheck size={15} />}
                           {contactingOfferId === sellerOffer.id ? 'در حال بررسی…' : 'استعلام آزمایشی فروشنده'}
                         </button>
-                        {attempt && sellerOffer.id !== offer.id && <div className={`mission-offer-attempt ${attempt.attempt.outcome === 'confirmed_available' ? 'success' : 'warning'}`} aria-live="polite"><strong>{OUTCOME_LABELS[attempt.attempt.outcome]}</strong><span>{attempt.attempt.response_text}</span></div>}
+                        {attempt && sellerOffer.id !== offer.id && <div className={`mission-offer-attempt warning`} aria-live="polite"><strong>{OUTCOME_LABELS[attempt.attempt.outcome]}</strong><span>{attempt.attempt.response_text}</span></div>}
                       </article>
                     )
                   })}
@@ -446,7 +446,7 @@ function ProductResults({
                 </section>
               )}
               {contact && (
-                <div className={`mission-contact-result ${contact.attempt.outcome === 'confirmed_available' ? 'success' : 'warning'}`} aria-live="polite">
+                <div className={`mission-contact-result warning`} aria-live="polite">
                   <strong>{OUTCOME_LABELS[contact.attempt.outcome]}</strong>
                   <span>{contact.attempt.response_text}</span>
                 </div>
