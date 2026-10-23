@@ -9,6 +9,7 @@ import { findCurrentSearchMessage, shouldFollowConversation } from './conversati
 import { GenUIRenderer } from './GenUIRenderer'
 import { formatDistance, formatLastPriceChange, getPriceQualityLabel, openStreetMapUrl } from './ui-formatters'
 import { osmEmbedUrl, TEHRAN_REGION_SAMPLES } from './shop-map'
+import { SellerLocationBoard } from './SellerLocationBoard'
 import { getResultPayload, getUIComponents, type GenUIAction, type GenUIComponent } from './genui-types'
 import { resolveRecoveryOffer } from './recovery-options'
 import { chooseProductHighlights } from './product-highlights'
@@ -354,12 +355,20 @@ function ProductResults({
               {allowActions && offerView?.expanded && (
                 <section id={offersPanelId} className="mission-offer-list" aria-label={`فروشگاه‌های ${result.product.title}`} aria-busy={offerView.loading}>
                   <div className="mission-offer-list-heading">
-                    <div><strong>فروشگاه‌ها و قیمت‌ها</strong><span>قیمت‌های ثبت‌شده برای همین مدل</span></div>
+                    <div><strong>آفرهای ثبت‌شدهٔ همین مدل</strong><span>وجود آفر به معنای موجودی واقعی نیست؛ نام بسیاری از فروشگاه‌ها در دیتاست آزمایشی ساختگی است.</span></div>
                     <span className="mission-offer-total">{money.format(offerView.total || result.eligible_offers_count)} مورد</span>
                   </div>
                   {offerView.loading && offerView.offers.length === 0 && <div className="mission-offer-state"><LoaderCircle size={17} className="spin" /> در حال دریافت فروشگاه‌های واجد شرایط…</div>}
                   {offerView.error && <div className="mission-offer-error" role="alert"><span>{offerView.error}</span><button type="button" onClick={() => onToggleOffers(result)}>تلاش دوباره</button></div>}
                   {!offerView.loading && !offerView.error && offerView.offers.length === 0 && <p className="mission-offer-state">فروشگاهی با این شروط برای این مدل پیدا نشد.</p>}
+                  {offerView.offers.length > 1 && (
+                    <SellerLocationBoard
+                      offers={offerView.offers}
+                      selectedOfferId={selectedOfferId}
+                      onSelectOffer={onSelectOffer}
+                      disabled={!allowActions || offerView.loading}
+                    />
+                  )}
                   {offerView.offers.length > 1 && (
                     <p className="mission-offer-shortlist-note">برچسب‌های مقایسه فقط بین فروشگاه‌های بارگذاری‌شده هستند؛ فاصله‌ها مستقیم و ساعت کار طبق داده ثبت‌شده است.</p>
                   )}
@@ -379,7 +388,7 @@ function ProductResults({
                           </button>
                           <div className="mission-seller-heading">
                             <strong>{sellerOffer.shop.name}</strong>
-                            <span className="mission-offer-price">{formatPrice(sellerOffer.price_toman)}</span>
+                            <span className="mission-offer-price" title="قیمت ثبت‌شده، نه قیمت زنده">{formatPrice(sellerOffer.price_toman)}</span>
                           </div>
                           <div className="mission-seller-quick-facts">
                             {sellerOffer.id === relativeTags.cheapestOfferId && <span className="mission-seller-tag">ارزان‌ترین در فهرست</span>}
@@ -389,7 +398,7 @@ function ProductResults({
                           </div>
                           <div className="mission-offer-badges">
                             <span className={`mission-price-quality ${sellerOffer.price_quality}`}><i />{getPriceQualityLabel(sellerOffer.price_quality)}</span>
-                            {sellerOffer.shop.opening_status && <span>{sellerOffer.shop.opening_status.label}</span>}
+                            {sellerOffer.shop.opening_status && <span title="بر اساس برنامه ثبت‌شده؛ باز بودن واقعی مشخص نیست">ساعات ثبت‌شده: {sellerOffer.shop.opening_status.label}</span>}
                           </div>
                           <details className="mission-seller-details">
                             <summary>آدرس، گارانتی و اطلاعات تکمیلی</summary>
@@ -1577,7 +1586,10 @@ export function MissionPanel({
               {item.results && item.results.length > 0 && (
                 <div className="mission-results-block conversation-results-block">
                   <div className="mission-results-header">
-                    <div><h3>مدل‌هایی که می‌توانی بررسی کنی</h3>{isCurrentResult && <p className="mission-results-guidance">مدل را مقایسه کن یا فروشگاه‌هایش را ببین.</p>}</div>
+                    <div><h3>مدل‌هایی که می‌توانی بررسی کنی</h3>
+                      {isCurrentResult && <p className="mission-results-guidance">مدل را مقایسه کن یا فروشگاه‌هایش را ببین.</p>}
+                      <p className="mission-results-data-warning">قیمت‌ها ثبت‌شده و ممکن است قدیمی باشند؛ موجودی حضوری تأیید نشده است. نام بیشتر فروشگاه‌ها در دادهٔ مسابقه ساختگی است. برای مراجعه واقعی به نام یا شماره تماس این داده تکیه نکن.</p>
+                    </div>
                     <div className="mission-results-header-actions">
                       <span>{money.format(item.resultCount ?? item.results.length)} محصول</span>
                       {isCurrentResult && <button type="button" className="mission-edit-filters" onClick={() => handleGenUIAction({ type: 'open_filter_form' })} disabled={isRunning || isRestoring}><SlidersHorizontal size={15} /> تغییر شرایط</button>}
