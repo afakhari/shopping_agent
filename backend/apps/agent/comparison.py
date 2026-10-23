@@ -9,6 +9,7 @@ from typing import Any
 
 from apps.catalog.models import Product
 from apps.search.services import eligible_offer_list
+from apps.search.credit import offer_supports_in_person_credit
 
 
 def build_evidence_comparison(product_ids: list[str], filters: dict[str, Any]) -> dict[str, Any] | None:
@@ -58,7 +59,7 @@ def build_evidence_comparison(product_ids: list[str], filters: dict[str, Any]) -
             "brand": product.brand_name or "ثبت نشده",
             "model": product.model or "ثبت نشده",
             "shop": offer.shop.name or "نامشخص",
-            "credit": "برای این آفر ثبت‌شده" if getattr(offer, "in_person_credit_eligible", False) else "برای این آفر ثبت نشده",
+            "credit": "برای این آفر ثبت‌شده" if offer_supports_in_person_credit(offer) else "برای این آفر ثبت نشده",
             "updated": offer.last_price_changed_at.isoformat() if offer.last_price_changed_at else "ثبت نشده",
         }
         for index, key in enumerate(selected_keys):
