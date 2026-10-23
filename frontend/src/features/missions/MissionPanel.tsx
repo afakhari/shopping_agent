@@ -410,7 +410,7 @@ function ProductResults({
                               <small>اعتبار حضوری: {sellerOffer.in_person_credit_eligible ? 'برای این آفر ثبت‌شده' : 'برای این آفر ثبت نشده'}</small>
                               {sellerUpdatedAt && <small><Clock3 size={12} aria-hidden="true" />آخرین تغییر قیمت ثبت‌شده: {sellerUpdatedAt}</small>}
                               {sellerMapUrl && <a className="mission-offer-map" href={sellerMapUrl} target="_blank" rel="noopener noreferrer"><MapPin size={12} /> موقعیت روی نقشه <ExternalLink size={11} /></a>}
-                              <small>برای بررسی موقعیت‌ها در یک جا، «مقایسهٔ مکان فروشگاه‌ها» را در ابتدای فهرست باز کن.</small>}
+                              <small>برای بررسی موقعیت‌ها در یک جا، «مقایسهٔ مکان فروشگاه‌ها» را در ابتدای فهرست باز کن.</small>
                             </div>
                           </details>
                         </div>
