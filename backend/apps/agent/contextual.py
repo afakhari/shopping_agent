@@ -27,7 +27,6 @@ _BUDGET = re.compile(
 _CREDIT = re.compile(r"(?:قسطی|اعتباری|ترب ?پی)")
 _CREDIT_NEGATION = re.compile(r"(?:بدون|نمی ?خوام|لازم نیست|نمی ?خوامش).{0,24}(?:قسطی|اعتباری|ترب ?پی)|(?:قسطی|اعتباری).{0,12}(?:نباشه|نمی ?خوام)")
 _MORE_GENERAL = re.compile(r"^(?:فقط |لطفا |لطفاً )?(?:قسطی|اعتباری|ترب ?پی)(?: باشه| می خوام)?$")
-_PRICE_ONLY = re.compile(r"^(?:(?:بودجه|سقف|حداکثر|تا|فقط|قیمت|مبلغ|می خوام|کمتر|بیشتر|ارزون ?تر|ارزان ?تر|شد|شده|رو|را|م|من|تومان|میلیون|هزار|از|نکن|کن|بذار|بزار|برام)\s*)+[\d\s.,]*)+$")
 _WHY = re.compile(r"^(?:چرا|به چه دلیل|دلیلش چیه|چرا اینو پیشنهاد دادی|چرا این مدل)(?:.*)?$")
 _SELLER_WORDS = re.compile(r"(?:فروشنده|فروشگاه|مغازه|پاساژ)")
 _STORE_QUESTION = re.compile(r"(?:ساعت|باز(?:ه| است)|بسته|آدرس|نشانی|کجا|موجودی|تلفن|تماس)")
@@ -88,9 +87,8 @@ def classify_contextual_turn(message: str, state: dict[str, Any] | None) -> dict
     credit = bool(_CREDIT.search(normalized))
     credit_only = bool(_MORE_GENERAL.match(normalized))
     sort_only = normalized in {"ارزون ترین", "ارزان ترین", "کمترین قیمت", "نزدیک ترین", "نزدیکترین", "تازه ترین قیمت"}
-    budget_only = value is not None and (
-        _PRICE_ONLY.fullmatch(normalized) is not None
-        or normalized.startswith(("بودجه", "سقف", "حداکثر", "تا "))
+    budget_only = value is not None and normalized.startswith(
+        ("بودجه", "سقف", "حداکثر", "تا ")
     )
     if previous_query and (budget_only or credit_only or sort_only or (
         credit and len(normalized.split()) <= 5 and not _STORE_QUESTION.search(normalized)
