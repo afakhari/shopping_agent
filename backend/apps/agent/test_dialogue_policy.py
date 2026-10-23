@@ -49,6 +49,38 @@ class DialoguePolicyContractTests(SimpleTestCase):
         self.assertEqual(third["kind"], "search")
         self.assertEqual(third["constraint_updates"]["max_price_toman"], "40000000")
 
+    def test_video_editing_recommendation_is_saved_until_budget_answer(self):
+        first = resolve_dialogue_policy(
+            "چه لپ تاپی برای تدوین ویدیو مناسب من هست؟", {}
+        )
+        self.assertEqual(first["kind"], "clarify")
+        self.assertEqual(first["pending_dialogue"]["slot"], "laptop_budget")
+        self.assertEqual(first["pending_dialogue"]["usage"], "editing")
+        continued = resolve_dialogue_policy(
+            "تدوین ویدیوی سبک و قیمت تا سقف 200 میلیون",
+            {"pending_dialogue": first["pending_dialogue"]},
+        )
+        self.assertEqual(continued["kind"], "search")
+        self.assertEqual(continued["query_override"], "لپ تاپ")
+        self.assertEqual(continued["usage_profile"], "video_editing")
+        self.assertEqual(
+            continued["constraint_updates"]["max_price_toman"], "200000000"
+        )
+
+    def test_single_message_video_editing_with_budget_keeps_product_family(self):
+        result = resolve_dialogue_policy(
+            "لپ تاپ مناسب تدوین ویدیو تا ۲۰۰ میلیون میخوام", {}
+        )
+        self.assertEqual(result["query_override"], "لپ تاپ")
+        self.assertEqual(result["usage_profile"], "video_editing")
+        self.assertEqual(result["constraint_updates"]["max_price_toman"], "200000000")
+
+    def test_unrelated_video_editing_without_laptop_stays_unresolved(self):
+        result = resolve_dialogue_policy(
+            "تدوین ویدیوی سبک و قیمت تا سقف 200 میلیون", {}
+        )
+        self.assertIsNone(result)
+
     def test_technical_advice_never_turns_into_unrelated_product_search(self):
         queries = [
             "من دقیقا نمیدونم لپ تاپی که باید بخرم باید کارت گرافیک داشته باشه یا نه",
