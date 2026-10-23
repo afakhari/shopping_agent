@@ -208,7 +208,7 @@ def mission_turn(request, mission_id: str):
             "kind": "clarify",
             "reply": "برای مرتب‌سازی فروشگاه‌ها بر اساس نزدیکی، ابتدا موقعیت یا محدوده تهران را انتخاب کن.",
         }
-    if decision["kind"] in {"select_product", "select_offer", "seller_details", "seller_recovery", "explain", "clarify"}:
+    if decision["kind"] in {"select_product", "explore_sellers", "contact_prompt", "select_offer", "seller_details", "seller_recovery", "explain", "clarify"}:
         # No extra LLM call for a grounded contextual turn. Re-evaluate every
         # selection with the *effective* constraints inside the row lock.
         with transaction.atomic():
@@ -232,7 +232,7 @@ def mission_turn(request, mission_id: str):
                     mission.save(update_fields=["constraints", "state", "updated_at"])
             selected_id = None
             extra_ui = None
-            if decision["kind"] == "select_product":
+            if decision["kind"] in {"select_product", "explore_sellers"}:
                 selected_id = decision["product_id"]
                 state = mission.state or {}
                 allowed = selected_id in state.get("visible_product_ids", [])
@@ -249,7 +249,7 @@ def mission_turn(request, mission_id: str):
                         mission.current_stage = "product_selected"
                         reply = (f"«{product.persian_title or selected_id}» انتخاب شد. "
                                  "آفر ثبت‌شده به معنی موجودی تأییدشده نیست.")
-                        if decision.get("explore_sellers"):
+                        if decision.get("explore_sellers") or decision["kind"] == "explore_sellers":
                             from apps.search.services import offer_ordering
                             filters = _search_filterset(mission.constraints or {})
                             if decision.get("prefer_distance") and filters.get("lat") is not None:
@@ -276,6 +276,32 @@ def mission_turn(request, mission_id: str):
                 else:
                     selected_id = None
                     reply = "این نتیجه یا فیلترهای آن تغییر کرده‌اند؛ قبل از انتخاب، جست‌وجو را به‌روز کن."
+            elif decision["kind"] == "contact_prompt":
+                state = mission.state or {}
+                offer_id = decision["offer_id"]
+                if state.get("results_stale") or offer_id != state.get("selected_offer_id"):
+                    reply = "این فروشنده دیگر انتخاب معتبر جاری نیست؛ از فهرست فروشنده‌های همین محصول انتخاب کن."
+                else:
+                    offer = eligible_offer_list(
+                        _search_filterset(mission.constraints or {})
+                    ).filter(source_id=offer_id).select_related("shop", "product").first()
+                    if offer is None:
+                        reply = "آفر فروشنده با شروط فعلی خرید مطابق نیست؛ نتایج را تازه کن."
+                    else:
+                        reply = (
+                            f"برای «{offer.product.persian_title}» از «{offer.shop.name}» "
+                            "می‌توانم فقط یک بررسی شبیه‌سازی‌شده اجرا کنم. "
+                            "هیچ تماس واقعی با فروشگاه انجام نمی‌شود و موجودی حضوری تأیید نمی‌شود. "
+                            "فقط با انتخاب دکمهٔ تأیید، شبیه‌ساز اجرا خواهد شد."
+                        )
+                        extra_ui = ("contact_prompt", {
+                            "offer_id": offer.source_id,
+                            "shop_id": offer.shop_id,
+                            "shop_name": offer.shop.name,
+                            "product_id": offer.product_id,
+                            "product_title": offer.product.persian_title,
+                            "source_type": "demo_simulation",
+                        })
             elif decision["kind"] in {"select_offer", "seller_details"}:
                 offer_id = decision["offer_id"]
                 state = mission.state or {}
