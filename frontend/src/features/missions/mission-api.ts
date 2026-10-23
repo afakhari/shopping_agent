@@ -207,6 +207,54 @@ export async function sendMissionTurn(
   }
 }
 
+export interface RoutingCapability {
+  provider: 'neshan'
+  enabled: boolean
+  modes: Array<'car' | 'motorcycle'>
+}
+
+export interface RouteEstimateResponse {
+  provider: 'neshan'
+  mode: 'car' | 'motorcycle'
+  status: 'ok' | 'unavailable'
+  reason?: string
+  measured_at?: string
+  estimates: Array<{
+    offer_id: string
+    status: 'ok' | 'no_route' | 'unknown_error'
+    duration_seconds?: number
+    route_distance_meters?: number
+  }>
+  availability_verified: false
+  source: 'provider_route_estimate'
+}
+
+export async function getRoutingCapability(missionId: string, signal?: AbortSignal): Promise<RoutingCapability> {
+  const response = await fetch(`/api/v1/missions/${encodeURIComponent(missionId)}/route-estimates/`, {
+    headers: { Accept: 'application/json' }, signal,
+  })
+  return readJson<RoutingCapability>(response)
+}
+
+export async function requestRouteEstimates(
+  missionId: string,
+  params: {
+    result_set_id: string
+    origin: { lat: number; lon: number; source: 'manual_region' }
+    offer_ids: string[]
+    mode: 'car' | 'motorcycle'
+  },
+  signal?: AbortSignal,
+): Promise<RouteEstimateResponse> {
+  const response = await fetch(`/api/v1/missions/${encodeURIComponent(missionId)}/route-estimates/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    signal,
+    body: JSON.stringify(params),
+  })
+  return readJson<RouteEstimateResponse>(response)
+}
+
 export interface MissionFocusAction {
   action: 'select_product' | 'view_sellers' | 'view_products' | 'select_offer' | 'set_compare'
   result_set_id: string

@@ -116,3 +116,13 @@ class ContactAttempt(models.Model):
 
     def __str__(self) -> str:
         return f"Contact {self.id} to {self.shop_id}: {self.outcome}"
+
+
+class RoutingDailyUsage(models.Model):
+    """Database-backed shared cap across workers and missions for paid Neshan calls."""
+
+    day = models.DateField(primary_key=True)
+    requests = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        db_table = "mission_routing_daily_usage"

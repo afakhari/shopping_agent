@@ -8,6 +8,7 @@ from decimal import Decimal
 from typing import Any, Iterator
 
 from django.db import transaction
+from django.utils import timezone
 from django.http import StreamingHttpResponse
 from django.shortcuts import get_object_or_404
 from rest_framework.decorators import api_view, renderer_classes
@@ -23,7 +24,7 @@ from apps.agent.comparison import build_evidence_comparison
 from apps.agent.simulator import serialize_contact_attempt, simulate_contact
 from apps.agent.contact_evidence import build_contact_evidence
 from apps.catalog.models import Offer, Product
-from apps.missions.models import ContactAttempt, PurchaseMission
+from apps.missions.models import ContactAttempt, PurchaseMission, RoutingDailyUsage
 from apps.missions.renderers import ServerSentEventRenderer
 from apps.missions.serializers import (
     ContactAttemptCreateSerializer,
@@ -31,9 +32,15 @@ from apps.missions.serializers import (
     MissionCreateSerializer,
     MissionTurnSerializer,
     MissionFocusSerializer,
+    RouteEstimatesSerializer,
 )
 from apps.missions.services import append_events_locked, serialize_mission
 from apps.missions.visit_plan import build_visit_plan
+from apps.missions.neshan_routing import (
+    RoutingUnavailable, neshan_enabled, read_matrix,
+    safe_response, successful_response,
+)
+from django.conf import settings
 from apps.catalog.services.normalization import normalize_persian_text
 from apps.search.services import eligible_offer_list, product_search_page, serialize_offer
 
@@ -513,7 +520,7 @@ def mission_turn(request, mission_id: str):
         )
         result_set_id = uuid.uuid4().hex
         mission.state = {
-            **{k: v for k, v in last_state.items() if k in {"last_contact_attempt_id", "last_contact_outcome"}},
+            **{k: v for k, v in last_state.items() if k in {"last_contact_attempt_id", "last_contact_outcome", "neshan_route_calls"}},
             "result_set_id": result_set_id,
             "results_stale": False,
             "active_surface": "products",
@@ -643,6 +650,95 @@ def mission_focus(request, mission_id: str):
         })])
     return Response({"state": mission.state, "last_event_seq": mission.last_event_seq,
                      "events": events})
+
+
+@api_view(["GET", "POST"])
+def route_estimates(request, mission_id: str):
+    """Optional paid ETA; only for eligible, visible sellers on user request."""
+    mission = _owned_mission(request, mission_id)
+    if request.method == "GET":
+        enabled = neshan_enabled()
+        return Response({"provider": "neshan", "enabled": enabled,
+                         "modes": ["car", "motorcycle"] if enabled else []})
+
+    serializer = RouteEstimatesSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    data = serializer.validated_data
+    state = mission.state or {}
+    if state.get("results_stale") or state.get("result_set_id") != data["result_set_id"]:
+        raise ValidationError({"result_set_id": "این فهرست دیگر معتبر نیست؛ ابتدا نتایج را تازه کن."})
+    if state.get("active_surface") != "sellers":
+        raise ValidationError({"offer_ids": "برای مسیر، ابتدا فهرست فروشنده‌های همان مدل را باز کن."})
+    ids = data["offer_ids"]
+    if any(offer_id not in state.get("visible_offer_ids", []) for offer_id in ids):
+        raise ValidationError({"offer_ids": "فروشنده انتخابی در فهرست معتبر این مأموریت نیست."})
+    origin = data["origin"]
+    if origin["source"] == "manual_region":
+        saved = mission.constraints or {}
+        if (
+            saved.get("lat") is None or saved.get("lon") is None
+            or abs(saved["lat"] - origin["lat"]) > 0.00001
+            or abs(saved["lon"] - origin["lon"]) > 0.00001
+        ):
+            raise ValidationError({"origin": "منطقه مبدأ باید از انتخاب ثبت‌شده در همین مأموریت باشد."})
+    filters = _search_filterset(mission.constraints or {})
+    selected_id = state.get("selected_product_id")
+    if not isinstance(selected_id, str) or not selected_id:
+        raise ValidationError({"offer_ids": "ابتدا یک محصول دارای آفر معتبر انتخاب کن."})
+    valid = eligible_offer_list(filters, product_id=selected_id).filter(
+        source_id__in=ids
+    ).select_related("shop", "product")
+    by_id = {offer.source_id: offer for offer in valid}
+    if len(by_id) != len(ids):
+        raise ValidationError({"offer_ids": "یک یا چند آفر با شرط‌های جاری مطابقت ندارند."})
+    offers = [by_id[offer_id] for offer_id in ids]
+    if len({offer.shop_id for offer in offers}) != len(offers):
+        raise ValidationError({"offer_ids": "آفرهای تکراری از یک فروشگاه هزینه مسیر غیرضروری دارند."})
+    for offer in offers:
+        if (
+            offer.shop.lat is None or offer.shop.lon is None
+            or not (35.35 <= offer.shop.lat <= 35.95)
+            or not (50.9 <= offer.shop.lon <= 51.85)
+        ):
+            raise ValidationError({"offer_ids": "مختصات همه فروشندگان باید در محدوده داده تهران معتبر باشد."})
+
+    mode = data["mode"]
+    if not neshan_enabled():
+        return Response(safe_response(mode=mode))
+
+    # DB row lock enforces per-mission cap across workers. A global paid-call
+    # limit at the deployment gateway is still required to enable service.
+    with transaction.atomic():
+        locked = _owned_mission(request, mission_id, lock=True)
+        locked_state = dict(locked.state or {})
+        if (
+            locked_state.get("result_set_id") != data["result_set_id"]
+            or locked_state.get("results_stale")
+            or locked_state.get("visible_offer_ids") != state.get("visible_offer_ids")
+        ):
+            raise ValidationError({"result_set_id": "فهرست حین درخواست تغییر کرد؛ دوباره بررسی کن."})
+        used = int(locked_state.get("neshan_route_calls", 0))
+        if used >= settings.NESHAN_ROUTING_MAX_CALLS_PER_MISSION:
+            return Response(safe_response(mode=mode, reason="mission_budget_exhausted"))
+        daily, _ = RoutingDailyUsage.objects.select_for_update().get_or_create(
+            day=timezone.localdate()
+        )
+        if daily.requests >= settings.NESHAN_ROUTING_DAILY_MAX_CALLS:
+            return Response(safe_response(mode=mode, reason="daily_budget_exhausted"))
+        daily.requests += 1
+        daily.save(update_fields=["requests"])
+        locked_state["neshan_route_calls"] = used + 1
+        locked.state = locked_state
+        locked.save(update_fields=["state", "updated_at"])
+    try:
+        matrix = read_matrix(
+            (origin["lat"], origin["lon"]),
+            [(offer.shop.lat, offer.shop.lon) for offer in offers],
+            mode,
+        )
+    except RoutingUnavailable as error:
+        return Response(safe_response(mode=mode, reason=error.reason))
+    return Response(successful_response(mode=mode, offers=offers, matrix=matrix))
 
 
 @api_view(["GET"])

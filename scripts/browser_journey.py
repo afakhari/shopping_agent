@@ -144,6 +144,12 @@ def main() -> None:
                     page.locator(".mission-offer-row").nth(1).wait_for()
                     assert page.locator(".mission-offer-row").count() == 2
                     page.locator(".mission-seller-location-board summary").first.click()
+                    # The server's paid Neshan provider is off by default;
+                    # the map/list UX remains fully functional without a secret.
+                    page.locator(".mission-neshan-routing").first.get_by_text(
+                        "اتصال مسیریابی نشان هنوز فعال نشده است", exact=False
+                    ).wait_for()
+                    assert page.locator(".mission-neshan-routing button").count() == 0
                     assert page.locator(".mission-location-choices button").count() == 2
                     assert page.locator(".mission-location-map iframe").count() == 0
                     page.locator(".mission-location-choices button").nth(1).click()

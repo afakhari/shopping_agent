@@ -37,7 +37,8 @@ describe('seller location trust and coordinated selection', () => {
 
   it('keeps the full seller list when the map cannot display a shop', () => {
     const markup = renderToStaticMarkup(<SellerLocationBoard
-      offers={shops} selectedOfferId="unknown" onSelectOffer={() => {}} disabled={false} />)
+      offers={shops} selectedOfferId="unknown" onSelectOffer={() => {}} disabled={false}
+      missionId="mission1" resultSetId="set1" origin={null} />)
     expect(markup).toContain('فروشگاه نمایشی unknown')
     expect(markup).toContain('مختصات معتبر در محدودهٔ پوشش تهران')
     expect(markup).toContain('نام بسیاری از فروشگاه‌ها')
@@ -46,16 +47,27 @@ describe('seller location trust and coordinated selection', () => {
 
   it('does not contact OpenStreetMap until a user opens the selected map', () => {
     const markup = renderToStaticMarkup(<SellerLocationBoard
-      offers={shops} selectedOfferId="second" onSelectOffer={() => {}} disabled={false} />)
+      offers={shops} selectedOfferId="second" onSelectOffer={() => {}} disabled={false}
+      missionId="mission1" resultSetId="set1" origin={null} />)
     expect(markup).toContain('نمایش نقشه OpenStreetMap')
     expect(markup).toContain('با نمایش نقشه')
     expect(markup).not.toContain('<iframe')
     expect(markup).toContain('aria-pressed="true"')
   })
 
+  it('does not render ETA or contact Neshan before user action', () => {
+    const markup = renderToStaticMarkup(<SellerLocationBoard
+      offers={shops} selectedOfferId="second" onSelectOffer={() => {}} disabled={false}
+      missionId="mission1" resultSetId="set1" origin={{ lat: 35.7, lon: 51.4 }} />)
+    expect(markup).toContain('مقایسه زمان سفر با نشان')
+    expect(markup).toContain('وضعیت سرویس پس از بازکردن')
+    expect(markup).not.toContain('دقیقه</strong>')
+  })
+
   it('asks for a seller from this product when focus belongs to another product', () => {
     const markup = renderToStaticMarkup(<SellerLocationBoard
-      offers={shops} selectedOfferId="prior-query" onSelectOffer={() => {}} disabled={false} />)
+      offers={shops} selectedOfferId="prior-query" onSelectOffer={() => {}} disabled={false}
+      missionId="mission1" resultSetId="set1" origin={null} />)
     expect(markup).toContain('فهرست دیگری است')
     expect(markup).not.toContain('<iframe')
   })

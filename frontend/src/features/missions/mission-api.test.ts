@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { getMission, sendMissionTurn } from './mission-api'
+import { getMission, getRoutingCapability, requestRouteEstimates, sendMissionTurn } from './mission-api'
 import type { MissionEvent } from './mission-api'
 
 afterEach(() => vi.unstubAllGlobals())
@@ -79,5 +79,39 @@ describe('SSE stream terminal state', () => {
       new Response(stream({ ...event('ui.component', 1), mission_id: 'other' },
         event('turn.completed', 2)), { status: 200 })))
     await expect(sendMissionTurn('mission', 'هدفون', {}, () => undefined)).rejects.toThrow('کامل')
+  })
+})
+
+
+describe('Neshan route boundaries', () => {
+  it('checks server capability without spending a paid routing request', async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => new Response(JSON.stringify({
+      provider: 'neshan', enabled: false, modes: [],
+    }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+    const capability = await getRoutingCapability('mission')
+    expect(capability.enabled).toBe(false)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock.mock.calls[0]?.[1]?.method ?? 'GET').toBe('GET')
+  })
+
+  it('sends only scoped offer IDs and the explicitly chosen Tehran origin', async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => new Response(JSON.stringify({
+      provider: 'neshan', mode: 'car', status: 'unavailable', reason: 'not_configured',
+      estimates: [], availability_verified: false, source: 'provider_route_estimate',
+    }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+    const value = await requestRouteEstimates('m1', {
+      result_set_id: 'current', origin: { lat: 35.7, lon: 51.4, source: 'manual_region' },
+      offer_ids: ['o1', 'o2'], mode: 'car',
+    })
+    expect(value.estimates).toEqual([])
+    expect(value.status).toBe('unavailable')
+    const options = fetchMock.mock.calls[0]?.[1]
+    expect(options?.method).toBe('POST')
+    expect(JSON.parse(String(options?.body))).toEqual({
+      result_set_id: 'current', origin: { lat: 35.7, lon: 51.4, source: 'manual_region' },
+      offer_ids: ['o1', 'o2'], mode: 'car',
+    })
   })
 })
