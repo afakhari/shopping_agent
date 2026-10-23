@@ -41,6 +41,12 @@ _QUESTION = re.compile(
     r"کدوم|کدام|چقدر|چه فرقی|فرق|تفاوت|توضیح بده|راهنمایی)"
 )
 _REQUEST = re.compile(r"(?:می ?خوام|می ?خواهم|بخرم|بخر|پیدا کن|نشون بده|پیشنهاد بده|معرفی کن)")
+_DECISION_HELP = re.compile(r"(?:کدوم|کدام|چه مدل|چه گزینه).{0,60}(?:بخرم|بهتره|انتخاب کنم)")
+_GENERAL_ADVICE_QUESTION = re.compile(
+    r"(?:آیا|ایا|چرا|چطور|چجوری|باید|لازم|نیاز|ضروری|"
+    r"نمی ?دونم|نمی ?دانم|نمیدونم|چه ویژگی|به چی دقت|چه نکته|"
+    r"چیه|چیست|کافیه|کدام بهتر|کدوم بهتر|ارزش خرید|می ارزه)"
+)
 _GPU_MODEL = re.compile(r"(?<!\w)(?:rtx|gtx|rx)\s*\d{3,4}(?!\w)")
 _USAGE_PRESENT = re.compile(r"(?:پخش|نمایش|اسلاید|موزیک|موسیقی|آهنگ|عکس|فیلم دیدن)")
 _USAGE_EDIT = re.compile(r"(?:تدوین|ادیت|رندر|افکت|ساخت فیلم|پریمیر|افترافکت|after effects|premiere)")
@@ -225,5 +231,23 @@ def resolve_dialogue_policy(
             "kind": "clarify",
             "reply": "برای پیشنهاد لپ‌تاپ، اول کاربرد و سقف بودجه‌ات را بگو تا "
                      "به‌جای فهرست پراکنده، مدل‌های مرتبط را بررسی کنیم.",
+        }
+
+    # Last line of defence, *independent of product category*: a buying
+    # question with no explicit retrieval command is not a product search.
+    # A new unseen technical noun should fail closed as dialogue rather than
+    # silently becoming an OR-catalog query.
+    if _DECISION_HELP.search(normalized) or (
+        (_GENERAL_ADVICE_QUESTION.search(normalized) or asking)
+        and not _REQUEST.search(normalized)
+    ):
+        return {
+            "kind": "clarify",
+            "reply": (
+                "این پرسش دربارهٔ انتخاب مناسب است، نه دستور جست‌وجوی مدل. "
+                "بگو محصول را برای چه کاری می‌خواهی و حدود بودجه‌ات چقدر است. "
+                "با این اطلاعات می‌توانم معیارهای انتخاب را توضیح بدهم "
+                "و فقط پس از روشن‌شدن نیاز، محصولات مرتبط را جست‌وجو کنم."
+            ),
         }
     return None
