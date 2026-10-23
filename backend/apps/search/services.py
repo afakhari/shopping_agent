@@ -17,16 +17,18 @@ from django.db.models import (
     Exists,
     Q,
     Subquery,
+    TextField,
     Value,
     When,
 )
-from django.db.models.functions import ASin, Cos, Least, Power, Radians, Sin, Sqrt
+from django.db.models.functions import ASin, Cast, Cos, Least, Power, Radians, Sin, Sqrt
 from django.utils import timezone
 
 from apps.catalog.models import Offer, Product, Shop
 from apps.catalog.services.visit_context import opening_status, indoor_address_hints
 from apps.search.credit import eligible_credit_offer_query, offer_supports_in_person_credit
 from apps.search.intents import CategoryScope, resolve_category_scope
+from apps.search.evidence import editing_laptop_evidence
 
 DEFAULT_MAX_REASONABLE_PRICE_TOMAN = 100_000_000_000
 
@@ -195,6 +197,22 @@ def product_search_page(filters: dict[str, Any]) -> dict[str, Any]:
     products = Product.objects.filter(_product_match_query(normalized_query))
     if category_scope is not None:
         products = products.filter(category_scope.query)
+    is_editing = (
+        filters.get("usage_profile") == "video_editing"
+        and category_scope is not None and category_scope.key == "laptop_computer"
+    )
+    if is_editing:
+        # Source-declared usage is soft evidence, not a guarantee of suitability.
+        # Only laptops surviving their category and offer eligibility can rank.
+        products = products.annotate(specs_as_text=Cast("specs", TextField()))
+        products = products.annotate(
+            usecase_score=Case(
+                When(specs_as_text__icontains="تدوین", then=Value(100)),
+                When(specs_as_text__icontains="مالتی مدیا", then=Value(20)),
+                default=Value(0),
+                output_field=IntegerField(),
+            )
+        )
     # One Boolean semi-join per candidate product. Unlike joining Offer plus
     # DISTINCT, this cannot duplicate product rows and can use the offer
     # product_id index to stop at the first eligible offer.
@@ -234,6 +252,11 @@ def product_search_page(filters: dict[str, Any]) -> dict[str, Any]:
         products = products.order_by(
             F("best_offer_changed_at").desc(nulls_last=True), "-relevance_score", "source_id"
         )
+    elif is_editing:
+        products = products.order_by(
+            "-usecase_score", "-relevance_score",
+            F("best_offer_price_toman").asc(nulls_last=True), "source_id",
+        )
     else:
         products = products.order_by(
             "-relevance_score", F("best_offer_price_toman").asc(nulls_last=True), "source_id"
@@ -263,12 +286,21 @@ def product_search_page(filters: dict[str, Any]) -> dict[str, Any]:
         if offer is None:  # Fail closed if an inconsistent row appears during an import.
             continue
         shop_distance = getattr(product, "best_offer_distance_m", None)
+        editing_evidence = (
+            editing_laptop_evidence(
+                product, intensity=filters.get("usage_intensity"),
+            ) if is_editing else None
+        )
         results.append(
             {
                 "product": serialize_product(product),
                 "best_offer": serialize_offer(offer, shop_distance),
                 "eligible_offers_count": counts.get(product.source_id, 0),
-                "reasons": _reasons(filters, category_scope),
+                "reasons": (
+                    _reasons(filters, category_scope)
+                    + (editing_evidence["notes"] if editing_evidence else [])
+                ),
+                "recommendation_evidence": editing_evidence,
             }
         )
     return {

@@ -15,6 +15,7 @@ from typing import Any, Literal, TypedDict
 
 from apps.agent.amounts import NUMBER_TOKEN, toman_amount
 from apps.agent.conversation import classify_conversation_intent
+from apps.agent.recommendation_frame import resolve_recommendation_frame
 from apps.catalog.services.normalization import normalize_persian_text
 
 DialogueAction = Literal["clarify", "advice", "search"]
@@ -26,6 +27,7 @@ class DialogueDecision(TypedDict, total=False):
     pending_dialogue: dict[str, str] | None
     query_override: str
     constraint_updates: dict[str, Any]
+    usage_profile: str
 
 
 _BARE_LAP = re.compile(r"(?<!\w)لپ(?!\w)")
@@ -171,6 +173,12 @@ def resolve_dialogue_policy(
             },
         }
 
+    # Typed, reusable recommendation slot filling. The product family is
+    # canonical and never reconstructed from a budget-only or use-case reply.
+    framed = resolve_recommendation_frame(message, state)
+    if framed is not None:
+        return dict(framed)
+
     if pending and pending["slot"] == "laptop_usage":
         if _USAGE_EDIT.search(normalized) or _USAGE_PRESENT.search(normalized):
             usage = "editing" if _USAGE_EDIT.search(normalized) else "presentation"
@@ -179,6 +187,7 @@ def resolve_dialogue_policy(
                 return {
                     "kind": "search", "query_override": "لپ تاپ",
                     "constraint_updates": {"max_price_toman": amount},
+                    "usage_profile": "video_editing" if usage == "editing" else "",
                     "pending_dialogue": None,
                 }
             return {
@@ -200,6 +209,7 @@ def resolve_dialogue_policy(
             return {
                 "kind": "search", "query_override": "لپ تاپ",
                 "constraint_updates": {"max_price_toman": amount},
+                "usage_profile": "video_editing" if pending.get("usage") == "editing" else "",
                 "pending_dialogue": None,
             }
         if _USAGE_PRESENT.search(normalized) or _USAGE_EDIT.search(normalized):

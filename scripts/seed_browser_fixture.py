@@ -90,6 +90,38 @@ def main() -> None:
                 "warranty": {"provider": "گارانتی آزمایشی", "period_months": 6},
             },
         )
+        # Dedicated, synthetic recommendation regression: an inexpensive
+        # projector bag cannot appear as a laptop, even with keyword overlap.
+        for pid, title, category, usecase, ram, price in (
+            ("browser-edit-laptop", "لپ تاپ تست تدوین ویدیو 16GB RAM SSD",
+             "لپ تاپ و نوت بوک", "تدوین", "16GB", 155000000),
+            ("browser-office-laptop", "لپ تاپ تست اداری 8GB RAM",
+             "لپ تاپ و نوت بوک", "اداری", "8GB", 90000000),
+            ("browser-video-bag", "کیف لپ تاپ و ویدیو پروژکتور تست",
+             "کیف و کاور ویدیو پروژکتور", "تدوین", "16GB", 1000000),
+        ):
+            item, _ = Product.objects.update_or_create(
+                source_id=pid,
+                defaults={
+                    "persian_title": title,
+                    "normalized_title": normalize_persian_text(title),
+                    "category_name": category,
+                    "specs": [
+                        {"key": "کاربری", "value": usecase, "section": "کلی"},
+                        {"key": "مقدار حافظه رم", "value": ram, "section": "حافظه"},
+                        {"key": "نوع حافظه", "value": "SSD", "section": "ذخیره‌سازی"},
+                    ],
+                },
+            )
+            Offer.objects.update_or_create(
+                source_id=f"{pid}-offer",
+                defaults={
+                    "shop": Shop.objects.get(pk="browser-shop-a"),
+                    "product": item,
+                    "price_toman": Decimal(price),
+                    "seller_title": title,
+                },
+            )
     print("Synthetic browser test catalog seeded; no competition data copied.")
 
 

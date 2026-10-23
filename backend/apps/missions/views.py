@@ -590,6 +590,24 @@ def mission_turn(request, mission_id: str):
                         updated_state.pop("pending_dialogue", None)
                     else:
                         updated_state["pending_dialogue"] = pending_slot
+                        # A changed purchasing goal invalidates actions on old
+                        # cards, without erasing the historical evidence.
+                        # This keeps stale contact/visit targets unavailable
+                        # until a new eligible result set is committed.
+                        if (
+                            pending_slot.get("slot") in {
+                                "product_kind", "laptop_usage", "laptop_budget",
+                                "recommendation_family", "recommendation_usage",
+                                "recommendation_budget",
+                            }
+                            and updated_state.get("candidate_product_ids")
+                        ):
+                            updated_state.pop("visit_plan", None)
+                            updated_state.update(
+                                results_stale=True, selected_product_id=None,
+                                selected_offer_id=None, selected_shop_id=None,
+                                active_surface="products", visible_offer_ids=[],
+                            )
                     mission.state = updated_state
                     mission.status = PurchaseMission.Status.WAITING_FOR_USER
                     if pending_slot:
@@ -633,6 +651,8 @@ def mission_turn(request, mission_id: str):
         )
         intent_result = {
             "search_query": decision["query_override"],
+            "usage_profile": decision.get("usage_profile"),
+            "usage_intensity": (decision.get("shopping_need") or {}).get("intensity"),
             "max_price_toman": preflight_constraints.get("max_price_toman"),
             "must_have_in_person_credit": preflight_constraints.get("must_have_in_person_credit", False),
             "sort": preflight_constraints.get("sort", "relevance"),
@@ -646,6 +666,8 @@ def mission_turn(request, mission_id: str):
         prior_query = decision["query"]
         intent_result = {
             "search_query": prior_query,
+            "usage_profile": (initial_mission.state or {}).get("usage_profile"),
+            "usage_intensity": ((initial_mission.state or {}).get("shopping_need") or {}).get("intensity"),
             "max_price_toman": preflight_constraints.get("max_price_toman"),
             "must_have_in_person_credit": preflight_constraints.get("must_have_in_person_credit", False),
             "sort": preflight_constraints.get("sort", "relevance"),
@@ -734,6 +756,12 @@ def mission_turn(request, mission_id: str):
             "candidate_product_ids": graph_state.get("candidate_product_ids", []),
             "eligible_offer_ids": graph_state.get("eligible_offer_ids", []),
             "search_query": graph_state.get("search_query", ""),
+            "usage_profile": graph_state.get("search_filters", {}).get("usage_profile"),
+            "shopping_need": (
+                decision.get("shopping_need")
+                if decision.get("shopping_need")
+                else last_state.get("shopping_need") if decision["kind"] == "refine" else None
+            ),
             "agent_runtime": graph_state.get("graph_runtime", "langgraph"),
             "intent_parser": graph_state.get("intent_parser", "heuristic"),
             "last_turn_message": data["message"],

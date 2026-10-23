@@ -49,6 +49,114 @@ class DialoguePolicyContractTests(SimpleTestCase):
         self.assertEqual(third["kind"], "search")
         self.assertEqual(third["constraint_updates"]["max_price_toman"], "40000000")
 
+    def test_video_editing_recommendation_is_saved_until_budget_answer(self):
+        first = resolve_dialogue_policy(
+            "چه لپ تاپی برای تدوین ویدیو مناسب من هست؟", {}
+        )
+        self.assertEqual(first["kind"], "clarify")
+        self.assertEqual(first["pending_dialogue"]["slot"], "recommendation_budget")
+        self.assertEqual(first["pending_dialogue"]["family"], "laptop")
+        self.assertEqual(first["pending_dialogue"]["usage"], "video_editing")
+        continued = resolve_dialogue_policy(
+            "تدوین ویدیوی سبک و قیمت تا سقف 200 میلیون",
+            {"pending_dialogue": first["pending_dialogue"]},
+        )
+        self.assertEqual(continued["kind"], "search")
+        self.assertEqual(continued["query_override"], "لپ تاپ")
+        self.assertEqual(continued["usage_profile"], "video_editing")
+        self.assertEqual(
+            continued["constraint_updates"]["max_price_toman"], "200000000"
+        )
+
+    def test_single_message_video_editing_with_budget_keeps_product_family(self):
+        result = resolve_dialogue_policy(
+            "لپ تاپ مناسب تدوین ویدیو تا ۲۰۰ میلیون میخوام", {}
+        )
+        self.assertEqual(result["query_override"], "لپ تاپ")
+        self.assertEqual(result["usage_profile"], "video_editing")
+        self.assertEqual(result["constraint_updates"]["max_price_toman"], "200000000")
+
+    def test_unrelated_video_editing_without_laptop_does_not_search(self):
+        result = resolve_dialogue_policy(
+            "تدوین ویدیوی سبک و قیمت تا سقف 200 میلیون", {}
+        )
+        self.assertEqual(result["kind"], "clarify")
+        self.assertEqual(result["pending_dialogue"]["slot"], "recommendation_family")
+
+    def test_generalized_recommendation_slots_for_families(self):
+        from apps.agent.recommendation_frame import resolve_recommendation_frame
+        cases = [
+            ("چه گوشی برای عکاسی مناسب است؟", "۳۰ میلیون", "گوشی", "phone", "photography"),
+            ("چه هدفونی برای درس مناسب است؟", "تا ۲ میلیون", "هدفون", "headphones", "study"),
+            ("چه تبلتی برای درس مناسب است؟", "بودجه ۵ میلیون", "تبلت", "tablet", "study"),
+            ("کدام تلویزیون برای گیم مناسب است؟", "تا ۳۰ میلیون", "تلویزیون", "television", "gaming"),
+            ("چه لپ تاپی برای تدوین مناسب است؟", "200 میلیون", "لپ تاپ", "laptop", "video_editing"),
+        ]
+        for initial, followup, canonical, family, usage in cases:
+            with self.subTest(initial=initial):
+                first = resolve_recommendation_frame(initial, {})
+                self.assertEqual(first["kind"], "clarify")
+                self.assertEqual(first["pending_dialogue"]["family"], family)
+                self.assertEqual(first["pending_dialogue"]["usage"], usage)
+                final = resolve_recommendation_frame(followup, {
+                    "pending_dialogue": first["pending_dialogue"],
+                })
+                self.assertEqual(final["kind"], "search")
+                self.assertEqual(final["query_override"], canonical)
+                self.assertEqual(final["shopping_need"]["family"], family)
+                self.assertEqual(final["usage_profile"], usage)
+
+    def test_missing_usage_then_budget_answer_does_not_guess_use_case(self):
+        from apps.agent.recommendation_frame import resolve_recommendation_frame
+        first = resolve_recommendation_frame("چه لپ تاپی بخرم؟", {})
+        self.assertEqual(first["pending_dialogue"]["slot"], "recommendation_usage")
+        second = resolve_recommendation_frame("تا ۲۰۰ میلیون", {
+            "pending_dialogue": first["pending_dialogue"],
+        })
+        self.assertEqual(second["kind"], "clarify")
+        self.assertEqual(second["pending_dialogue"]["budget"], "200000000")
+        third = resolve_recommendation_frame("تدوین ویدیو سبک", {
+            "pending_dialogue": second["pending_dialogue"],
+        })
+        self.assertEqual(third["query_override"], "لپ تاپ")
+        self.assertEqual(third["shopping_need"]["intensity"], "light")
+
+    def test_interruptions_do_not_turn_into_unrelated_implicit_searches(self):
+        from apps.agent.recommendation_frame import resolve_recommendation_frame
+        old = {"slot": "recommendation_budget", "family": "laptop",
+               "usage": "video_editing", "intensity": "light"}
+        state = {"pending_dialogue": old}
+        self.assertIsNone(resolve_recommendation_frame("گوشی میخوام", state))
+        self.assertIsNone(resolve_recommendation_frame("چه پردازنده ای لازمه؟", state))
+        cancelled = resolve_recommendation_frame("بی خیال", state)
+        self.assertEqual(cancelled["kind"], "clarify")
+        self.assertIsNone(cancelled["pending_dialogue"])
+        self.assertIsNone(resolve_recommendation_frame("کیف لپ تاپ ارزان", {}))
+
+    def test_category_missing_from_budget_and_usecase_requires_clarification(self):
+        from apps.agent.recommendation_frame import resolve_recommendation_frame
+        text = "تدوین ویدیوی سبک و قیمت تا سقف 200 میلیون"
+        first = resolve_recommendation_frame(text, {})
+        self.assertEqual(first["kind"], "clarify")
+        self.assertEqual(first["pending_dialogue"]["slot"], "recommendation_family")
+        self.assertEqual(first["pending_dialogue"]["budget"], "200000000")
+        second = resolve_recommendation_frame("لپ تاپ", {
+            "pending_dialogue": first["pending_dialogue"],
+        })
+        self.assertEqual(second["query_override"], "لپ تاپ")
+        self.assertEqual(second["shopping_need"]["intensity"], "light")
+        self.assertEqual(second["constraint_updates"]["max_price_toman"], "200000000")
+
+    def test_recommendation_uses_canonical_query_and_not_user_usecase_words(self):
+        first = resolve_dialogue_policy("چه لپ تاپی مناسب تدوین ویدیوی سبک است؟", {})
+        self.assertEqual(first["pending_dialogue"]["family"], "laptop")
+        second = resolve_dialogue_policy(
+            "تدوین ویدیوی سبک و قیمت تا سقف 200 میلیون",
+            {"pending_dialogue": first["pending_dialogue"]},
+        )
+        self.assertEqual(second["query_override"], "لپ تاپ")
+        self.assertEqual(second["constraint_updates"]["max_price_toman"], "200000000")
+
     def test_technical_advice_never_turns_into_unrelated_product_search(self):
         queries = [
             "من دقیقا نمیدونم لپ تاپی که باید بخرم باید کارت گرافیک داشته باشه یا نه",

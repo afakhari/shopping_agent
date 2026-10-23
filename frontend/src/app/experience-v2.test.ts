@@ -35,9 +35,14 @@ describe('minimal Persian shopping experience v3', () => {
 
   it('keeps seller and assistant explanations available on demand', () => {
     expect(mission).toContain('className="assistant-explanation"')
+    expect(mission).toContain('شواهد ثبت‌شده برای تدوین ویدیو')
+    expect(mission).toContain('recommendation_evidence.caveat')
     expect(mission).toContain('className="mission-product-details"')
-    expect(mission).toContain('className="conversation-disclosure"')
-    expect(mission).toContain('نام فروشگاه‌ها')
+    // The redundant About Data accordion was deliberately removed on main.
+    // Data honesty remains visible beside actual product results.
+    expect(mission).not.toContain('className="conversation-disclosure"')
+    expect(mission).toContain('قیمت‌ها ثبت‌شده و ممکن است قدیمی باشند')
+    expect(mission).toContain('نام بیشتر فروشگاه‌ها')
   })
 
   it('supports tablet, mobile, narrow devices, reduced motion and high contrast', () => {

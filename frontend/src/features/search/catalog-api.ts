@@ -62,6 +62,18 @@ export interface CatalogSearchResult {
   best_offer: CatalogOffer
   eligible_offers_count: number
   reasons: string[]
+  recommendation_evidence?: {
+    source: 'snapshot_catalog'
+    use_case: string
+    intensity: 'light' | 'heavy' | null
+    usage_declared: boolean
+    ram_gb: number | null
+    ram_source: 'spec' | 'title' | null
+    ssd_stated: boolean
+    notes: string[]
+    suitability_verified: false
+    caveat: string
+  } | null
 }
 
 export interface CatalogSearchResponse {

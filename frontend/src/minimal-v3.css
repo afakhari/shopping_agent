@@ -1694,3 +1694,34 @@
 .redesign-v2 .conversation-results-history > summary:focus-visible {
   outline: 2px solid #c9233a; outline-offset: 3px;
 }
+
+/* Source-backed recommendation reasoning is opt-in and never a green verified badge. */
+.redesign-v2 .mission-product-evidence {
+  margin: 8px 0;
+  border: 1px solid #d9dfe7;
+  border-radius: 10px;
+  background: #f8fafc;
+  padding: 7px 10px;
+  color: #344054;
+}
+.redesign-v2 .mission-product-evidence summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.8;
+}
+.redesign-v2 .mission-product-evidence summary:focus-visible {
+  outline: 2px solid #c9233a;
+  outline-offset: 3px;
+}
+.redesign-v2 .mission-product-evidence ul {
+  margin: 8px 0 5px;
+  padding-inline-start: 18px;
+  line-height: 1.9;
+  font-size: 12px;
+}
+.redesign-v2 .mission-product-evidence p {
+  margin: 6px 0 0;
+  font-size: 11px;
+  line-height: 1.9;
+}

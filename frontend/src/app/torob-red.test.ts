@@ -25,8 +25,8 @@ describe('Torob-inspired red palette without a cluttered page', () => {
   })
 
   it('never turns sparse shop data or simulated contacts into a real claim', () => {
-    expect(mission).toContain('قیمت‌ها تاریخی‌اند')
-    expect(mission).toContain('موجودی به‌صورت نمایشی بررسی می‌شود')
+    expect(mission).toContain('قیمت‌ها ثبت‌شده و ممکن است قدیمی باشند')
+    expect(mission).toContain('وجود آفر به معنای موجودی واقعی نیست')
     expect(brief).toContain('شماره‌های تماس')
   })
 
