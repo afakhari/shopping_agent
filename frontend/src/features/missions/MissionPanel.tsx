@@ -218,6 +218,8 @@ function ProductResults({
   offerViews,
   onToggleOffers,
   onLoadMoreOffers,
+  resultSetId,
+  routeOrigin,
   allowActions = true,
 }: {
   results: CatalogSearchResult[]
@@ -234,6 +236,8 @@ function ProductResults({
   offerViews: Record<string, ProductOfferView>
   onToggleOffers: (result: CatalogSearchResult) => void
   onLoadMoreOffers: (result: CatalogSearchResult) => void
+  resultSetId: string | null
+  routeOrigin: { lat: number; lon: number } | null
   allowActions?: boolean
 }) {
   const [showAllResults, setShowAllResults] = useState(false)
@@ -365,6 +369,9 @@ function ProductResults({
                       offers={offerView.offers}
                       selectedOfferId={selectedOfferId}
                       onSelectOffer={onSelectOffer}
+                      missionId={missionId}
+                      resultSetId={resultSetId}
+                      origin={routeOrigin}
                       disabled={!allowActions || offerView.loading}
                     />
                   )}
@@ -1631,6 +1638,9 @@ export function MissionPanel({
                     offerViews={offerViews}
                     onToggleOffers={toggleProductOffers}
                     onLoadMoreOffers={loadMoreProductOffers}
+                    resultSetId={isCurrentResult ? resultSetId : null}
+                    routeOrigin={constraints.lat !== undefined && constraints.lon !== undefined
+                      ? { lat: constraints.lat, lon: constraints.lon } : null}
                     allowActions={isCurrentResult && !resultsStale && !queuePaused && !isRunning && !isRestoring}
                   />
                 </div>
