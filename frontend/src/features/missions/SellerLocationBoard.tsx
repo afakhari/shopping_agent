@@ -52,6 +52,7 @@ export function SellerLocationBoard({ offers, selectedOfferId, onSelectOffer, di
           نام بسیاری از فروشگاه‌های دیتاست آزمایشی ساختگی است. مختصات، مکان ثبت‌شده‌اند؛
           فاصله‌ها مستقیم هستند و زمان سفر یا مسیر داخل پاساژ مشخص نیست.
         </p>
+        {disabled && <p role="note">فهرست در حال بارگذاری یا متعلق به نتیجهٔ غیرفعال است؛ تا دریافت نتیجهٔ معتبر انتخاب و نمایش نقشه غیرفعال‌اند.</p>}
         <div className="mission-location-choices" role="group" aria-label="انتخاب فروشنده برای دیدن موقعیت">
           {offers.map((offer, index) => {
             const isSelected = offer.id === selectedOfferId
@@ -81,7 +82,7 @@ export function SellerLocationBoard({ offers, selectedOfferId, onSelectOffer, di
                   <p>{active.shop.address || active.shop.location_label || 'نشانی دقیق ثبت نشده'}</p>
                   {!mapVisible
                     ? <button type="button" className="mission-location-load-map"
-                        onClick={() => setOpenMapOfferId(selectedOfferId)}>
+                        onClick={() => setOpenMapOfferId(selectedOfferId)} disabled={disabled}>
                         نمایش نقشه OpenStreetMap
                       </button>
                     : <div className="mission-location-map">
@@ -90,7 +91,7 @@ export function SellerLocationBoard({ offers, selectedOfferId, onSelectOffer, di
                         <button type="button" onClick={() => setOpenMapOfferId(null)}>بستن نقشه</button>
                       </div>}
                   <small>با نمایش نقشه، مختصات این فروشنده برای OpenStreetMap ارسال می‌شود؛ نام فروشگاه یا موجودی تأیید نمی‌شود.</small>
-                  {externalUrl && <a href={externalUrl} target="_blank" rel="noopener noreferrer">
+                  {externalUrl && !disabled && <a href={externalUrl} target="_blank" rel="noopener noreferrer">
                     <ExternalLink size={13} aria-hidden="true" /> بازکردن نقطه در OpenStreetMap
                   </a>}
                 </>
