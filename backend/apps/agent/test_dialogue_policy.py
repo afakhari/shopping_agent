@@ -76,11 +76,12 @@ class DialoguePolicyContractTests(SimpleTestCase):
         self.assertEqual(result["usage_profile"], "video_editing")
         self.assertEqual(result["constraint_updates"]["max_price_toman"], "200000000")
 
-    def test_unrelated_video_editing_without_laptop_stays_unresolved(self):
+    def test_unrelated_video_editing_without_laptop_does_not_search(self):
         result = resolve_dialogue_policy(
             "تدوین ویدیوی سبک و قیمت تا سقف 200 میلیون", {}
         )
-        self.assertIsNone(result)
+        self.assertEqual(result["kind"], "clarify")
+        self.assertEqual(result["pending_dialogue"]["slot"], "recommendation_family")
 
     def test_generalized_recommendation_slots_for_families(self):
         from apps.agent.recommendation_frame import resolve_recommendation_frame
@@ -131,6 +132,20 @@ class DialoguePolicyContractTests(SimpleTestCase):
         self.assertEqual(cancelled["kind"], "clarify")
         self.assertIsNone(cancelled["pending_dialogue"])
         self.assertIsNone(resolve_recommendation_frame("کیف لپ تاپ ارزان", {}))
+
+    def test_category_missing_from_budget_and_usecase_requires_clarification(self):
+        from apps.agent.recommendation_frame import resolve_recommendation_frame
+        text = "تدوین ویدیوی سبک و قیمت تا سقف 200 میلیون"
+        first = resolve_recommendation_frame(text, {})
+        self.assertEqual(first["kind"], "clarify")
+        self.assertEqual(first["pending_dialogue"]["slot"], "recommendation_family")
+        self.assertEqual(first["pending_dialogue"]["budget"], "200000000")
+        second = resolve_recommendation_frame("لپ تاپ", {
+            "pending_dialogue": first["pending_dialogue"],
+        })
+        self.assertEqual(second["query_override"], "لپ تاپ")
+        self.assertEqual(second["shopping_need"]["intensity"], "light")
+        self.assertEqual(second["constraint_updates"]["max_price_toman"], "200000000")
 
     def test_recommendation_uses_canonical_query_and_not_user_usecase_words(self):
         first = resolve_dialogue_policy("چه لپ تاپی مناسب تدوین ویدیوی سبک است؟", {})
