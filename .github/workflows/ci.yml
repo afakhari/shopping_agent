@@ -56,6 +56,7 @@ jobs:
       - run: python scripts/verify_blueprint.py
       - run: python -m unittest discover -s tests -p "test_contracts.py" -v
       - run: python -m unittest discover -s scripts -p "test_predeploy_smoke.py" -v
+      - run: python -m unittest discover -s scripts -p "test_retrieval_benchmark.py" -v
 
   backend-tests:
     runs-on: ubuntu-latest
