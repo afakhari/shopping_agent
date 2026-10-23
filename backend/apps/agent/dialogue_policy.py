@@ -14,6 +14,7 @@ import re
 from typing import Any, Literal, TypedDict
 
 from apps.agent.amounts import NUMBER_TOKEN, toman_amount
+from apps.agent.conversation import classify_conversation_intent
 from apps.catalog.services.normalization import normalize_persian_text
 
 DialogueAction = Literal["clarify", "advice", "search"]
@@ -85,6 +86,15 @@ def resolve_dialogue_policy(
     normalized = normalize_persian_text(message).strip(" ؟?!.,؛")
     if not normalized:
         return {"kind": "clarify", "reply": "دنبال چه محصولی هستی؟"}
+    # Existing social, product-comparison and seller-detail routers own these
+    # actions and must not be swallowed by the broad question safeguard.
+    if classify_conversation_intent(message) is not None:
+        return None
+    if (
+        re.search(r"(?:این دو|این مدل|مدل دوم|دومی).*(?:فرق|تفاوت)", normalized)
+        or re.search(r"^(?:آدرس|نشانی|ساعت|موجودی).*فروشگاه", normalized)
+    ):
+        return None
     asking = bool(_QUESTION.search(normalized) or "؟" in message or "?" in message)
 
     state = state or {}
