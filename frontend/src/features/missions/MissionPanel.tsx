@@ -8,7 +8,7 @@ import { canDrainQueuedTurn } from './queue-policy'
 import { findCurrentSearchMessage, shouldFollowConversation } from './conversation-behavior'
 import { GenUIRenderer } from './GenUIRenderer'
 import { formatDistance, formatLastPriceChange, getPriceQualityLabel, openStreetMapUrl } from './ui-formatters'
-import { osmEmbedUrl, TEHRAN_REGION_SAMPLES } from './shop-map'
+import { TEHRAN_REGION_SAMPLES } from './shop-map'
 import { SellerLocationBoard } from './SellerLocationBoard'
 import { getResultPayload, getUIComponents, type GenUIAction, type GenUIComponent } from './genui-types'
 import { resolveRecoveryOffer } from './recovery-options'
@@ -237,7 +237,6 @@ function ProductResults({
   allowActions?: boolean
 }) {
   const [showAllResults, setShowAllResults] = useState(false)
-  const [openMapOfferId, setOpenMapOfferId] = useState<string | null>(null)
   if (results.length === 0) return <p className="mission-empty-results">با این عبارت و شرایط، محصول واجد شرایطی پیدا نشد. می‌توانی عبارت یا شروط خرید را تغییر بدهی.</p>
   const visibleResults = showAllResults ? results : results.slice(0, 4)
   return (
@@ -377,7 +376,6 @@ function ProductResults({
                     const sellerDistance = formatDistance(sellerOffer.shop.distance_m)
                     const sellerUpdatedAt = formatPersianDateTime(sellerOffer.last_price_changed_at)
                     const sellerMapUrl = openStreetMapUrl(sellerOffer.shop.lat, sellerOffer.shop.lon)
-                    const inlineMapUrl = osmEmbedUrl(sellerOffer.shop.lat, sellerOffer.shop.lon)
                     return (
                       <article className="mission-offer-row" key={sellerOffer.id}>
                         <div className="mission-offer-copy">
@@ -412,18 +410,11 @@ function ProductResults({
                               <small>اعتبار حضوری: {sellerOffer.in_person_credit_eligible ? 'برای این آفر ثبت‌شده' : 'برای این آفر ثبت نشده'}</small>
                               {sellerUpdatedAt && <small><Clock3 size={12} aria-hidden="true" />آخرین تغییر قیمت ثبت‌شده: {sellerUpdatedAt}</small>}
                               {sellerMapUrl && <a className="mission-offer-map" href={sellerMapUrl} target="_blank" rel="noopener noreferrer"><MapPin size={12} /> موقعیت روی نقشه <ExternalLink size={11} /></a>}
-                              {inlineMapUrl && <button className="mission-inline-map-toggle" type="button" aria-expanded={openMapOfferId === sellerOffer.id} onClick={() => setOpenMapOfferId(current => current === sellerOffer.id ? null : sellerOffer.id)}>
-                                <MapPin size={12} />{openMapOfferId === sellerOffer.id ? 'بستن نقشه' : 'نقشه در همین صفحه'}
-                              </button>}
+                              <small>برای بررسی موقعیت‌ها در یک جا، «مقایسهٔ مکان فروشگاه‌ها» را در ابتدای فهرست باز کن.</small>}
                             </div>
                           </details>
                         </div>
-                        {inlineMapUrl && openMapOfferId === sellerOffer.id && (
-                          <div className="mission-inline-map" role="region" aria-label={`پیش‌نمایش نقشه فروشگاه ${sellerOffer.shop.name}`}>
-                            <iframe src={inlineMapUrl} title={`موقعیت ثبت‌شده ${sellerOffer.shop.name} روی OpenStreetMap`} loading="lazy" referrerPolicy="no-referrer" />
-                            <small>مختصات ثبت‌شده فروشگاه؛ زمان سفر و مسیر داخل پاساژ تأیید نشده‌اند.</small>
-                          </div>
-                        )}
+
                         <button
                           type="button"
                           className="mission-offer-verify"
