@@ -104,7 +104,16 @@ def classify_contextual_turn(message: str, state: dict[str, Any] | None) -> dict
         return {"kind": "refine", "query": previous_query, "constraint_updates": updates}
 
     if not previous_query and (credit_only or budget_only):
-        return {"kind": "clarify", "reply": "شرایط خرید را متوجه شدم. دنبال چه کالایی در تهران هستی؟"}
+        pending: dict[str, Any] = {}
+        if value is not None:
+            pending["max_price_toman"] = value
+        if credit:
+            pending["must_have_in_person_credit"] = not bool(_CREDIT_NEGATION.search(normalized))
+        return {
+            "kind": "clarify",
+            "reply": "شرایط خرید ثبت شد. دنبال چه کالایی در تهران هستی؟",
+            "pending_constraints": pending,
+        }
 
     # No product is implied merely because a user mentions "this" or "the second".
     if _INDEXED.search(normalized) and _STORE_QUESTION.search(normalized):
