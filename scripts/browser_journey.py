@@ -144,7 +144,7 @@ def main() -> None:
                     # Bare "دومی" now means the second seller, not the second product.
                     composer.fill("دومی")
                     page.get_by_role("button", name="ارسال پیام").click()
-                    page.get_by_text("فروشگاه", exact=False).last.wait_for()
+                    page.locator(".chat-message-assistant").last.get_by_text("انتخاب شد", exact=False).wait_for()
                     composer.fill("آدرسش")
                     page.get_by_role("button", name="ارسال پیام").click()
                     page.locator(".genui-sellers").last.wait_for()
