@@ -36,6 +36,7 @@ def neshan_enabled() -> bool:
         getattr(settings, "NESHAN_ROUTING_ENABLED", False)
         and getattr(settings, "NESHAN_ROUTING_API_KEY", "")
         and getattr(settings, "NESHAN_ROUTING_MAX_CALLS_PER_MISSION", 0) > 0
+        and getattr(settings, "NESHAN_ROUTING_DAILY_MAX_CALLS", 0) > 0
     )
 
 
