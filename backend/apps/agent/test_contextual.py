@@ -29,7 +29,9 @@ class ContextualRouterTests(TestCase):
         self.assertEqual(classify_contextual_turn("مدل دوم رو انتخاب کن", context)["product_id"], "p2")
         self.assertEqual(classify_contextual_turn("دومی", context)["product_id"], "p2")
         self.assertEqual(classify_contextual_turn("دومی رو بیشتر دوست دارم", context)["product_id"], "p2")
-        self.assertEqual(classify_contextual_turn("دومی خوبه ولی نزدیکتر پیدا کن", context)["kind"], "clarify")
+        combined = classify_contextual_turn("دومی خوبه ولی نزدیکتر پیدا کن", context)
+        self.assertEqual(combined["kind"], "select_product")
+        self.assertTrue(combined["prefer_distance"])
 
     def test_unseen_or_seller_reference_must_clarify(self):
         context = {"visible_product_ids": ["p1"], "search_query": "هدفون"}
