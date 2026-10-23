@@ -25,6 +25,7 @@ import {
   type ContactAttemptRecord,
   type MissionConstraints,
   type MissionEvent,
+  type MissionFocusAction,
 } from './mission-api'
 
 const money = new Intl.NumberFormat('fa-IR', { maximumFractionDigits: 0 })
@@ -606,6 +607,7 @@ export function MissionPanel({
   const resultSetIdRef = useRef<string | null>(null)
   const [resultsStale, setResultsStale] = useState(false)
   const [queuePaused, setQueuePaused] = useState(false)
+  const queuePausedRef = useRef(false)
   const latestEventSeqRef = useRef(0)
   const missionIdRef = useRef<string | null>(missionId)
   const serverConstraintsRef = useRef<MissionConstraints | null>(null)
@@ -807,12 +809,47 @@ export function MissionPanel({
     }
   }
 
+  const applyFocus = async (input: Omit<MissionFocusAction, 'result_set_id'>) => {
+    const activeId = missionIdRef.current
+    const activeResultId = resultSetIdRef.current ?? resultSetId
+    if (isRunning || isRestoring || turnInFlightRef.current || resultsStale || !activeId || !activeResultId) {
+      setError('نتایج این جست‌وجو آماده یا معتبر نیستند؛ ابتدا وضعیت را به‌روز کن.')
+      return
+    }
+    try {
+      const response = await updateMissionFocus(activeId, { ...input, result_set_id: activeResultId })
+      response.events.forEach(handleEvent)
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'انتخاب ثبت نشد؛ وضعیت مأموریت را بررسی کن.')
+    }
+  }
+
+  const removeQueuedTurn = (index: number, edit: boolean) => {
+    const item = queuedTurnsRef.current[index]
+    if (!item) return
+    queuedTurnsRef.current.splice(index, 1)
+    setQueuedCount(queuedTurnsRef.current.length)
+    if (edit) {
+      setMessage(item.text)
+      composerInputRef.current?.focus()
+    }
+  }
+
+  const resumeQueue = () => {
+    if (isRunning || isRestoring || turnInFlightRef.current) return
+    queuePausedRef.current = false
+    setQueuePaused(false)
+    const next = queuedTurnsRef.current.shift()
+    setQueuedCount(queuedTurnsRef.current.length)
+    if (next) void runTurn(next.text, serverConstraintsRef.current ?? next.constraints, next.displayQuery)
+  }
+
   const runTurn = async (turnMessage: string, turnConstraints: MissionConstraints = constraints, displayQuery = turnMessage) => {
     const trimmed = turnMessage.trim()
     // The ref is synchronous: two Enter clicks in the same React render cannot
     // launch duplicate POSTs or two paid model requests.
     if (!trimmed) return
-    if (isRunning || isRestoring || turnInFlightRef.current) {
+    if (isRunning || isRestoring || turnInFlightRef.current || queuePausedRef.current) {
       if (queuedTurnsRef.current.length >= 5) {
         setError('حداکثر پنج پیام در صف است. پس از پردازش آن‌ها پیام جدید بفرست.')
         return
@@ -924,7 +961,7 @@ export function MissionPanel({
         }
         return next
       })
-      if (confirmed && !queuePaused) {
+      if (confirmed && !queuePausedRef.current) {
         const queued = queuedTurnsRef.current.shift()
         if (queued) {
           setQueuedCount(queuedTurnsRef.current.length)
@@ -932,8 +969,9 @@ export function MissionPanel({
             void runTurn(queued.text, serverConstraintsRef.current ?? queued.constraints, queued.displayQuery)
           })
         }
-      } else if (!confirmed && queuedTurnsRef.current.length > 0) {
-        // Never send a queued turn after an uncertain server commit.
+      } else if (!confirmed) {
+        // Every uncertain failure pauses pending work even if no queue exists yet.
+        queuePausedRef.current = true
         setQueuePaused(true)
       }
     }
@@ -1132,6 +1170,19 @@ export function MissionPanel({
           },
         }
       })
+      // Persist the *ordered* rendered seller IDs so "دومی" refers to
+      // this list, not to the second product in the previous search.
+      // The backend revalidates each offer against current hard filters.
+      const listed = append
+        ? [...(offerViews[productId]?.offers ?? []), ...response.results].filter(
+            (offer, index, all) => all.findIndex((candidate) => candidate.id === offer.id) === index
+          )
+        : response.results
+      await applyFocus({
+        action: 'view_sellers',
+        product_id: productId,
+        offer_ids: listed.slice(0, 24).map((offer) => offer.id),
+      })
     } catch (reason) {
       if (controller.signal.aborted) return
       setOfferViews((current) => {
@@ -1162,10 +1213,15 @@ export function MissionPanel({
     const current = offerViews[result.product.id]
     if (current?.expanded && !current.error) {
       setOfferViews((views) => ({ ...views, [result.product.id]: { ...views[result.product.id]!, expanded: false } }))
+      void applyFocus({ action: 'view_products' })
       return
     }
     if (current?.offers.length && !current.error) {
       setOfferViews((views) => ({ ...views, [result.product.id]: { ...views[result.product.id]!, expanded: true } }))
+      void applyFocus({
+        action: 'view_sellers', product_id: result.product.id,
+        offer_ids: current.offers.slice(0, 24).map(offer => offer.id),
+      })
       return
     }
     void fetchProductOffers(result, 1, false)
@@ -1321,6 +1377,7 @@ export function MissionPanel({
     storeMissionId(null)
     queuedTurnsRef.current = []
     setQueuedCount(0)
+    queuePausedRef.current = false
     setQueuePaused(false)
     setMessage('')
     setEvents([])
@@ -1528,7 +1585,18 @@ export function MissionPanel({
         <button type="button" onClick={() => setError(null)}>بستن</button>
       </div>}
       {isRunning && <div className="conversation-running-note" role="status" aria-live="polite"><span className="mission-progress-dot" />{stageLabel ?? 'در حال بررسی درخواست'}<span className="conversation-running-sub">اطلاعات محصول و شروط خرید در حال بررسی است</span></div>}
-      {queuedCount > 0 && <div className="conversation-running-note" role="status" aria-live="polite">{money.format(queuedCount)} پیام در صف پردازش است.</div>}
+      {queuedCount > 0 && <div className="conversation-queue" aria-label="پیام‌های در انتظار">
+        <p role="status">{queuePaused
+          ? 'ارسال پیام‌های بعدی متوقف شد. ابتدا وضعیت درخواست قبلی را بازیابی کن.'
+          : `${money.format(queuedCount)} پیام در صف پردازش است.`}</p>
+        <ol>{queuedTurnsRef.current.map((item, index) => <li key={index}>
+          <span>{item.text}</span>
+          <button type="button" onClick={() => removeQueuedTurn(index, true)}>ویرایش</button>
+          <button type="button" onClick={() => removeQueuedTurn(index, false)}>حذف</button>
+        </li>)}</ol>
+        {queuePaused && <button type="button" disabled={isRunning || isRestoring || Boolean(error)}
+          onClick={resumeQueue}>ادامه صف پس از بررسی وضعیت</button>}
+      </div>}
 
       <form className="conversation-composer" id="conversation-composer" onSubmit={submit}>
         {lastQuery && <button className="composer-tool" type="button" aria-label="تنظیم شرایط خرید" title="تنظیم شرایط خرید" disabled={isRunning || isRestoring} onClick={() => handleGenUIAction({ type: 'open_filter_form' })}><SlidersHorizontal size={18} /></button>}
