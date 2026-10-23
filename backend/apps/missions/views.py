@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import secrets
+import uuid
 from decimal import Decimal
 from typing import Any, Iterator
 
@@ -28,6 +29,7 @@ from apps.missions.serializers import (
     MissionConstraintsSerializer,
     MissionCreateSerializer,
     MissionTurnSerializer,
+    MissionFocusSerializer,
 )
 from apps.missions.services import append_events_locked, serialize_mission
 from apps.missions.visit_plan import build_visit_plan
@@ -204,26 +206,29 @@ def mission_turn(request, mission_id: str):
             "kind": "clarify",
             "reply": "برای مرتب‌سازی فروشگاه‌ها بر اساس نزدیکی، ابتدا موقعیت یا محدوده تهران را انتخاب کن.",
         }
-    if decision["kind"] in {"select_product", "explain", "clarify"}:
-        # Text-only follow-ups must not trigger paid inference or an unrelated
-        # catalogue search. Validate the reference again under the mission lock.
+    if decision["kind"] in {"select_product", "select_offer", "seller_details", "explain", "clarify"}:
+        # No extra LLM call for a grounded contextual turn. Re-evaluate every
+        # selection with the *effective* constraints inside the row lock.
         with transaction.atomic():
             mission = _owned_mission(request, mission_id, lock=True)
             decision = classify_contextual_turn(data["message"], mission.state)
-            if (
-                decision["kind"] == "refine"
-                and decision["constraint_updates"].get("sort") == "distance_asc"
-                and preflight_constraints.get("lat") is None
-            ):
-                decision = {
-                    "kind": "clarify",
-                    "reply": "برای مرتب‌سازی بر اساس نزدیکی، ابتدا محدوده تهران را انتخاب کن.",
-                }
+            if decision["kind"] == "refine" and decision["constraint_updates"].get("sort") == "distance_asc" and preflight_constraints.get("lat") is None:
+                decision = {"kind": "clarify", "reply": "برای نزدیکی، ابتدا محدوده تهران را انتخاب کن."}
+            submitted = data.get("constraints", {})
+            if submitted:
+                updated = _validate_full_constraints(mission.constraints, submitted)
+                if updated != mission.constraints:
+                    mission.constraints = updated
+                    mission.state = {**(mission.state or {}), "results_stale": True}
+                    mission.save(update_fields=["constraints", "state", "updated_at"])
             selected_id = None
+            extra_ui = None
             if decision["kind"] == "select_product":
                 selected_id = decision["product_id"]
-                allowed = selected_id in (mission.state or {}).get("visible_product_ids", [])
-                allowed = allowed and selected_id in (mission.state or {}).get("candidate_product_ids", [])
+                state = mission.state or {}
+                allowed = selected_id in state.get("visible_product_ids", [])
+                allowed = allowed and selected_id in state.get("candidate_product_ids", [])
+                allowed = allowed and not state.get("results_stale", False)
                 if allowed:
                     allowed = eligible_offer_list(
                         _search_filterset(mission.constraints or {}), product_id=selected_id
@@ -231,52 +236,119 @@ def mission_turn(request, mission_id: str):
                 if allowed:
                     product = Product.objects.filter(source_id=selected_id).first()
                     if product:
-                        mission.state = {**(mission.state or {}), "selected_product_id": selected_id}
+                        mission.state = {**state, "selected_product_id": selected_id}
                         mission.current_stage = "product_selected"
+                        reply = (f"«{product.persian_title or selected_id}» انتخاب شد. "
+                                 "آفر ثبت‌شده به معنی موجودی تأییدشده نیست.")
+                        if decision.get("explore_sellers"):
+                            from apps.search.services import offer_ordering
+                            filters = _search_filterset(mission.constraints or {})
+                            if decision.get("prefer_distance") and filters.get("lat") is not None:
+                                filters["sort"] = "distance_asc"
+                            offers = [
+                                serialize_offer(o, getattr(o, "distance_m", None))
+                                for o in eligible_offer_list(filters, product_id=selected_id).order_by(
+                                    *offer_ordering(filters["sort"], filters.get("lat") is not None)
+                                )[:5]
+                            ]
+                            mission.state = {
+                                **mission.state, "active_surface": "sellers",
+                                "visible_offer_ids": [o["id"] for o in offers],
+                            }
+                            extra_ui = ("seller_options", {"offers": offers, "product_id": selected_id})
+                            if decision.get("prefer_distance") and filters.get("lat") is None:
+                                reply += " برای مرتب‌سازی براساس فاصله، موقعیت یا محدوده تهران را انتخاب کن. فهرست زیر بر اساس داده ثبت‌شده است."
+                            else:
+                                reply += " فروشندگان واجد شرایط این مدل در ادامه آمده‌اند."
                         mission.save(update_fields=["state", "current_stage", "updated_at"])
-                        reply = (
-                            f"«{product.persian_title or selected_id}» را انتخاب کردی. "
-                            "می‌توانی از کارت همین کالا فروشگاه‌های دارای آفر ثبت‌شده را ببینی."
-                        )
                     else:
                         selected_id = None
-                        reply = "این مدل دیگر در داده‌های معتبر مأموریت پیدا نشد؛ نتایج را دوباره بررسی کن."
+                        reply = "محصول انتخاب‌شده در دیتاست پیدا نشد. نتایج را تازه کن."
                 else:
                     selected_id = None
-                    reply = "این مدل دیگر با شرایط فعلی مطابقت ندارد؛ فیلترها را بررسی کن."
+                    reply = "این نتیجه یا فیلترهای آن تغییر کرده‌اند؛ قبل از انتخاب، جست‌وجو را به‌روز کن."
+            elif decision["kind"] in {"select_offer", "seller_details"}:
+                offer_id = decision["offer_id"]
+                state = mission.state or {}
+                if state.get("results_stale") or (
+                    offer_id not in state.get("visible_offer_ids", [])
+                    and offer_id != state.get("selected_offer_id")
+                ):
+                    reply = "این فروشنده در فهرست معتبر فعلی نیست؛ فروشنده‌ها را تازه کن."
+                else:
+                    offer = eligible_offer_list(
+                        _search_filterset(mission.constraints or {})
+                    ).filter(source_id=offer_id).select_related("shop", "product").first()
+                    if offer is None:
+                        reply = "آفر فروشنده دیگر با شروط خرید مطابقت ندارد."
+                    else:
+                        mission.state = {**state, "selected_offer_id": offer_id,
+                                         "selected_shop_id": offer.shop_id, "active_surface": "sellers"}
+                        mission.save(update_fields=["state", "updated_at"])
+                        if decision["kind"] == "select_offer":
+                            reply = (f"فروشگاه «{offer.shop.name}» برای «{offer.product.persian_title}» انتخاب شد. "
+                                     "موجودی و قیمت فعلی به‌صورت واقعی تأیید نشده‌اند.")
+                        else:
+                            from apps.catalog.services.visit_context import opening_status
+                            hours = opening_status(offer.shop.weekly_hours)
+                            price = f"{offer.price_toman:,.0f} تومان" if offer.price_toman is not None else "نامشخص"
+                            reply = (
+                                f"«{offer.shop.name}»؛ نشانی ثبت‌شده: "
+                                f"{offer.shop.address or offer.shop.location_label or 'نامشخص'}. "
+                                f"ساعات طبق داده ثبت‌شده: {hours.get('label', 'نامشخص')}. "
+                                f"قیمت ثبت‌شده: {price}. موجودی واقعی مشخص نیست."
+                            )
+                            extra_ui = ("seller_details", {"offer": serialize_offer(offer)})
             elif decision["kind"] == "explain":
                 chosen = (mission.state or {}).get("selected_product_id")
                 product = Product.objects.filter(source_id=chosen).first() if chosen else None
-                if product:
-                    reply = (
-                        f"«{product.persian_title}» در نتایج عبارت «{(mission.state or {}).get('search_query', '')}» "
-                        "دارای آفر ثبت‌شده و مطابق فیلترهای مأموریت بوده است. "
-                        "این به معنی موجودی تأییدشده یا برتری قطعی نسبت به مدل‌های دیگر نیست."
-                    )
+                if product is None:
+                    reply = "کدام مدل را می‌گویی؟ از کارت محصول آن را انتخاب کن تا دلایل ثبت‌شده را توضیح بدهم."
                 else:
-                    reply = (
-                        "این نتیجه از تطبیق متن محصول و آفرهای واجد شرایط با جست‌وجو و فیلترهای تو آمده است؛ "
-                        "برای توضیح یک مدل مشخص، آن را انتخاب کن. موجودی واقعی تأیید نشده است."
-                    )
+                    offer = eligible_offer_list(
+                        _search_filterset(mission.constraints or {}), product_id=product.source_id
+                    ).first()
+                    if offer is None:
+                        reply = "این محصول با شروط فعلی آفر منطبق ندارد. ابتدا نتایج را تازه کن."
+                    else:
+                        facts = [f"در نتایج «{(mission.state or {}).get('search_query', '')}» آفر ثبت‌شده دارد"]
+                        if product.brand_name:
+                            facts.append(f"برند ثبت‌شده: {product.brand_name}")
+                        if product.model:
+                            facts.append(f"مدل ثبت‌شده: {product.model}")
+                        if offer.price_toman is not None:
+                            facts.append(f"قیمت یک آفر واجد شرایط: {offer.price_toman:,.0f} تومان")
+                        if mission.constraints.get("must_have_in_person_credit"):
+                            facts.append("شرط اعتبار حضوری همین آفر رعایت شده است")
+                        reply = f"«{product.persian_title}»: " + "؛ ".join(facts[:4]) + ". برتری قطعی یا موجودی زنده از این داده نتیجه نمی‌شود."
             else:
                 pending = decision.get("pending_constraints")
                 if isinstance(pending, dict) and pending:
                     mission.constraints = _validate_full_constraints(mission.constraints, pending)
-                    mission.save(update_fields=["constraints", "updated_at"])
+                    mission.state = {**(mission.state or {}), "results_stale": bool(
+                        (mission.state or {}).get("candidate_product_ids")
+                    )}
+                    mission.save(update_fields=["constraints", "state", "updated_at"])
                 reply = decision.get("reply", "لطفاً منظورت را دقیق‌تر مشخص کن.")
-            created_events = append_events_locked(mission, [
+            scoped_events = [
                 ("user.message", {"message": data["message"]}),
                 ("assistant.message", {"text": reply}),
-                ("turn.completed", {
-                    "status": mission.status,
-                    "current_stage": mission.current_stage,
-                    "intent_parser": "contextual",
-                    "agent_runtime": "deterministic_guard",
-                    "search_query": (mission.state or {}).get("search_query", ""),
-                    "selected_product_id": selected_id or (mission.state or {}).get("selected_product_id"),
-                    "constraints": mission.constraints,
-                }),
-            ])
+            ]
+            if extra_ui is not None:
+                scoped_events.append(("ui.component", {"component": extra_ui[0], "data": extra_ui[1]}))
+            scoped_events.append(("turn.completed", {
+                "status": mission.status,
+                "current_stage": mission.current_stage,
+                "intent_parser": "contextual",
+                "agent_runtime": "deterministic_guard",
+                "search_query": (mission.state or {}).get("search_query", ""),
+                "selected_product_id": (mission.state or {}).get("selected_product_id"),
+                "selected_offer_id": (mission.state or {}).get("selected_offer_id"),
+                "result_set_id": (mission.state or {}).get("result_set_id"),
+                "results_stale": bool((mission.state or {}).get("results_stale", False)),
+                "constraints": mission.constraints,
+            }))
+            created_events = append_events_locked(mission, scoped_events)
         response_stream = StreamingHttpResponse(
             _sse_stream(created_events), content_type="text/event-stream; charset=utf-8"
         )
@@ -350,8 +422,15 @@ def mission_turn(request, mission_id: str):
             previous_selection if previous_selection in graph_state.get("candidate_product_ids", [])
             and new_query == last_state.get("search_query") else None
         )
+        result_set_id = uuid.uuid4().hex
         mission.state = {
             **{k: v for k, v in last_state.items() if k in {"last_contact_attempt_id", "last_contact_outcome"}},
+            "result_set_id": result_set_id,
+            "results_stale": False,
+            "active_surface": "products",
+            "visible_offer_ids": [],
+            "selected_offer_id": None,
+            "selected_shop_id": None,
             "selected_product_id": selected_product,
             "visible_product_ids": visible_products,
             "candidate_product_ids": graph_state.get("candidate_product_ids", []),
@@ -386,6 +465,8 @@ def mission_turn(request, mission_id: str):
                     "intent_parser": graph_state.get("intent_parser", "heuristic"),
                     "search_query": graph_state.get("search_query", ""),
                     "selected_product_id": selected_product,
+                    "result_set_id": result_set_id,
+                    "results_stale": False,
                     # Sync the *effective* server-side filters to the browser.
                     # Natural-language budget/credit may differ from initial form toggles.
                     "constraints": effective_constraints,
@@ -401,6 +482,64 @@ def mission_turn(request, mission_id: str):
     response_stream["X-Accel-Buffering"] = "no"
     response_stream["X-Mission-ID"] = str(mission.pk)
     return response_stream
+
+
+@api_view(["POST"])
+def mission_focus(request, mission_id: str):
+    """Update active UI reference with a server-checked, versioned focus action."""
+    serializer = MissionFocusSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    data = serializer.validated_data
+    with transaction.atomic():
+        mission = _owned_mission(request, mission_id, lock=True)
+        state = dict(mission.state or {})
+        if state.get("result_set_id") != data["result_set_id"] or state.get("results_stale"):
+            raise ValidationError({"result_set_id": "این نتایج دیگر معتبر نیستند؛ جست‌وجو را به‌روز کن."})
+        action = data["action"]
+        filters = _search_filterset(mission.constraints or {})
+        if action in {"select_product", "view_sellers"}:
+            product_id = data["product_id"]
+            if product_id not in state.get("candidate_product_ids", []):
+                raise ValidationError({"product_id": "محصول در نتایج فعلی مأموریت وجود ندارد."})
+            if not eligible_offer_list(filters, product_id=product_id).exists():
+                raise ValidationError({"product_id": "این کالا با شرایط فعلی مطابقت ندارد."})
+            state["selected_product_id"] = product_id
+            if action == "view_sellers":
+                offer_ids = data["offer_ids"]
+                eligible_ids = set(
+                    eligible_offer_list(filters, product_id=product_id).filter(
+                        source_id__in=offer_ids
+                    ).values_list("source_id", flat=True)
+                )
+                if eligible_ids != set(offer_ids):
+                    raise ValidationError({"offer_ids": "فهرست فروشندگان با شروط فعلی مطابقت ندارد."})
+                state.update(active_surface="sellers", visible_offer_ids=offer_ids,
+                             selected_offer_id=None, selected_shop_id=None)
+            else:
+                state.update(active_surface="products", visible_offer_ids=[],
+                             selected_offer_id=None, selected_shop_id=None)
+        elif action == "view_products":
+            state.update(active_surface="products", visible_offer_ids=[],
+                         selected_offer_id=None, selected_shop_id=None)
+        elif action == "select_offer":
+            offer_id = data["offer_id"]
+            if offer_id not in state.get("visible_offer_ids", []):
+                raise ValidationError({"offer_id": "فروشنده در فهرست فعال نیست."})
+            offer = eligible_offer_list(filters).filter(source_id=offer_id).first()
+            if offer is None or offer.product_id != state.get("selected_product_id"):
+                raise ValidationError({"offer_id": "این آفر دیگر با شروط مأموریت مطابقت ندارد."})
+            state.update(active_surface="sellers", selected_offer_id=offer_id,
+                         selected_shop_id=offer.shop_id)
+        mission.state = state
+        mission.save(update_fields=["state", "updated_at"])
+        events = append_events_locked(mission, [("focus.updated", {
+            "active_surface": state.get("active_surface", "products"),
+            "selected_product_id": state.get("selected_product_id"),
+            "selected_offer_id": state.get("selected_offer_id"),
+            "result_set_id": state["result_set_id"],
+        })])
+    return Response({"state": mission.state, "last_event_seq": mission.last_event_seq,
+                     "events": events})
 
 
 @api_view(["GET"])
