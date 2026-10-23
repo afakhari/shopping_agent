@@ -11,6 +11,10 @@ import {
 
 const numerals = new Intl.NumberFormat('fa-IR', { maximumFractionDigits: 0 })
 
+// An intentional opt-in: a missing value means there are no paid Neshan controls,
+// no provider-capability requests, and no user-facing upsell.
+export const paidNeshanRoutingUiEnabled = import.meta.env.VITE_ENABLE_PAID_NESHAN_ROUTES === '1'
+
 /** An offer must carry its own valid shop coordinates. Never geocode a synthetic name. */
 export function geographicallyMappedOffers(offers: CatalogOffer[]): CatalogOffer[] {
   return offers.filter(({ shop }) => isTehranCatalogPoint(shop.lat, shop.lon)
@@ -78,7 +82,8 @@ export function SellerLocationBoard({
   const visibleDirection = currentRouteEvidence(directionResult, directionScope, disabled)?.data ?? null
 
   const checkRouting = (opened: boolean, force = false) => {
-    if (!opened || disabled || !resultSetId || (!force && routingChecked) || !missionId) return
+    if (!paidNeshanRoutingUiEnabled || !opened || disabled || !resultSetId
+      || (!force && routingChecked) || !missionId) return
     setRoutingCheckedMission(missionId)
     setCapabilityError(null)
     void getRoutingCapability(missionId)
@@ -133,10 +138,11 @@ export function SellerLocationBoard({
     }
   }
 
-  if (offers.length < 2) return null
+  if (offers.length === 0) return null
   return (
     <details className="mission-seller-location-board" onToggle={(event) => checkRouting(event.currentTarget.open)}>
-      <summary><MapPin size={16} aria-hidden="true" /> مقایسهٔ مکان فروشگاه‌ها
+      <summary><MapPin size={16} aria-hidden="true" />
+        {offers.length > 1 ? 'مقایسهٔ مکان فروشگاه‌ها' : 'موقعیت فروشنده'}
         <span className="mission-location-count">{numerals.format(distinctMappedShopCount)} فروشگاه دارای مختصات ثبت‌شده از {numerals.format(offers.length)} آفرِ بارگذاری‌شده</span>
       </summary>
       <div className="mission-location-content">
@@ -207,7 +213,7 @@ export function SellerLocationBoard({
                 </>
           }
         </div>
-        <section className="mission-neshan-routing" aria-label="مقایسه زمان سفر با نشان">
+        {paidNeshanRoutingUiEnabled && <section className="mission-neshan-routing" aria-label="مقایسه زمان سفر با نشان">
           <strong>مقایسه زمان سفر با نشان (اختیاری)</strong>
           <p>این بخش فقط در صورت فعال‌بودن سرویس، بعد از انتخاب مبدأ و درخواست مستقیم تو محاسبه می‌شود.
             زمان‌های نشان تخمینی‌اند؛ نام فروشگاه‌ها و موجودی آن‌ها تأیید نشده‌اند.</p>
@@ -273,9 +279,10 @@ export function SellerLocationBoard({
               </li>
             })}</ul>
           </div>}
-        </section>
+        </section>}
         <p className="mission-location-footer"><LocateFixed size={14} aria-hidden="true" />
-          نقشه فعلی فقط مکان فروشندهٔ منتخب را نشان می‌دهد؛ قابلیت چندپین نشان تا تأیید کلید و سهمیه فعال نیست.
+          موقعیت نمایش‌داده‌شده فقط مختصات ثبت‌شده است؛ فاصله مستقیم، زمان سفر نیست.
+          این نقشه موجودی یا هویت فروشگاه را تأیید نمی‌کند.
         </p>
       </div>
     </details>
