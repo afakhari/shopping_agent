@@ -207,9 +207,18 @@ def resolve_recommendation_frame(
     # explicit product/model request still follows the standard catalog path.
     recommending = bool(
         _RECOMMENDATION.search(normalized)
-        or ("مناسب" in normalized and ("؟" in message or "?" in message))
+        or ("مناسب" in normalized and (
+            "؟" in message or "?" in message
+            or _usage(normalized) or _budget(normalized)
+        ))
     )
     if not recommending or _ACCESSORY_FIRST.match(normalized):
+        return None
+    # Explicit brand/model and GPU-SKU requests need exact lexical matching,
+    # not replacement by the broad canonical product family.
+    if re.search(r"(?<!\w)(?:rtx|gtx|rx)\s*\d{3,4}(?!\w)", normalized):
+        return None
+    if re.search(r"(?<!\w)مدل\s+[a-z0-9]", normalized):
         return None
     # Do not accidentally turn technical support / purchase-spec questions
     # into a catalog recommendation flow.
