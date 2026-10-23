@@ -342,11 +342,12 @@ function VisitPlan({ component }: { component: GenUIComponent }) {
       <div className="genui-card-heading">
         <span className="genui-icon"><MapPin size={17} /></span>
         <div><h4>{text(component.data.title, 'برنامه مراجعه')}</h4>
-          <p>قبل از مراجعه، قیمت و ساعت کاری را مستقل از شبیه‌سازی تأیید کن.</p>
+          <p>این فقط خلاصه سناریوی دمو است؛ نام بسیاری از فروشگاه‌ها ساختگی است و مراجعه واقعی با این اطلاعات توصیه نمی‌شود.</p>
         </div>
       </div>
       {text(component.data.status) && <span className="genui-status-chip"><BadgeCheck size={14} />{text(component.data.status)}</span>}
-      {text(component.data.source_label) && <p className="genui-data-caveat">{text(component.data.source_label)}</p>}
+      <p className="genui-data-caveat" role="note">{text(component.data.source_label,
+        'فقط سناریوی نمایشی: نام فروشگاه، موجودی، قیمت فعلی و ساعت بازبودن تأیید نشده‌اند.')}</p>
       <dl className="genui-visit-key-facts">{essentials.map(displayDetail)}</dl>
       {safeLocation && (
         <a className="genui-primary-action genui-visit-navigation" href={safeLocation} target="_blank" rel="noopener noreferrer">
@@ -380,7 +381,6 @@ function ContactStatus({ component }: { component: GenUIComponent }) {
     ? component.data.attempts[0]
     : null
   const status = text(component.data.status, text(firstAttempt?.outcome, 'pending'))
-  const positive = status === 'confirmed_available'
   const fallbackCopy = { title: 'وضعیت استعلام', message: 'وضعیت بر اساس نتیجه ثبت‌شده نمایش داده می‌شود.' }
   const messages: Record<string, { title: string; message: string }> = {
     confirmed_available: { title: 'موجودی در سناریوی دمو تأیید شد', message: 'اطلاعات فروشگاه را پیش از مراجعه مرور کن؛ این نتیجه تماس واقعی نیست.' },
@@ -399,8 +399,8 @@ function ContactStatus({ component }: { component: GenUIComponent }) {
   const registeredPrice = priceEvidence ? text(priceEvidence.registered_price_toman) : ''
   const registeredHours = hoursEvidence ? text(hoursEvidence.weekly_hours) : ''
   return (
-    <section className={`genui-contact-status ${positive ? 'positive' : 'caution'}`}>
-      {positive ? <CheckCircle2 size={20} /> : <HelpCircle size={20} />}
+    <section className="genui-contact-status caution">
+      <HelpCircle size={20} />
       <div>
         <strong>{text(component.data.title, copy.title)}</strong>
         <p>{text(component.data.message, copy.message)}</p>
