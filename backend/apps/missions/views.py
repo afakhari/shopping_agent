@@ -206,17 +206,17 @@ def mission_turn(request, mission_id: str):
         and preflight_constraints.get("lat") is None
     ):
         decision = {
-            "kind": "clarify",
+            "kind": "location_clarify",
             "reply": "برای مرتب‌سازی فروشگاه‌ها بر اساس نزدیکی، ابتدا موقعیت یا محدوده تهران را انتخاب کن.",
         }
-    if decision["kind"] in {"select_product", "explore_sellers", "contact_prompt", "compare", "select_offer", "seller_details", "seller_recovery", "explain", "clarify"}:
+    if decision["kind"] in {"select_product", "explore_sellers", "contact_prompt", "compare", "select_offer", "seller_details", "seller_recovery", "explain", "clarify", "location_clarify"}:
         # No extra LLM call for a grounded contextual turn. Re-evaluate every
         # selection with the *effective* constraints inside the row lock.
         with transaction.atomic():
             mission = _owned_mission(request, mission_id, lock=True)
             decision = classify_contextual_turn(data["message"], mission.state)
             if decision["kind"] == "refine" and decision["constraint_updates"].get("sort") == "distance_asc" and preflight_constraints.get("lat") is None:
-                decision = {"kind": "clarify", "reply": "برای نزدیکی، ابتدا محدوده تهران را انتخاب کن."}
+                decision = {"kind": "location_clarify", "reply": "برای نزدیکی، ابتدا محدوده تهران را انتخاب کن."}
             submitted = data.get("constraints", {})
             if submitted:
                 updated = _validate_full_constraints(mission.constraints, submitted)
@@ -400,6 +400,11 @@ def mission_turn(request, mission_id: str):
                             facts.append("شرط اعتبار حضوری همین آفر رعایت شده است")
                         reply = f"«{product.persian_title}»: " + "؛ ".join(facts[:4]) + ". برتری قطعی یا موجودی زنده از این داده نتیجه نمی‌شود."
             else:
+                if decision["kind"] == "location_clarify":
+                    extra_ui = ("location_choice", {
+                        "city": "tehran",
+                        "source_type": "approximate_region",
+                    })
                 pending = decision.get("pending_constraints")
                 if isinstance(pending, dict) and pending:
                     mission.constraints = _validate_full_constraints(mission.constraints, pending)
