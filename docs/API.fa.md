@@ -7,6 +7,7 @@
 - `GET /api/v1/catalog/search/?q=...&page_size=...` برای جست‌وجوی فیلترشده با Offer معتبر؛ `GET /api/v1/products/{id}/`، `GET /api/v1/products/{id}/offers/`، `GET /api/v1/shops/{id}/`.
 - `POST /api/v1/missions/` با `initial_message` و `constraints`، `GET /api/v1/missions/{uuid}/` با نشست مالک.
 - `POST /api/v1/missions/{uuid}/turns/` با `message` و `constraints` و پاسخ SSE شامل `user.message`، `assistant.message`، رویداد UI برای خرید واقعی و `turn.completed`. احوال‌پرسی خالص رویداد UI و فراخوانی LLM ندارد.
+- `POST /api/v1/missions/{uuid}/focus/` (بعد از PR #26): اکشن صریح `select_product | view_sellers | view_products | select_offer` همراه با `result_set_id` و `product_id` یا `offer_id` و در صورت نیاز `offer_ids`؛ بررسی server-side نسبت به نتیجه جاری و فیلترهای سخت، برگشت `state`, `events`, `last_event_seq`؛ انتخاب از کارت بدون پیام مصنوعی.
 - `POST /api/v1/missions/{uuid}/contact-attempts/` با `shop_id`، `offer_id`، `client_request_id` (اختیاری در serializer ولی مهم برای تکرار ایمن)، `purpose=verify_availability` و `questions`؛ نتیجه **شبیه‌سازی‌شده**.
 - `GET /api/v1/missions/{uuid}/visit-plan/`، بازیابی state برنامه مراجعه بدون ساخت داده جدید.
 
