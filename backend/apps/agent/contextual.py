@@ -24,13 +24,10 @@ _BUDGET = re.compile(
     r"(?: (?:م|رو|را|شد|شده|هست|بشه|بکن|کن|رسید|می خوام))*"
     r"\s*(?P<amount>\d+(?:[.,]\d+)?)\s*(?P<unit>میلیون|هزار|تومان)?"
 )
-_CREDIT = re.compile(r"(?:قسطی|اعتباری|ترب ?پی)")
 _CREDIT_NEGATION = re.compile(r"(?:بدون|نمی ?خوام|لازم نیست|نمی ?خوامش).{0,24}(?:قسطی|اعتباری|ترب ?پی)|(?:قسطی|اعتباری).{0,12}(?:نباشه|نمی ?خوام)")
-_MORE_GENERAL = re.compile(r"^(?:فقط |لطفا |لطفاً )?(?:قسطی|اعتباری|ترب ?پی)(?: باشه| می خوام)?$")
 _WHY = re.compile(r"^(?:چرا|به چه دلیل|دلیلش چیه|چرا اینو پیشنهاد دادی|چرا این مدل)(?:.*)?$")
 _SELLER_WORDS = re.compile(r"(?:فروشنده|فروشگاه|مغازه|پاساژ)")
 _STORE_QUESTION = re.compile(r"(?:ساعت|باز(?:ه| است)|بسته|آدرس|نشانی|کجا|موجودی|تلفن|تماس)")
-_INDEXED = re.compile(r"(?:اولی|دومی|سومی|چهارمی|اول|دوم|سوم|چهارم)")
 
 
 def _budget_value(message: str) -> str | None:
@@ -138,7 +135,6 @@ def classify_contextual_turn(message: str, state: dict[str, Any] | None) -> dict
         return {"kind": "clarify", "reply": "کدام فروشگاه؟ فروشنده را از فهرست انتخاب کن تا فقط داده‌های ثبت‌شده را توضیح بدهم."}
 
     value = _budget_value(normalized)
-    credit = bool(_CREDIT.search(normalized))
     # A budget-only update has no new product tokens after the amount.
     match_budget = _BUDGET.search(normalized) if value is not None else None
     remainder = (normalized[:match_budget.start()] + " " + normalized[match_budget.end():]).strip() if match_budget else ""
