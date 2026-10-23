@@ -597,6 +597,7 @@ export function MissionPanel({
   const [chatMessages, setChatMessages] = useState<MissionChatMessage[]>([])
   const [lastQuery, setLastQuery] = useState('')
   const [selectedCompareProductIds, setSelectedCompareProductIds] = useState<string[]>([])
+  const focusChainRef = useRef<Promise<void>>(Promise.resolve())
   const [comparisonOpen, setComparisonOpen] = useState(false)
   const [isRunning, setIsRunning] = useState(false)
   const [contactingOfferId, setContactingOfferId] = useState<string | null>(null)
@@ -658,6 +659,8 @@ export function MissionPanel({
       .then((snapshot) => {
         const history = snapshot.events ?? []
         setEvents(history)
+        setSelectedCompareProductIds(Array.isArray(snapshot.state?.compared_product_ids)
+          ? snapshot.state.compared_product_ids.filter((id): id is string => typeof id === 'string') : [])
         latestEventSeqRef.current = Math.max(0, ...history.map((item) => item.seq))
         resultSetIdRef.current = typeof snapshot.state?.result_set_id === 'string' ? snapshot.state.result_set_id : null
         setResultSetId(resultSetIdRef.current)
@@ -741,10 +744,18 @@ export function MissionPanel({
   const handleEvent = (event: MissionEvent) => {
     latestEventSeqRef.current = Math.max(latestEventSeqRef.current, event.seq)
     if (event.type === 'focus.updated') {
+      if (Array.isArray(event.payload.compared_product_ids)) {
+        setSelectedCompareProductIds(event.payload.compared_product_ids.filter(
+          (id): id is string => typeof id === 'string'))
+      }
       setSelectedProductId(typeof event.payload.selected_product_id === 'string' ? event.payload.selected_product_id : null)
       setSelectedOfferId(typeof event.payload.selected_offer_id === 'string' ? event.payload.selected_offer_id : null)
     }
     if (event.type === 'turn.completed') {
+      if (Array.isArray(event.payload.compared_product_ids)) {
+        setSelectedCompareProductIds(event.payload.compared_product_ids.filter(
+          (id): id is string => typeof id === 'string'))
+      }
       if (typeof event.payload.result_set_id === 'string') {
         resultSetIdRef.current = event.payload.result_set_id
         setResultSetId(event.payload.result_set_id)
@@ -818,22 +829,33 @@ export function MissionPanel({
     }
   }
 
-  const applyFocus = async (input: Omit<MissionFocusAction, 'result_set_id'>) => {
-    const activeId = missionIdRef.current
-    const activeResultId = resultSetIdRef.current ?? resultSetId
-    if (isRunning || isRestoring || turnInFlightRef.current || queuePausedRef.current || resultsStale || !activeId || !activeResultId) {
-      setError('نتایج این جست‌وجو آماده یا معتبر نیستند؛ ابتدا وضعیت را به‌روز کن.')
-      return
+  const applyFocus = (input: Omit<MissionFocusAction, 'result_set_id'>): Promise<void> => {
+    // Serialize explicit UI mutations. An overlapping select/seller/compare click
+    // must not reorder the server's active reference by network completion time.
+    const execute = async () => {
+      const activeId = missionIdRef.current
+      const activeResultId = resultSetIdRef.current ?? resultSetId
+      if (isRunning || isRestoring || turnInFlightRef.current || queuePausedRef.current || resultsStale || !activeId || !activeResultId) {
+        setError('نتایج این جست‌وجو آماده یا معتبر نیستند؛ ابتدا وضعیت را به‌روز کن.')
+        return
+      }
+      try {
+        const response = await updateMissionFocus(activeId, { ...input, result_set_id: activeResultId })
+        response.events.forEach(handleEvent)
+        setSelectedProductId(typeof response.state.selected_product_id === 'string' ? response.state.selected_product_id : null)
+        setSelectedOfferId(typeof response.state.selected_offer_id === 'string' ? response.state.selected_offer_id : null)
+        if (Array.isArray(response.state.compared_product_ids)) {
+          setSelectedCompareProductIds(response.state.compared_product_ids.filter(
+            (id): id is string => typeof id === 'string'))
+        }
+      } catch (reason) {
+        setError(reason instanceof Error ? reason.message : 'انتخاب ثبت نشد؛ وضعیت مأموریت را بررسی کن.')
+        if (input.action === 'set_compare') setSelectedCompareProductIds([])
+      }
     }
-    try {
-      const response = await updateMissionFocus(activeId, { ...input, result_set_id: activeResultId })
-      response.events.forEach(handleEvent)
-      // A repeat focus is idempotent and may produce no event; state is still authoritative.
-      setSelectedProductId(typeof response.state.selected_product_id === 'string' ? response.state.selected_product_id : null)
-      setSelectedOfferId(typeof response.state.selected_offer_id === 'string' ? response.state.selected_offer_id : null)
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'انتخاب ثبت نشد؛ وضعیت مأموریت را بررسی کن.')
-    }
+    const next = focusChainRef.current.then(execute, execute)
+    focusChainRef.current = next
+    return next
   }
 
   const removeQueuedTurn = (index: number, edit: boolean) => {
@@ -905,6 +927,9 @@ export function MissionPanel({
     ])
     setMessage('')
     try {
+      // A user may submit "این دو تا چه فرقی دارند؟" immediately after
+      // tapping two compare controls. Commit those focus actions first.
+      await focusChainRef.current
       if (!activeMissionId) {
         const created = await createMission(trimmed, turnConstraints)
         activeMissionId = created.mission_id
@@ -934,6 +959,8 @@ export function MissionPanel({
             setResultsStale(snapshot.state?.results_stale === true)
             setSelectedProductId(typeof snapshot.state?.selected_product_id === 'string' ? snapshot.state.selected_product_id : null)
             setSelectedOfferId(typeof snapshot.state?.selected_offer_id === 'string' ? snapshot.state.selected_offer_id : null)
+            setSelectedCompareProductIds(Array.isArray(snapshot.state?.compared_product_ids)
+              ? snapshot.state.compared_product_ids.filter((id): id is string => typeof id === 'string') : [])
             setChatMessages(rebuildChatFromEvents(history))
             setContactByOffer(restoreContactResponses(history))
             const actualQuery = typeof snapshot.state?.search_query === 'string'
@@ -1003,6 +1030,8 @@ export function MissionPanel({
       setResultSetId(resultSetIdRef.current)
       setResultsStale(snapshot.state?.results_stale === true)
       setSelectedOfferId(typeof snapshot.state?.selected_offer_id === 'string' ? snapshot.state.selected_offer_id : null)
+      setSelectedCompareProductIds(Array.isArray(snapshot.state?.compared_product_ids)
+        ? snapshot.state.compared_product_ids.filter((id): id is string => typeof id === 'string') : [])
       serverConstraintsRef.current = snapshot.constraints
       setBrandFilter(snapshot.constraints.brand_name ?? null)
       setModelFilter(snapshot.constraints.model_exact ?? null)
@@ -1135,6 +1164,7 @@ export function MissionPanel({
       : [...selectedCompareProductIds, result.product.id]
     setSelectedCompareProductIds(next)
     setComparisonOpen(next.length >= 2)
+    void applyFocus({ action: 'set_compare', product_ids: next })
   }
 
   const fetchProductOffers = async (result: CatalogSearchResult, page: number, append: boolean) => {
@@ -1563,7 +1593,11 @@ export function MissionPanel({
                           {comparisonOpen ? 'بستن مقایسه' : 'نمایش مقایسه'}
                         </button>}
                         <button type="button" className="mission-compare-clear" aria-label="پاک کردن انتخاب‌های مقایسه"
-                          onClick={() => { setSelectedCompareProductIds([]); setComparisonOpen(false) }}>
+                          onClick={() => {
+                            setSelectedCompareProductIds([])
+                            setComparisonOpen(false)
+                            void applyFocus({ action: 'set_compare', product_ids: [] })
+                          }}>
                           پاک کردن
                         </button>
                       </div>
