@@ -94,7 +94,7 @@ def editing_laptop_evidence(
     else:
         notes.append(
             f"RAM ثبت‌شده {ram_gb} گیگابایت است؛ از مقدار پیشنهادی "
-            "Adobe Premiere برای ویدیوی {adobe_example} کمتر نیست"
+            f"Adobe Premiere برای ویدیوی {adobe_example} کمتر نیست"
         )
     if ssd_stated:
         notes.append("ذخیره‌سازی SSD در دادهٔ این مدل ذکر شده است")
