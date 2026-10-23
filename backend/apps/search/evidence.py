@@ -89,7 +89,7 @@ def editing_laptop_evidence(
     elif ram_gb < preferred_ram:
         notes.append(
             f"RAM ثبت‌شده {ram_gb} گیگابایت است؛ کمتر از مقدار پیشنهادی "
-            "Adobe Premiere برای ویدیوی {adobe_example}"
+            f"Adobe Premiere برای ویدیوی {adobe_example}"
         )
     else:
         notes.append(
