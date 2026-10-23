@@ -84,7 +84,7 @@ describe('seller location trust and coordinated selection', () => {
 
   it('renders map access even if only one seller is eligible', () => {
     const markup = renderToStaticMarkup(<SellerLocationBoard
-      offers={[shops[0]]} selectedOfferId="first" onSelectOffer={() => {}} disabled={false}
+      offers={[offer('first', 35.7, 51.4)]} selectedOfferId="first" onSelectOffer={() => {}} disabled={false}
       missionId="mission1" resultSetId="set1" origin={null} />)
     expect(markup).toContain('موقعیت فروشنده')
     expect(markup).toContain('نمایش نقشه OpenStreetMap')
