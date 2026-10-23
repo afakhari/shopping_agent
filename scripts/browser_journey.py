@@ -154,6 +154,13 @@ def main() -> None:
                     assert page.locator(".mission-location-map iframe").count() == 0
                     page.locator(".mission-location-choices button").nth(1).click()
                     expect(page.locator(".mission-location-choices button").nth(1)).to_have_attribute("aria-pressed", "true")
+                    # Keyless Neshan point link is an explicit opt-in external action,
+                    # never auto-navigation, fake ETA or lookup by synthetic shop name.
+                    neshan_link = page.get_by_role("link", name="بازکردن مختصات ثبت‌شده در نقشه نشان، نه تأیید فروشگاه")
+                    neshan_url = neshan_link.get_attribute("href")
+                    assert neshan_url and neshan_url.startswith("https://nshn.ir/?lat=")
+                    assert "lng=" in neshan_url
+                    assert neshan_link.get_attribute("target") == "_blank"
                     page.get_by_role("button", name="نمایش نقشه OpenStreetMap").click()
                     page.locator(".mission-location-map iframe").first.wait_for()
                     map_url = page.locator(".mission-location-map iframe").first.get_attribute("src")
