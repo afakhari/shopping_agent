@@ -59,6 +59,9 @@ def main() -> None:
                     permissions=[],
                 )
                 page = context.new_page()
+                paid_route_requests = []
+                page.on("request", lambda request: paid_route_requests.append(request.url)
+                        if "/route-estimates/" in request.url else None)
                 page.set_default_timeout(25000)
                 page.goto(BASE, wait_until="domcontentloaded")
                 page.locator('textarea[aria-label="پیام به دستیار خرید"]').wait_for()
@@ -161,13 +164,12 @@ def main() -> None:
                         "(el) => el.parentElement?.classList.contains('mission-product-card')"
                     ), "Seller evidence should fill the card rather than a narrow text column"
                     page.locator(".mission-seller-location-board summary").first.click()
-                    # The server's paid Neshan provider is off by default;
-                    # the map/list UX remains fully functional without a secret.
-                    page.locator(".mission-neshan-routing").first.get_by_text(
-                        "اتصال مسیریابی نشان هنوز فعال نشده است", exact=False
-                    ).wait_for()
-                    assert page.locator(".mission-neshan-routing button").count() == 0
+                    # Zero-credit mode: opening the seller workspace neither
+                    # shows a paid-routing upsell nor calls any paid provider.
+                    assert page.locator(".mission-neshan-routing").count() == 0
+                    assert paid_route_requests == [], "Free seller browsing must not ask the paid API for capabilities or ETA"
                     assert page.get_by_role("button", name="محاسبه مسیر فروشنده منتخب", exact=False).count() == 0
+                    assert page.locator(".mission-location-footer").first.is_visible()
                     assert page.locator(".mission-location-choices button").count() == 2
                     assert page.locator(".mission-location-map iframe").count() == 0
                     page.locator(".mission-location-choices button").nth(1).click()
