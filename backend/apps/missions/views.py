@@ -221,7 +221,14 @@ def mission_turn(request, mission_id: str):
                 updated = _validate_full_constraints(mission.constraints, submitted)
                 if updated != mission.constraints:
                     mission.constraints = updated
-                    mission.state = {**(mission.state or {}), "results_stale": True}
+                    invalidated = dict(mission.state or {})
+                    invalidated.pop("visit_plan", None)
+                    invalidated.update(
+                        results_stale=True, selected_product_id=None,
+                        selected_offer_id=None, selected_shop_id=None,
+                        active_surface="products", visible_offer_ids=[],
+                    )
+                    mission.state = invalidated
                     mission.save(update_fields=["constraints", "state", "updated_at"])
             selected_id = None
             extra_ui = None
@@ -588,6 +595,8 @@ def create_contact_attempt(request, mission_id: str):
             raise ValidationError({"offer_id": "این آفر متعلق به فروشگاه انتخاب‌شده نیست."})
 
         # Enforce all hard filters against the current database state immediately before simulation.
+        if (mission.state or {}).get("results_stale"):
+            raise ValidationError({"offer_id": "شرایط خرید تغییر کرده‌اند؛ ابتدا نتایج را تازه کن."})
         candidate_ids = set((mission.state or {}).get("candidate_product_ids", []))
         if offer.product_id not in candidate_ids:
             raise ValidationError({"offer_id": "ابتدا این محصول را در همین مأموریت جست‌وجو کن."})
