@@ -208,7 +208,7 @@ def mission_turn(request, mission_id: str):
             "kind": "clarify",
             "reply": "برای مرتب‌سازی فروشگاه‌ها بر اساس نزدیکی، ابتدا موقعیت یا محدوده تهران را انتخاب کن.",
         }
-    if decision["kind"] in {"select_product", "select_offer", "seller_details", "explain", "clarify"}:
+    if decision["kind"] in {"select_product", "select_offer", "seller_details", "seller_recovery", "explain", "clarify"}:
         # No extra LLM call for a grounded contextual turn. Re-evaluate every
         # selection with the *effective* constraints inside the row lock.
         with transaction.atomic():
@@ -308,6 +308,36 @@ def mission_turn(request, mission_id: str):
                                 f"قیمت ثبت‌شده: {price}. موجودی واقعی مشخص نیست."
                             )
                             extra_ui = ("seller_details", {"offer": serialize_offer(offer)})
+            elif decision["kind"] == "seller_recovery":
+                state = mission.state or {}
+                offer_id = decision["offer_id"]
+                if offer_id != state.get("selected_offer_id") or state.get("results_stale"):
+                    reply = "انتخاب فروشنده دیگر معتبر نیست؛ فهرست را به‌روز کن."
+                else:
+                    original = eligible_offer_list(
+                        _search_filterset(mission.constraints or {})
+                    ).filter(source_id=offer_id).first()
+                    if original is None:
+                        reply = "آفر اولیه دیگر با شروط فعلی منطبق نیست؛ جست‌وجو را تازه کن."
+                    else:
+                        backup = _serialize_alternatives(mission, original, original.shop_id)
+                        if backup:
+                            extra_ui = ("seller_options", {
+                                "offers": backup, "product_id": original.product_id,
+                            })
+                            mission.state = {
+                                **state, "visible_offer_ids": [x["id"] for x in backup],
+                                "selected_offer_id": None, "selected_shop_id": None,
+                                "active_surface": "sellers",
+                            }
+                            mission.save(update_fields=["state", "updated_at"])
+                            reply = (
+                                "طبق گزارشی که دادی، فروشندهٔ قبلی مناسب مراجعه نیست. "
+                                "این فروشگاه‌های جایگزین همان محصول را با شروط ثبت‌شده عرضه کرده‌اند؛ "
+                                "موجودی هیچ‌کدام در دنیای واقعی تأیید نشده است."
+                            )
+                        else:
+                            reply = "با شروط فعلی، فروشندهٔ جایگزین برای این مدل در دیتاست پیدا نشد. فقط با تغییر صریح شروط می‌توان جست‌وجو را گسترش داد."
             elif decision["kind"] == "explain":
                 chosen = (mission.state or {}).get("selected_product_id")
                 product = Product.objects.filter(source_id=chosen).first() if chosen else None
