@@ -143,6 +143,17 @@ def main() -> None:
                     page.locator(".mission-offers-toggle").first.click()
                     page.locator(".mission-offer-row").nth(1).wait_for()
                     assert page.locator(".mission-offer-row").count() == 2
+                    page.locator(".mission-seller-location-board summary").first.click()
+                    assert page.locator(".mission-location-choices button").count() == 2
+                    assert page.locator(".mission-location-map iframe").count() == 0
+                    page.locator(".mission-location-choices button").nth(1).click()
+                    expect(page.locator(".mission-location-choices button").nth(1)).to_have_attribute("aria-pressed", "true")
+                    page.get_by_role("button", name="نمایش نقشه OpenStreetMap").click()
+                    page.locator(".mission-location-map iframe").first.wait_for()
+                    map_url = page.locator(".mission-location-map iframe").first.get_attribute("src")
+                    assert map_url and map_url.startswith("https://www.openstreetmap.org/export/embed.html")
+                    page.get_by_role("button", name="بستن نقشه").click()
+                    assert page.locator(".mission-location-map iframe").count() == 0
                     page.locator(".mission-offer-row .mission-select-button").nth(1).click()
                     expect(page.locator(".mission-offer-row .mission-select-button").nth(1)).to_have_attribute("aria-pressed", "true")
                     # Bare "دومی" now means the second seller, not the second product.
@@ -160,12 +171,8 @@ def main() -> None:
                     page.locator(".genui-contact-consent").last.wait_for()
                     assert "تماس یا پیام واقعی" in page.locator(".genui-contact-consent").last.inner_text()
                     page.locator(".mission-seller-details summary").first.click()
-                    page.locator(".mission-inline-map-toggle").first.click()
-                    page.locator(".mission-inline-map iframe").first.wait_for()
-                    # External tiles are optional; only the iframe's safe URL matters.
-                    map_url = page.locator(".mission-inline-map iframe").first.get_attribute("src")
-                    assert map_url and map_url.startswith("https://www.openstreetmap.org/")
-                    page.locator(".mission-inline-map-toggle").first.click()
+                    # Map was explicitly opened above; no background third-party
+                    # embed is created by simply opening the seller list.
 
                     # The simulator's first result is no_answer and second is available.
                     page.locator(".mission-offer-verify").first.click()
