@@ -174,6 +174,7 @@ class RouteOriginSerializer(serializers.Serializer):
 
 class RouteEstimatesSerializer(serializers.Serializer):
     """Only explicitly opted-in, bounded, currently visible offer IDs."""
+    service = serializers.ChoiceField(choices=("matrix", "direction"), default="matrix")
     result_set_id = serializers.CharField(max_length=40)
     origin = RouteOriginSerializer()
     offer_ids = serializers.ListField(
@@ -186,3 +187,8 @@ class RouteEstimatesSerializer(serializers.Serializer):
         if len(value) != len(set(value)):
             raise serializers.ValidationError("شناسه آفرها نباید تکراری باشد.")
         return value
+
+    def validate(self, attrs):
+        if attrs["service"] == "direction" and len(attrs["offer_ids"]) != 1:
+            raise serializers.ValidationError({"offer_ids": "برای مسیر دقیق، یک فروشنده انتخاب کن."})
+        return attrs
