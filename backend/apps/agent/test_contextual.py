@@ -383,6 +383,13 @@ class ContextualMissionApiTests(TestCase):
             )
         mission = PurchaseMission.objects.get(pk=self.mission_id)
         previous_results = list(mission.state["candidate_product_ids"])
+        mission.state = {
+            **mission.state,
+            "selected_product_id": self.first.source_id,
+            "selected_offer_id": "context_offer_0",
+            "visit_plan": {"offer_id": "context_offer_0"},
+        }
+        mission.save(update_fields=["state"])
         with patch("apps.missions.views.extract_intent") as paid_model:
             first = self.turn("چه لپ تاپی برای تدوین ویدیو مناسب من هست؟")
             paid_model.assert_not_called()
@@ -394,6 +401,10 @@ class ContextualMissionApiTests(TestCase):
                  "usage": "video_editing", "intensity": ""},
             )
             self.assertEqual(mission.state["candidate_product_ids"], previous_results)
+            self.assertTrue(mission.state["results_stale"])
+            self.assertIsNone(mission.state["selected_product_id"])
+            self.assertIsNone(mission.state["selected_offer_id"])
+            self.assertNotIn("visit_plan", mission.state)
             completed = self.turn("تدوین ویدیوی سبک و قیمت تا سقف 200 میلیون")
             paid_model.assert_not_called()
         mission.refresh_from_db()
@@ -403,6 +414,7 @@ class ContextualMissionApiTests(TestCase):
         self.assertEqual(mission.state["shopping_need"]["family"], "laptop")
         self.assertEqual(mission.state["shopping_need"]["intensity"], "light")
         self.assertNotIn("pending_dialogue", mission.state)
+        self.assertFalse(mission.state["results_stale"])
         self.assertEqual(
             mission.state["candidate_product_ids"],
             ["edit_laptop", "basic_laptop"],
