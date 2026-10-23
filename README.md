@@ -67,6 +67,10 @@ Development can be temporarily broken on feature branches. Run narrow local chec
 [راهنمای کامل اجرای محلی](docs/LOCAL-DATASET-SETUP.fa.md) · [فرمان کنترل داده‌های واردشده](backend/apps/catalog/management/commands/verify_dataset.py)
 
 
+## معماری گفتگو و جست‌وجوی نوع‌دار
+
+[تصمیم معماری تفکیک سؤال، مشاوره و جست‌وجو](docs/ADR-TYPED-DIALOGUE-SEARCH-2026-10-23.fa.md) شامل سیاست پیش از BoxAPI، وضعیت روشن‌سازی چندمرحله‌ای، دامنه محصول در دیتاست و ناوردایی‌های آزمون است. این بهبود به معنی حذف همه خطاهای احتمالی زبان طبیعی نیست.
+
 ## آماده‌سازی انتشار مسابقه
 
 > **پیش از دیپلوی (شاخه hardening):** [چک‌لیست قابل اجرا و راهنمای TLS](docs/PREDEPLOY-RUNBOOK-2026-10-23.fa.md)، [گزارش ۲۰ سناریو و ۱۲ مسیر با گیت شواهد](docs/release-evidence-template.json)، [دستور کنترل شواهد](scripts/check_release_evidence.py)، [بنچمارک ۵۰ پرس‌وجوی بدون برچسب](scripts/retrieval_benchmark.py)، و [متن ضبط ویدئو](docs/FINAL-DEMO-RECORDING.fa.md). هیچ‌کدام به‌تنهایی نشانه انتشار عمومی یا تکمیل آزمون انسانی نیستند.
