@@ -303,6 +303,61 @@ class ContextualMissionApiTests(TestCase):
         mission = PurchaseMission.objects.get(pk=self.mission_id)
         self.assertFalse((mission.state or {}).get("candidate_product_ids"))
 
+    def test_clarification_survives_social_turn_and_resumes_budget_search(self):
+        mission = PurchaseMission.objects.get(pk=self.mission_id)
+        old_query = mission.state["search_query"]
+        old_constraints = dict(mission.constraints)
+        with patch("apps.missions.views.extract_intent") as model:
+            first = self.turn("من یه لپ برای عروسی میخوام")
+            mission.refresh_from_db()
+            self.assertEqual(mission.state["pending_dialogue"]["slot"], "product_kind")
+            self.assertEqual(mission.state["search_query"], old_query)
+            self.assertEqual(mission.constraints, old_constraints)
+            self.assertNotIn("ui.component", [e["type"] for e in first])
+
+            self.turn("مرسی")
+            mission.refresh_from_db()
+            self.assertEqual(mission.state["pending_dialogue"]["slot"], "product_kind")
+
+            second = self.turn("منظورم لپ تاپ است")
+            self.assertIn("پخش", second[1]["payload"]["text"])
+            mission.refresh_from_db()
+            self.assertEqual(mission.state["pending_dialogue"]["slot"], "laptop_usage")
+
+            self.turn("برای تدوین فیلم عروسی")
+            mission.refresh_from_db()
+            self.assertEqual(mission.state["pending_dialogue"]["slot"], "laptop_budget")
+            final = self.turn("بودجه تا ۴۰ میلیون")
+            model.assert_not_called()
+        mission.refresh_from_db()
+        self.assertNotIn("pending_dialogue", mission.state)
+        self.assertEqual(mission.constraints["max_price_toman"], "40000000")
+        self.assertEqual(mission.state["search_query"], "لپ تاپ")
+        self.assertEqual(final[-1]["payload"]["intent_parser"], "contextual")
+
+    def test_new_explicit_product_goal_cancels_previous_clarification(self):
+        self.turn("یه لپ برای عروسی میخوام")
+        mission = PurchaseMission.objects.get(pk=self.mission_id)
+        self.assertEqual(mission.state["pending_dialogue"]["slot"], "product_kind")
+        self.turn("هدفون میخوام")
+        mission.refresh_from_db()
+        self.assertNotIn("pending_dialogue", mission.state)
+        self.assertIn("هدفون", mission.state["search_query"])
+
+    def test_laptop_spec_question_does_not_touch_results_or_boxapi(self):
+        mission = PurchaseMission.objects.get(pk=self.mission_id)
+        old_state = mission.state.copy()
+        with patch("apps.missions.views.extract_intent") as model, patch(
+            "apps.missions.views.run_purchase_graph"
+        ) as graph:
+            events = self.turn("برای خرید لپ تاپ چه پردازنده ای باید داشته باشم؟")
+            model.assert_not_called()
+            graph.assert_not_called()
+        mission.refresh_from_db()
+        self.assertEqual(mission.state, old_state)
+        self.assertNotIn("ui.component", [e["type"] for e in events])
+        self.assertIn("کاربرد", events[1]["payload"]["text"])
+
     def test_product_reference_keeps_previous_results_and_does_not_search(self):
         mission = PurchaseMission.objects.get(pk=self.mission_id)
         visible = mission.state["visible_product_ids"]
