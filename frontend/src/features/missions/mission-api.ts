@@ -4,6 +4,8 @@ export interface MissionConstraints {
   city?: 'tehran'
   max_price_toman?: string | null
   must_have_in_person_credit?: boolean
+  brand_name?: string | null
+  model_exact?: string | null
   lat?: number
   lon?: number
   radius_m?: number
