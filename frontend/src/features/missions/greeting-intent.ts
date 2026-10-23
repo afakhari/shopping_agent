@@ -7,6 +7,7 @@ function normalizeConversationalText(input: string): string {
   return input
     .normalize('NFKC')
     .replace(/[\u200c\u200d]/g, ' ')
+    .replace(/[\u064b-\u065f\u0670]/g, '')
     .replace(/[يى]/g, 'ی')
     .replace(/ك/g, 'ک')
     .replace(/[!؟?.,،؛:؛\s]+/gu, ' ')
@@ -18,7 +19,26 @@ const greetings = new Set([
   'سلام', 'درود', 'سلام علیکم', 'سلام خوبی', 'سلام خوبی چطوری',
   'سلام چطوری', 'سلام وقت بخیر', 'سلام وقتتون بخیر',
   'صبح بخیر', 'عصر بخیر', 'شب بخیر', 'خوبی', 'چطوری',
-  'چطوری خوبی', 'حالت چطوره', 'چه خبر', 'hi', 'hello', 'hey',
+  'چطوری خوبی', 'حالت چطوره', 'چه خبر', 'چه خبرا', 'احوال شما',
+  'احوالتون چطوره', 'احوالتان چطوره', 'احوال شریف', 'احوالات چطوره',
+  'حال شما چطوره', 'حال شما چگونه است', 'حالت چطوره', 'حالتون چطوره',
+  'حالتون خوبه', 'حالت خوبه', 'خوب هستید', 'خوبین', 'چطورید',
+  'چطورین', 'شما چطورید', 'شما خوبید', 'سلام حال شما چطوره',
+  'سلام احوال شما', 'سلام حالتون چطوره', 'سلام چه خبر',
+  'hi', 'hello', 'hey',
+])
+// Use a bounded, full-message vocabulary, never partial substrings.
+const socialTokens = new Set([
+  'سلام', 'درود', 'حال', 'حالت', 'حالتون', 'حالتان', 'احوال',
+  'احوالتون', 'احوالتان', 'احوالات', 'شما', 'خودتون',
+  'چطوره', 'چطور', 'چطورید', 'چطورین', 'چطوری', 'چگونه',
+  'هستید', 'هستین', 'هستی', 'خوب', 'خوبه', 'خوبین', 'خوبید',
+  'خوبی', 'است', 'چه', 'خبر', 'خبرا', 'روز', 'امروز', 'تون',
+  'تان', 'همه', 'چی', 'روبه', 'راه', 'و', 'بخیر', 'عزیز',
+])
+const greetingSignals = new Set([
+  'سلام', 'درود', 'حال', 'حالت', 'حالتون', 'حالتان', 'احوال',
+  'احوالتون', 'احوالتان', 'احوالات', 'چطورید', 'چطورین', 'چطوری', 'خوبی',
 ])
 const helpRequests = new Set([
   'راهنما', 'کمک', 'روش استفاده', 'چطور ازت استفاده کنم',
@@ -35,6 +55,9 @@ export function classifyLocalConversation(message: string): LocalConversationInt
   if (message.length > 200) return null
   const value = normalizeConversationalText(message)
   if (greetings.has(value)) return 'greeting'
+  const tokens = value.split(' ')
+  if (tokens.length <= 8 && tokens.every((token) => socialTokens.has(token))
+    && tokens.some((token) => greetingSignals.has(token))) return 'greeting'
   if (helpRequests.has(value)) return 'help'
   if (thanks.has(value)) return 'thanks'
   if (goodbyes.has(value)) return 'goodbye'
@@ -47,4 +70,15 @@ export function isGreetingOnly(message: string): boolean {
 
 export function isAssistantHelpRequest(message: string): boolean {
   return classifyLocalConversation(message) === 'help'
+}
+
+/** Shared by live chat and presentation repair of events saved by older versions. */
+export function localConversationReply(intent: LocalConversationIntent): string {
+  const replies: Record<LocalConversationIntent, string> = {
+    greeting: 'سلام! خوش اومدی. 🌱 دنبال چه محصولی هستی؟ می‌تونی مدل، کاربرد یا حدود بودجه رو بگی تا فروشگاه‌های تهران رو بررسی کنیم.',
+    help: 'برای شروع نام یا کاربرد محصول را بنویس؛ مثلاً «هدفون بی‌سیم تا ۳ میلیون تومان». بعد می‌توانی مدل‌ها را مقایسه کنی، فروشگاه‌های تهران را ببینی و استعلام نمایشی انجام بدهی. بودجه، اعتبار و محدوده را هم خودت تنظیم می‌کنی.',
+    thanks: 'خواهش می‌کنم! هر زمان محصول دیگری خواستی یا خواستی شروط خرید را تغییر بدهی، همین‌جا بنویس.',
+    goodbye: 'خداحافظ! نتیجه‌های ثبت‌شده مأموریت را می‌توانی بعداً هم بررسی کنی.',
+  }
+  return replies[intent]
 }
