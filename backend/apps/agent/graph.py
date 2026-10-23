@@ -172,6 +172,11 @@ def parse_request_node(state: MissionGraphState) -> dict[str, Any]:
         "sort": constraints.get("sort", "relevance"),
         "page": 1,
         "page_size": 12,
+        # Only validated, server-owned usage profiles may affect ranking.
+        "usage_profile": (
+            llm_intent.get("usage_profile") if llm_intent
+            and llm_intent.get("usage_profile") == "video_editing" else None
+        ),
     }
     return {
         "constraints": constraints,
