@@ -174,7 +174,7 @@ export async function sendMissionTurn(
           && Boolean(event.payload.text.trim())) gotAssistantMessage = true
         if (event.type === 'turn.completed') {
           gotCompletion = true
-          if (event.payload.intent_parser === 'local_conversation') {
+          if (event.payload.intent_parser === 'local_conversation' || event.payload.intent_parser === 'contextual') {
             gotConversationalCompletion = true
           }
         }
