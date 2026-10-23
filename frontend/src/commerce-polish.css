@@ -211,7 +211,7 @@
 .redesign-v2 .mission-product-image-fallback {
   display: flex; flex-direction: column; align-items: center;
   justify-content: center; gap: 5px;
-  color: #747980; font-size: 10px; line-height: 1.5;
+  color: #666d75; font-size: 10px; line-height: 1.5;
 }
 .redesign-v2 .conversation-results-block .mission-product-main {
   grid-column: 2; grid-row: 1; min-width: 0;
@@ -564,3 +564,7 @@
   .redesign-v2 .conversation-results-block .mission-product-card > .mission-offer-list { grid-column: 1/-1; }
   .redesign-v2 .genui-comparison-table th:first-child { min-width: 102px; max-width: 124px; }
 }
+
+/* Secondary copy remains readable against white, including small metadata. */
+.redesign-v2 .mission-offer-count { color: #626971; }
+.redesign-v2 .conversation-composer textarea::placeholder { color: #686d77; opacity: 1; }
