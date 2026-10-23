@@ -150,6 +150,7 @@ def main() -> None:
                         "اتصال مسیریابی نشان هنوز فعال نشده است", exact=False
                     ).wait_for()
                     assert page.locator(".mission-neshan-routing button").count() == 0
+                    assert page.get_by_role("button", name="محاسبه مسیر فروشنده منتخب", exact=False).count() == 0
                     assert page.locator(".mission-location-choices button").count() == 2
                     assert page.locator(".mission-location-map iframe").count() == 0
                     page.locator(".mission-location-choices button").nth(1).click()
