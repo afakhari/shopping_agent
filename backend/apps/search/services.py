@@ -17,10 +17,11 @@ from django.db.models import (
     Exists,
     Q,
     Subquery,
+    TextField,
     Value,
     When,
 )
-from django.db.models.functions import ASin, Cos, Least, Power, Radians, Sin, Sqrt
+from django.db.models.functions import ASin, Cast, Cos, Least, Power, Radians, Sin, Sqrt
 from django.utils import timezone
 
 from apps.catalog.models import Offer, Product, Shop
@@ -195,6 +196,22 @@ def product_search_page(filters: dict[str, Any]) -> dict[str, Any]:
     products = Product.objects.filter(_product_match_query(normalized_query))
     if category_scope is not None:
         products = products.filter(category_scope.query)
+    is_editing = (
+        filters.get("usage_profile") == "video_editing"
+        and category_scope is not None and category_scope.key == "laptop_computer"
+    )
+    if is_editing:
+        # Source-declared usage is soft evidence, not a guarantee of suitability.
+        # Only laptops surviving their category and offer eligibility can rank.
+        products = products.annotate(specs_as_text=Cast("specs", TextField()))
+        products = products.annotate(
+            usecase_score=Case(
+                When(specs_as_text__icontains="تدوین", then=Value(100)),
+                When(specs_as_text__icontains="مالتی مدیا", then=Value(20)),
+                default=Value(0),
+                output_field=IntegerField(),
+            )
+        )
     # One Boolean semi-join per candidate product. Unlike joining Offer plus
     # DISTINCT, this cannot duplicate product rows and can use the offer
     # product_id index to stop at the first eligible offer.
@@ -234,6 +251,11 @@ def product_search_page(filters: dict[str, Any]) -> dict[str, Any]:
         products = products.order_by(
             F("best_offer_changed_at").desc(nulls_last=True), "-relevance_score", "source_id"
         )
+    elif is_editing:
+        products = products.order_by(
+            "-usecase_score", "-relevance_score",
+            F("best_offer_price_toman").asc(nulls_last=True), "source_id",
+        )
     else:
         products = products.order_by(
             "-relevance_score", F("best_offer_price_toman").asc(nulls_last=True), "source_id"
@@ -268,7 +290,17 @@ def product_search_page(filters: dict[str, Any]) -> dict[str, Any]:
                 "product": serialize_product(product),
                 "best_offer": serialize_offer(offer, shop_distance),
                 "eligible_offers_count": counts.get(product.source_id, 0),
-                "reasons": _reasons(filters, category_scope),
+                "reasons": (
+                    _reasons(filters, category_scope)
+                    + (
+                        ["در مشخصات ثبت‌شده، کاربری تدوین ذکر شده است؛ عملکرد واقعی تضمین نشده"]
+                        if product.usecase_score >= 100 else
+                        ["در مشخصات ثبت‌شده، کاربری چندرسانه‌ای ذکر شده؛ تناسب تدوین نیاز به بررسی دارد"]
+                        if product.usecase_score > 0 else
+                        ["مناسب‌بودن برای تدوین از مشخصات موجود تأیید نشده است"]
+                    )
+                    if is_editing else _reasons(filters, category_scope)
+                ),
             }
         )
     return {
