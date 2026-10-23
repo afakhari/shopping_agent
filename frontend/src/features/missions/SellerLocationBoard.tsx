@@ -47,6 +47,8 @@ export function SellerLocationBoard({
   const [capabilityError, setCapabilityError] = useState<{missionId: string; text: string} | null>(null)
   const [routeMode, setRouteMode] = useState<'car' | 'motorcycle'>('car')
   const [routeBusy, setRouteBusy] = useState(false)
+  const [directionBusy, setDirectionBusy] = useState(false)
+  const [directionResult, setDirectionResult] = useState<{scope: string; data: RouteEstimateResponse} | null>(null)
   const [routeResult, setRouteResult] = useState<{scope: string; data: RouteEstimateResponse} | null>(null)
   const [routeError, setRouteError] = useState<{scope: string; message: string} | null>(null)
   const mapped = geographicallyMappedOffers(offers)
@@ -72,6 +74,8 @@ export function SellerLocationBoard({
   })
   const visibleRouteResult = currentRouteEvidence(routeResult, routeScope, disabled)?.data ?? null
   const visibleRouteError = currentRouteEvidence(routeError, routeScope, disabled)?.message ?? null
+  const directionScope = routeScope + ':' + (selectedOfferId ?? '')
+  const visibleDirection = currentRouteEvidence(directionResult, directionScope, disabled)?.data ?? null
 
   const checkRouting = (opened: boolean, force = false) => {
     if (!opened || disabled || !resultSetId || (!force && routingChecked) || !missionId) return
@@ -102,6 +106,30 @@ export function SellerLocationBoard({
         message: error instanceof Error ? error.message : 'دریافت زمان سفر ممکن نشد.'})
     } finally {
       setRouteBusy(false)
+    }
+  }
+
+  const calculateOneRoute = async () => {
+    if (!activeCapability?.direction_enabled || !origin || !resultSetId
+      || !active || disabled || directionBusy || routeBusy) return
+    setDirectionBusy(true)
+    setDirectionResult(null)
+    const requestedScope = directionScope
+    try {
+      const data = await requestRouteEstimates(missionId, {
+        result_set_id: resultSetId,
+        origin: { ...origin, source: 'manual_region' },
+        offer_ids: [active.id], mode: routeMode, service: 'direction',
+      })
+      setDirectionResult({scope: requestedScope, data})
+    } catch {
+      setDirectionResult({scope: requestedScope, data: {
+        provider: 'neshan', mode: routeMode, status: 'unavailable',
+        estimates: [], availability_verified: false,
+        source: 'provider_route_estimate',
+      }})
+    } finally {
+      setDirectionBusy(false)
     }
   }
 
@@ -197,7 +225,7 @@ export function SellerLocationBoard({
           {activeCapability?.enabled && origin && <div className="mission-route-actions">
             <label>نوع سفر
               <select value={routeMode} disabled={disabled || routeBusy}
-                onChange={(event) => { setRouteMode(event.target.value as 'car' | 'motorcycle'); setRouteResult(null) }}>
+                onChange={(event) => { setRouteMode(event.target.value as 'car' | 'motorcycle'); setRouteResult(null); setDirectionResult(null) }}>
                 <option value="car">خودرو</option>
                 <option value="motorcycle">موتورسیکلت</option>
               </select>
@@ -207,6 +235,24 @@ export function SellerLocationBoard({
               {routeBusy ? 'در حال دریافت از نشان…' : 'محاسبه زمان سفر (درخواست به نشان)'}
             </button>
           </div>}
+          {activeCapability?.direction_enabled && origin && <div className="mission-route-actions">
+            <button type="button"
+              disabled={disabled || routeBusy || directionBusy || !active || !resultSetId}
+              onClick={() => { void calculateOneRoute() }}>
+              {directionBusy ? 'در حال دریافت مسیر…' : 'محاسبه مسیر فروشنده منتخب (درخواست جداگانه)'}
+            </button>
+            <small>این اقدام یک فراخوانی پولی مجزا دارد. قبل از حرکت، نام و نشانی فروشگاه را مستقل بررسی کن.</small>
+          </div>}
+          {visibleDirection?.status === 'unavailable' && <p role="status">
+            مسیر این فروشنده از نشان دریافت نشد؛ مدت سفر اعلام نمی‌شود.
+          </p>}
+          {visibleDirection?.status === 'ok' && visibleDirection.route?.offer_id === selectedOfferId &&
+            <div className="mission-route-results" role="status">
+              <strong>مسیر پیشنهادی نشان برای فروشنده انتخاب‌شده</strong>
+              <p>{numerals.format(Math.ceil(visibleDirection.route.duration_seconds / 60))} دقیقه،
+                {numerals.format(visibleDirection.route.route_distance_meters)} متر مسیر با {routeMode === 'car' ? 'خودرو' : 'موتورسیکلت'}</p>
+              <small>این زمان تخمینی است، نه زمان رسیدن قطعی یا تأیید هویت و موجودی فروشگاه. نمایش خطوط مسیر داخل نقشه پس از فعال‌سازی کلید Web SDK امکان‌پذیر خواهد شد.</small>
+            </div>}
           {visibleRouteError && <p role="status">{visibleRouteError} هیچ زمان فرضی نمایش داده نمی‌شود.</p>}
           {visibleRouteResult?.status === 'unavailable' && <p role="status">
             مسیریابی در حال حاضر در دسترس نیست؛ زمان سفر قابل اعتماد نداریم.
